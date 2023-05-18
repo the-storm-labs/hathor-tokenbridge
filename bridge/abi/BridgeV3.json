@@ -144,10 +144,10 @@
         "type": "address"
       },
       {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_to",
-        "type": "address"
+        "indexed": false,
+        "internalType": "string",
+        "name": "hathorTo",
+        "type": "string"
       },
       {
         "indexed": false,
@@ -715,9 +715,9 @@
   {
     "inputs": [
       {
-        "internalType": "address",
+        "internalType": "string",
         "name": "to",
-        "type": "address"
+        "type": "string"
       }
     ],
     "name": "depositTo",
@@ -1082,9 +1082,9 @@
         "type": "address"
       },
       {
-        "internalType": "address",
-        "name": "to",
-        "type": "address"
+        "internalType": "string",
+        "name": "hathorTo",
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -1193,44 +1193,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "operator",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "from",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "to",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "userData",
-        "type": "bytes"
-      },
-      {
-        "internalType": "bytes",
-        "name": "",
-        "type": "bytes"
-      }
-    ],
-    "name": "tokensReceived",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

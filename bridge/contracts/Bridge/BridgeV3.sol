@@ -11,7 +11,6 @@ import "../zeppelin/upgradable/lifecycle/UpgradablePausable.sol";
 import "../zeppelin/upgradable/ownership/UpgradableOwnable.sol";
 
 import "../zeppelin/introspection/IERC1820Registry.sol";
-import "../zeppelin/token/ERC777/IERC777Recipient.sol";
 import "../zeppelin/token/ERC20/IERC20.sol";
 import "../zeppelin/token/ERC20/SafeERC20.sol";
 import "../zeppelin/utils/Address.sol";
@@ -28,7 +27,7 @@ import "../interface/IAllowTokens.sol";
 import "../interface/IWrapped.sol";
 
 
-contract BridgeV3 is Initializable, IBridgeV3, IERC777Recipient, UpgradablePausable, UpgradableOwnable, ReentrancyGuard {
+contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwnable, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -359,46 +358,24 @@ contract BridgeV3 is Initializable, IBridgeV3, IERC777Recipient, UpgradablePausa
      * ERC-20 tokens approve and transferFrom pattern
      * See https://eips.ethereum.org/EIPS/eip-20#transferfrom
      */
-    function receiveTokensTo(address tokenToUse, address to, uint256 amount) override public {
+    function receiveTokensTo(address tokenToUse, string memory hathorTo, uint256 amount) override public {
         address sender = _msgSender();
         //Transfer the tokens on IERC20, they should be already Approved for the bridge Address to use them
         IERC20(tokenToUse).safeTransferFrom(sender, address(this), amount);
-        crossTokens(tokenToUse, sender, to, amount, "");
+        crossTokens(tokenToUse, sender, hathorTo, amount, "");
     }
 
     /**
      * Use network currency and cross it.
      */
-    function depositTo(address to) override external payable {
+    function depositTo(string memory to) override external payable {
         address sender = _msgSender();
         require(address(wrappedCurrency) != NULL_ADDRESS, "Bridge: wrappedCurrency empty");
         wrappedCurrency.deposit{ value: msg.value }();
         crossTokens(address(wrappedCurrency), sender, to, msg.value, "");
     }
 
-    /**
-     * ERC-777 tokensReceived hook allows to send tokens to a contract and notify it in a single transaction
-     * See https://eips.ethereum.org/EIPS/eip-777#motivation for details
-     */
-    function tokensReceived (
-        address operator,
-        address from,
-        address to,
-        uint amount,
-        bytes calldata userData,
-        bytes calldata
-    ) external override(IBridgeV3, IERC777Recipient){
-        //Hook from ERC777address
-        if(operator == address(this)) return; // Avoid loop from bridge calling to ERC77transferFrom
-        require(to == address(this), "Bridge: Not to this address");
-        address tokenToUse = _msgSender();
-        require(erc1820.getInterfaceImplementer(tokenToUse, _erc777Interface) != NULL_ADDRESS, "Bridge: Not ERC777 token");
-        require(userData.length != 0 || !from.isContract(), "Bridge: Specify receiver address in data");
-        address receiver = userData.length == 0 ? from : LibUtils.bytesToAddress(userData);
-        crossTokens(tokenToUse, from, receiver, amount, userData);
-    }
-
-    function crossTokens(address tokenToUse, address from, address to, uint256 amount, bytes memory userData)
+    function crossTokens(address tokenToUse, address from, string memory hathorTo, uint256 amount, bytes memory userData)
     internal whenNotUpgrading whenNotPaused nonReentrant {
         knownTokens[tokenToUse] = true;
         uint256 fee = amount.mul(feePercentage).div(feePercentageDivider);
@@ -425,7 +402,7 @@ contract BridgeV3 is Initializable, IBridgeV3, IERC777Recipient, UpgradablePausa
         emit Cross(
             originalTokenAddress,
             from,
-            to,
+            hathorTo,
             amountMinusFees,
             userData
         );
