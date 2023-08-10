@@ -358,7 +358,7 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
      * ERC-20 tokens approve and transferFrom pattern
      * See https://eips.ethereum.org/EIPS/eip-20#transferfrom
      */
-    function receiveTokensTo(address tokenToUse, string memory hathorTo, uint256 amount) override public {
+    function receiveTokensTo(address tokenToUse, bytes32 hathorTo, uint256 amount) override public {
         address sender = _msgSender();
         //Transfer the tokens on IERC20, they should be already Approved for the bridge Address to use them
         IERC20(tokenToUse).safeTransferFrom(sender, address(this), amount);
@@ -368,14 +368,14 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
     /**
      * Use network currency and cross it.
      */
-    function depositTo(string memory to) override external payable {
+    function depositTo(bytes32 to) override external payable {
         address sender = _msgSender();
         require(address(wrappedCurrency) != NULL_ADDRESS, "Bridge: wrappedCurrency empty");
         wrappedCurrency.deposit{ value: msg.value }();
         crossTokens(address(wrappedCurrency), sender, to, msg.value, "");
     }
 
-    function crossTokens(address tokenToUse, address from, string memory hathorTo, uint256 amount, bytes memory userData)
+    function crossTokens(address tokenToUse, address from, bytes32 hathorTo, uint256 amount, bytes memory userData)
     internal whenNotUpgrading whenNotPaused nonReentrant {
         knownTokens[tokenToUse] = true;
         uint256 fee = amount.mul(feePercentage).div(feePercentageDivider);
@@ -477,4 +477,7 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
         return claimed[transactionsDataHashes[transactionHash]];
     }
 
+    function bytesToAddress (bytes32 data) public pure  returns (address) {
+        return address(uint160(uint256(data)));
+    }
 }

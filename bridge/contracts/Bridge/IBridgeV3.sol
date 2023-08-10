@@ -20,12 +20,12 @@ interface IBridgeV3 {
      * ERC-20 tokens approve and transferFrom pattern
      * See https://eips.ethereum.org/EIPS/eip-20#transferfrom
      */
-    function receiveTokensTo(address tokenToUse, string memory hathorTo, uint256 amount) external;
+    function receiveTokensTo(address tokenToUse, bytes32 hathorTo, uint256 amount) external;
 
     /**
      * Use network currency and cross it.
      */
-    function depositTo(string memory hathorTo) external payable;
+    function depositTo(bytes32 hathorTo) external payable;
 
     /**
      * Accepts the transaction from the other chain that was voted and sent by the Federation contract
@@ -68,7 +68,7 @@ interface IBridgeV3 {
     event Cross(
         address indexed _tokenAddress,
         address indexed _from,
-        string hathorTo,
+        bytes32 hathorTo,
         uint256 _amount,
         bytes _userData
     );

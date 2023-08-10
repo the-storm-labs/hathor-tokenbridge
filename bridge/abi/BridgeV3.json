@@ -145,9 +145,9 @@
       },
       {
         "indexed": false,
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "hathorTo",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "indexed": false,
@@ -456,6 +456,25 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "data",
+        "type": "bytes32"
+      }
+    ],
+    "name": "bytesToAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "newAllowTokens",
         "type": "address"
@@ -715,9 +734,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "to",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "depositTo",
@@ -1082,9 +1101,9 @@
         "type": "address"
       },
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "hathorTo",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "internalType": "uint256",
