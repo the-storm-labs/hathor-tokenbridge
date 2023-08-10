@@ -42,6 +42,7 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
     bytes32 public DOMAIN_SEPARATOR; // replaces uint256 internal _depprecatedLastDay;
     uint256 internal _deprecatedSpentToday;
 
+    mapping (bytes32 => address) public hathorOriginalTokens; // HathorToken => ConvertedAddress
     mapping (address => address) public mappedTokens; // OirignalToken => SideToken
     mapping (address => address) public originalTokens; // SideToken => OriginalToken
     mapping (address => bool) public knownTokens; // OriginalToken => true
@@ -164,6 +165,7 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
     function createSideToken(
         uint256 _typeId,
         address _originalTokenAddress,
+        bytes32 _hathorToken,
         uint8 _originalTokenDecimals,
         string calldata _originalTokenSymbol,
         string calldata _originalTokenName
@@ -176,9 +178,11 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
 
         // Create side token
         sideToken = sideTokenFactory.createSideToken(_originalTokenName, newSymbol, granularity);
-
+        
         mappedTokens[_originalTokenAddress] = sideToken;
         originalTokens[sideToken] = _originalTokenAddress;
+        hathorOriginalTokens[_hathorToken] = _originalTokenAddress;
+
         allowTokens.setToken(sideToken, _typeId);
 
         emit NewSideToken(sideToken, _originalTokenAddress, newSymbol, granularity);
@@ -478,6 +482,7 @@ contract BridgeV3 is Initializable, IBridgeV3, UpgradablePausable, UpgradableOwn
     }
 
     function bytesToAddress (bytes32 data) public pure  returns (address) {
-        return address(uint160(uint256(data)));
+        bytes32 hash = keccak256(abi.encodePacked(data));
+        return address(uint160(bytes20(hash)));
     }
 }

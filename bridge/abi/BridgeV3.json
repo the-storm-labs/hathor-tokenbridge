@@ -711,6 +711,11 @@
         "type": "address"
       },
       {
+        "internalType": "bytes32",
+        "name": "_hathorToken",
+        "type": "bytes32"
+      },
+      {
         "internalType": "uint8",
         "name": "_originalTokenDecimals",
         "type": "uint8"
@@ -855,6 +860,25 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "hathorOriginalTokens",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
