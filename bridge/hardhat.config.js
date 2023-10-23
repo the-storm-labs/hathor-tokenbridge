@@ -139,7 +139,7 @@ module.exports = {
       tags: ['staging'],
     },
     sepolia: {
-      live: true,
+      live: false,
       url: 'https://sepolia.infura.io/v3/' + INFURA_PROJECT_ID,
       network_id: chains.SEPOLIA_TEST_NET_CHAIN_ID,
       token_symbol: 'e',

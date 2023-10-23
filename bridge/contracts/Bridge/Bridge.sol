@@ -518,21 +518,21 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		* ERC-20 tokens approve and transferFrom pattern
 		* See https://eips.ethereum.org/EIPS/eip-20#transferfrom
 		*/
-	function receiveTokensTo(uint256 destinationChainId, address tokenToUse, address to, uint256 amount) external override {
+	function receiveTokensTo(uint256 destinationChainId, address tokenToUse, string memory hathorTo, uint256 amount) external override {
 		address sender = _msgSender();
 		//Transfer the tokens on IERC20, they should be already Approved for the bridge Address to use them
 		IERC20(tokenToUse).safeTransferFrom(sender, address(this), amount);
-		crossTokens(tokenToUse, sender, to, amount, "", destinationChainId);
+		crossTokens(tokenToUse, sender, hathorTo, amount, "", destinationChainId);
 	}
 
 	/**
 		* Use network currency and cross it.
 		*/
-	function depositTo(uint256 chainId, address to) external payable override {
+	function depositTo(uint256 chainId, string memory hathorTo) external payable override {
 		address sender = _msgSender();
 		require(address(wrappedCurrency) != NULL_ADDRESS, "Bridge: wrappedCurrency empty");
 		wrappedCurrency.deposit{ value: msg.value }();
-		crossTokens(address(wrappedCurrency), sender, to, msg.value, "", chainId);
+		crossTokens(address(wrappedCurrency), sender, hathorTo, msg.value, "", chainId);
 	}
 
 	/**
@@ -563,13 +563,14 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		require(userData.length == 64 || !from.isContract(), "Bridge: Specify receiver address in data");
 		address receiver = userData.length == 32 ? from : LibUtils.toAddress(userData, 12);
 		uint256 destinationChainId = LibUtils.toUint256(userData, userData.length - 32);
-		crossTokens(tokenToUse, from, receiver, amount, userData, destinationChainId);
+		string memory hathorTo = "undefined";
+		crossTokens(tokenToUse, from, hathorTo, amount, userData, destinationChainId);
 	}
 
 	function crossTokens(
 		address tokenToUse,
 		address from,
-		address to,
+		string memory hathorTo,
 		uint256 amount,
 		bytes memory userData,
 		uint256 destinationChainId
@@ -600,7 +601,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 			}
 			emit Cross(
 				sideToken.tokenAddress,
-				to,
+				hathorTo,
 				destinationChainId,
 				from,
 				block.chainid,
@@ -610,7 +611,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		} else {
 			emit Cross(
 				tokenToUse,
-				to,
+				hathorTo,
 				destinationChainId,
 				from,
 				block.chainid,
