@@ -48,7 +48,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	mapping (address => address) public deprecatedMappedTokens; // OriginalToken => SideToken
 	mapping (address => address) public deprecatedOriginalTokens; // SideToken => OriginalToken
 	mapping (address => bool) public deprecatedKnownTokens; // OriginalToken => true
-
+	
 	// claimed can use the same of bytes32
 	mapping (bytes32 => bool) public claimed; // transactionDataHash => true // previously named processed
 
@@ -73,12 +73,14 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	mapping (uint256 => mapping(address => address)) public sideTokenByOriginalTokenByChain; // chainId => OriginalToken Address => SideToken Address
 	mapping (address => OriginalToken) public originalTokenBySideToken; // SideTokenAddress => struct {}
 	mapping (uint256 => mapping(address => bool)) public knownTokenByChain; // chainId => OriginalToken Address => Know
+	mapping (address => string) public hathorTokenMap;
 
 	event AllowTokensChanged(address _newAllowTokens);
 	event FederationChanged(address _newFederation);
 	event SideTokenFactoryChanged(address _newSideTokenFactory);
 	event Upgrading(bool _isUpgrading);
 	event WrappedCurrencyChanged(address _wrappedCurrency);
+	event HathorTokenMapped(address token, string uid);
 
 	function initialize(
 		address _manager,
@@ -698,6 +700,16 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 
 	function hasBeenClaimed(bytes32 transactionHash) public view returns (bool) {
 		return claimed[transactionsDataHashes[transactionHash]];
+	}
+
+	function uidToAddress (string calldata uid) public pure  returns (address) {
+        bytes32 hash = keccak256(abi.encodePacked(uid));
+        return address(uint160(bytes20(hash)));
+    }
+
+	function addHathorToken(address token, string memory uid) public onlyOwner {
+		hathorTokenMap[token] = uid;
+		emit HathorTokenMapped(token, uid);
 	}
 
 }
