@@ -1,7 +1,7 @@
 import { Config } from './lib/config';
 import * as utils from './lib/utils';
 import Scheduler from './services/Scheduler';
-import Federator from './lib/FederatorERC';
+import Federator from './lib/FederatorHTR';
 import Heartbeat from './lib/Heartbeat';
 import { MetricCollector } from './lib/MetricCollector';
 import { Endpoint } from './lib/Endpoints';
@@ -15,6 +15,7 @@ import {
   LOGGER_CATEGORY_HEARTBEAT,
   LOGGER_CATEGORY_ENDPOINT,
 } from './lib/logs';
+import { HathorWallet } from './lib/HathorWallet';
 
 export class Main {
   logger: LogWrapper;
@@ -51,20 +52,21 @@ export class Main {
   }
 
   async start() {
-    this.scheduleFederatorProcesses();
+    this.listenToHathorTransactions();
+    // this.scheduleFederatorProcesses();
     // TODO uncoment this after tests
-    this.scheduleHeartbeatProcesses();
+    // this.scheduleHeartbeatProcesses();
   }
 
   async runFederator() {
     try {
       // TODO uncoment this after tests
-      await this.heartbeat.readLogs();
+      // await this.heartbeat.readLogs();
       await this.runErcRskFederator();
 
-      for (const sideChainConfig of this.config.sidechain) {
-        await this.runErcOtherChainFederator(sideChainConfig);
-      }
+      // for (const sideChainConfig of this.config.sidechain) {
+      //   await this.runErcOtherChainFederator(sideChainConfig);
+      // }
     } catch (err) {
       this.logger.error('Unhandled Error on main.run()', err);
       process.exit(1);
@@ -89,6 +91,11 @@ export class Main {
 
     this.logger.info('Side Host', sideChainConfig.host);
     await sideFederator.runAll();
+  }
+
+  async listenToHathorTransactions() {
+    const wallet = new HathorWallet(this.config, this.logger);
+    wallet.listenToEventQueue();
   }
 
   async scheduleFederatorProcesses() {
@@ -120,7 +127,7 @@ export class Main {
         try {
           const result = await this.heartbeat.run();
           if (!result) {
-            this.logger.warn("Heartbeat run run was not successful.")
+            this.logger.warn('Heartbeat run run was not successful.');
           }
         } catch (err) {
           this.logger.error('Unhandled Error on runHeartbeat()', err);
