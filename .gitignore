@@ -11,4 +11,4 @@ federator.log
 
 federator/built
 
-**/package-lock.json
+federator/package-lock.json

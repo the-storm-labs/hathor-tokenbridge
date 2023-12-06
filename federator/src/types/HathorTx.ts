@@ -1,33 +1,15 @@
-import { Utxo } from './HathorUtxo';
+import { HathorUtxo } from './HathorUtxo';
 
 export class HathorTx {
   tx_id: string;
-  version: number;
-  weight: number;
-  timestamp: Date;
-  is_voided: boolean;
-  inputs: input[];
-  outputs: Utxo[];
+  timestamp: number;
+  outputs: HathorUtxo[];
   parents: string[];
 
-  constructor(
-    id: string,
-    version: number,
-    weight: number,
-    timestamp: Date,
-    is_voided: boolean,
-    inputs: input[],
-    outputs: Utxo[],
-    parents: string[],
-  ) {
+  constructor(id: string, timestamp: number, outputs: HathorUtxo[]) {
     this.tx_id = id;
-    this.version = version;
-    this.weight = weight;
     this.timestamp = timestamp;
-    this.is_voided = is_voided;
-    this.inputs = inputs;
     this.outputs = outputs;
-    this.parents = parents;
   }
 
   haveCustomData(dataType: string = null): boolean {
@@ -48,16 +30,5 @@ export class HathorTx {
     return customData;
   }
 }
-
-export class data extends HathorTx {
-  address: string;
-  history: HathorTx;
-  type: string; //can be a enum?
-}
-
-export type input = Utxo & {
-  tx_id: string;
-  index: number;
-};
 
 export default HathorTx;

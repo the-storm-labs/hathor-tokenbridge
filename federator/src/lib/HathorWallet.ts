@@ -5,22 +5,26 @@ import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
 import { MetricCollector } from './MetricCollector';
 import { PubSub } from '@google-cloud/pubsub';
-import { hathorEvent, eventType } from '../types/hathorEvent';
-import HathorData from './HathorData';
-import { tx } from '../types/HathorTx';
+import { HathorTx } from '../types/HathorTx';
+import { HathorUtxo } from '../types/HathorUtxo';
+import { Data } from '../types/hathorEvent';
+import { HathorException } from '../types/HathorException';
 
-axiosCurlirize(axios);
+// axiosCurlirize(axios);
 
 type Response = {
   success: boolean;
-  message: string;
-  errorCode: string;
+  message?: string;
+  error?: string;
+  errorCode?: string;
 };
 type CreateProposalResponse = Response & { txHex: string };
 type GetAddressResponse = Response & { address: string };
 type GetMySignatureResponse = Response & { signatures: string };
 type StatusResponse = Response & { statusCode: number; statusMessage: string };
-type DecodeResponse = Response & { tx: tx };
+type DecodeResponse = Response & { tx: Data };
+
+type ProposalComponents = { hex: string; signatures: string[] };
 
 export class HathorWallet {
   public logger: LogWrapper;
@@ -39,6 +43,7 @@ export class HathorWallet {
   private WALLET_STATUS_CONNECTING = 1;
   private WALLET_STATUS_SYNCING = 2;
   private WALLET_STATUS_READY = 3;
+  private nonRetriableErrors = ['Invalid transaction. At least one of your inputs has already been spent.'];
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor(config: ConfigData, logger: LogWrapper) {
@@ -100,12 +105,23 @@ export class HathorWallet {
     );
 
     if (subscription) {
-      subscription.on('message', (message) => {
-        // this.logger.info(`Evento puro: ${message.data.toString()}`);
-        this.parseHathorLogs(JSON.parse(message.data.toString()));
-        // TODO retry policy if fails to parse and resolve
-        // with this message.nack();
-        message.ack();
+      subscription.on('message', async (message) => {
+        try {
+          // this.logger.info(`Evento puro: ${message.data.toString()}`);
+          await this.parseHathorLogs(JSON.parse(message.data.toString()));
+          message.ack();
+        } catch (error) {
+          // TODO retry policy if fails to parse and resolve
+          this.logger.error(`Fail to processing hathor event: ${error}`);
+          if (error instanceof HathorException) {
+            if (this.nonRetriableErrors.includes((error as HathorException).getOriginalMessage())) {
+              message.ack();
+              return;
+            }
+          }
+
+          message.nack();
+        }
       });
       subscription.on('error', (error) => {
         this.logger.error(
@@ -117,25 +133,28 @@ export class HathorWallet {
     }
   }
 
-  private async parseHathorLogs(event: hathorEvent) {
+  private async parseHathorLogs(event: any) {
     if (event.type !== 'wallet:new-tx') return;
 
     // this.logger.info(JSON.stringify(event));
-    const hathorData = new HathorData();
+    const utxos = event.data.outputs.map((o) => new HathorUtxo(o.script));
+    const tx = new HathorTx(event.data.tx_id, event.data.timestamp, utxos);
     // TODO: if tx proposal to send to hathor, collect signature, and if last one, get others and sign and push
-    const isProposal = hathorData.hasTxData(event.data as tx, 'hex');
+    const isProposal = tx.haveCustomData('hex');
 
     if (isProposal) {
-      this.logger.info(hathorData.extractTxData(event.data as tx));
+      const txHex = tx.getCustomData();
+      this.logger.info(txHex);
       await this.isWalletReady(true);
       await this.isWalletReady(false);
-      await this.sendMySignaturesToProposal(hathorData.extractTxData(event.data as tx));
+      // await this.sendMySignaturesToProposal(txHex);
     }
 
     if (this.multisigOrder >= this.multisigRequiredSignatures) {
       //TODO: check if tx are not completed before - test if is required
-      const signatures = await this.getSignaturesToPush(hathorData, '', '');
-      await this.signAndPushProposal('txHex goes here', signatures);
+      const components = await this.getSignaturesToPush();
+      this.logger.info(components);
+      await this.signAndPushProposal(components.hex, components.signatures);
     }
 
     // TODO: if tokens sent to evm melt and send event to federator here
@@ -143,16 +162,22 @@ export class HathorWallet {
 
   // Functions involved in sending tokens from EVM to Hathor
 
-  private async getSignaturesToPush(hathorData: HathorData, _txHash: string): Promise<string, string[]> {
-    const history = await this.getHistory();
-    const hex: string;
-    const signatures: string[];
+  private async getSignaturesToPush(): Promise<ProposalComponents> {
+    const jsonTxs = await this.getHistory();
 
-    history.forEach((tx) => { hathorData.extractTxData(h) })
+    const txs: HathorTx[] = [];
+
+    jsonTxs.forEach((data) => {
+      const utxos = data.outputs.map((o) => new HathorUtxo(o.script));
+      const tx = new HathorTx(data.tx_id, data.timestamp, utxos);
+      txs.push(tx);
+    });
 
     //TODO filter by tx-hash
-    const txHex = history.filter((tx) => hathorData.hasTxData(tx, 'hex'))[0]
-    return history.filter((tx) => hathorData.hasTxData(tx, 'sig'));
+    const hex = txs.find((tx) => tx.haveCustomData('hex'));
+    const signatures = txs.filter((tx) => tx.haveCustomData('sig'));
+
+    return { hex: hex.getCustomData(), signatures: signatures.map((sig) => sig.getCustomData()) };
   }
 
   private async getHistory() {
@@ -166,15 +191,15 @@ export class HathorWallet {
     };
 
     try {
-      const response = await axios.get<tx[]>(url, config);
+      const response = await axios.get<Data[]>(url, config);
 
       if (response.status == 200) {
         return response.data;
       }
 
-      this.logger.error(`Unable to getHistory: ${response.status} - ${response.data}`);
+      throw Error(`${response.status} - ${response.data}`);
     } catch (error) {
-      this.logger.error(`Fail to getHistory: ${error}`);
+      throw Error(`Fail to getHistory: ${error}`);
     }
   }
 
@@ -199,9 +224,9 @@ export class HathorWallet {
       if (response.status == 200 && response.data.success) {
         return response.data.txHex;
       }
-      throw Error(`Unable to send transaction proposal: ${response.data}`);
+      throw Error(`${response.status} - ${response.statusText} - ${response.data}`);
     } catch (error) {
-      this.logger.error(`Failed to send transaction proposal: ${error}`);
+      throw Error(`Failed to send transaction proposal: ${error}`);
     }
   }
 
@@ -222,8 +247,8 @@ export class HathorWallet {
 
   private async sendMySignaturesToProposal(txHex: string) {
     // TODO Validate proposal content
-    const transaction = await this.decodeTxHex(txHex);
-    this.logger.info(transaction);
+    // const transaction = await this.decodeTxHex(txHex);
+    // this.logger.info(transaction);
     const signature = await this.getMySignatures(txHex);
     const wrappedSig = await this.wrapData('sig', signature);
     const data = {
@@ -232,7 +257,7 @@ export class HathorWallet {
     await this.broadcastDataToMultisig(data);
   }
 
-  private async decodeTxHex(txHex: string): Promise<tx> {
+  private async decodeTxHex(txHex: string): Promise<Data> {
     const url = `${this.walletUrl}/wallet/decode`;
     const config = {
       headers: {
@@ -248,9 +273,9 @@ export class HathorWallet {
         return response.data.tx;
       }
 
-      this.logger.info(`Fail to decodeTxHex: ${response.status} - ${response.data}`);
+      throw Error(`${response.status} - ${response.data}`);
     } catch (error) {
-      this.logger.error(`Error on decodeTxHex: ${error}`);
+      throw Error(`Error on decodeTxHex: ${error}`);
     }
   }
 
@@ -270,15 +295,32 @@ export class HathorWallet {
         return response.data.signatures;
       }
 
-      this.logger.error(`Unable to getMySignature: ${response.status} - ${response.data}`);
+      throw Error(`${response.status} - ${response.data}`);
     } catch (error) {
-      this.logger.error(`Fail to getMySignature: ${error}`);
+      throw Error(`Fail to getMySignature: ${error}`);
     }
   }
 
-  private async signAndPushProposal(txHex: string, signatures: string) {
-    // TODO: Sign and push
-    throw new Error('signAndPushProposal is not ready');
+  private async signAndPushProposal(txHex: string, signatures: string[]) {
+    const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/sign-and-push`;
+    const config = {
+      headers: {
+        'X-Wallet-Id': this.multisigWalletId,
+        'Content-type': 'application/json',
+      },
+    };
+
+    const data = {
+      txHex: `${txHex}`,
+      signatures: signatures,
+    };
+
+    const response = await axios.post<Response>(url, data, config);
+
+    if (response.status != 200 || !response.data.success) {
+      const fullMessage = `${response.status} - ${response.statusText} - ${JSON.stringify(response.data)}`;
+      throw new HathorException(fullMessage, response.data.error);
+    }
   }
 
   // Base functions
@@ -298,15 +340,10 @@ export class HathorWallet {
       if (response.status == 200) {
         return response.data.address;
       }
-      this.logger.error(`Fail to getMultiSigAddress: 
-        ${response.status} - 
-        ${response.statusText} | 
-        ${response.data}`);
+      throw Error(`${response.status} - ${response.statusText} | ${response.data}`);
     } catch (error) {
-      this.logger.error(`Fail to getMultiSigAddress: ${error}`);
+      throw Error(`Fail to getMultiSigAddress: ${error}`);
     }
-
-    // return 'wY5dNSAqCsmcimkgHig3CzZPjYRDyBWbjv';
   }
 
   private async wrapData(dataType: string, data: string, txId = ''): Promise<any[]> {
@@ -348,12 +385,17 @@ export class HathorWallet {
 
     try {
       const response = await axios.post<Response>(url, data, config);
-      if (response.status == 200 && response.data.success) {
-        //TODO Fix the response type
-        return true;
+
+      if (response.status != 200) {
+        throw Error(`Response status: ${response.status} - status message: ${response.statusText}`);
       }
+      if (response.status == 200 && !response.data.success) {
+        throw Error(`Error message: ${response.data.error}`);
+      }
+
+      return true;
     } catch (error) {
-      this.logger.error(`Fail to broadcast data to multisig: ${error.toJSON()}`);
+      throw Error(`Fail to broadcast data to multisig: ${error}`);
     }
   }
 
@@ -390,7 +432,7 @@ export class HathorWallet {
         return this.isWalletReady(multisig, ++retry);
       }
     } catch (error) {
-      this.logger.error(`Fail to get status of ${id} wallet: ${error}`);
+      throw Error(`Fail to get status of ${id} wallet: ${error}`);
     }
   }
 
@@ -414,7 +456,7 @@ export class HathorWallet {
       const response = await axios.post<Response>(url, data, config);
       return response.status == 200 && response.data.success;
     } catch (error) {
-      this.logger.error(`Fail to start wallet: ${error}`);
+      throw Error(`Fail to start wallet: ${error}`);
     }
   }
 

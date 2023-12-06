@@ -1,23 +1,13 @@
 import * as script from '../utils/scripts';
 
-export class Utxo {
-  value: number;
-  token_data: number;
+export class HathorUtxo {
   script: string;
-  decoded: decodedUtxo;
-  token: string;
-  spent_by?: any;
 
   customData?: CustomUtxoData;
   haveCustomData: boolean;
 
-  constructor(value: number, token_data: number, script: string, decoded: decodedUtxo, token: string, spent_by?: any) {
-    this.value = value;
-    this.token_data = token_data;
+  constructor(script: string) {
     this.script = script;
-    this.decoded = decoded;
-    this.token = token;
-    this.spent_by = spent_by;
     this.haveCustomData = false;
 
     this.decodeScript();
@@ -36,7 +26,7 @@ export class Utxo {
       this.haveCustomData = true;
     } catch (error) {
       // If false, we don't have custom data. If true, an unexpected error ocurred, so we log it
-      if (error.indexOf('Invalid output script.') == -1) {
+      if (error.toString().indexOf('Invalid output script.') == -1) {
         console.log(error);
       }
       // Nothing else to do here, let's leave
@@ -59,10 +49,4 @@ class CustomUtxoData {
   }
 }
 
-type decodedUtxo = {
-  type: string;
-  address: string;
-  timelock?: any;
-};
-
-export default Utxo;
+export default HathorUtxo;
