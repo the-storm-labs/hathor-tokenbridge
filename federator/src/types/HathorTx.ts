@@ -19,10 +19,10 @@ export class HathorTx {
     return this.outputs.some((utxo) => utxo.haveCustomData);
   }
 
-  getCustomData(): string {
+  getCustomData(dataType: string): string {
     let customData = '';
     const dataOutputs = this.outputs
-      .filter((output) => output.haveCustomData)
+      .filter((output) => output.haveCustomData && output.customData.dataType === dataType)
       .sort((a, b) => a.customData.index - b.customData.index);
     dataOutputs.forEach((output) => {
       customData += output.customData.data;

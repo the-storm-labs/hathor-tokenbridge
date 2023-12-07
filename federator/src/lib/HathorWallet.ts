@@ -68,7 +68,7 @@ export class HathorWallet {
     this.pubsubProjectId = chainConfig.pubsubProjectId;
   }
 
-  async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txId: string) {
+  async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
     if (this.multisigOrder > 1) {
       //TODO Log that ack the request, but is not the correct federator
       // Maybe, save data to evaluate later when signing?
@@ -79,7 +79,7 @@ export class HathorWallet {
     await this.isWalletReady(false);
 
     const txHex = await this.sendTransactionProposal(receiverAddress, qtd, tokenAddress);
-    await this.broadcastProposal(txHex, txId);
+    await this.broadcastProposal(txHex, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -143,17 +143,33 @@ export class HathorWallet {
     const isProposal = tx.haveCustomData('hex');
 
     if (isProposal) {
-      const txHex = tx.getCustomData();
-      this.logger.info(txHex);
+      const txHex = tx.getCustomData('hex');
+      const txHash = tx.getCustomData('hsh');
+      // this.logger.info(txHex);
       await this.isWalletReady(true);
       await this.isWalletReady(false);
-      // await this.sendMySignaturesToProposal(txHex);
+      await this.sendMySignaturesToProposal(txHex, txHash);
+
+      return;
     }
 
-    if (this.multisigOrder >= this.multisigRequiredSignatures) {
+    const isSignature = tx.haveCustomData('sig');
+
+    if (isSignature && this.multisigOrder >= this.multisigRequiredSignatures) {
       //TODO: check if tx are not completed before - test if is required
-      const components = await this.getSignaturesToPush();
-      this.logger.info(components);
+      const txHash = tx.getCustomData('hsh');
+      const components = await this.getSignaturesToPush(txHash);
+      // this.logger.info(components);
+      if (components.signatures.length < this.multisigRequiredSignatures) {
+        this.logger.info(
+          `Number of signatures not reached. Require ${this.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
+        );
+        return;
+      }
+
+      if (!this.validateTx(components.hex, txHash)) {
+        this.logger.error('Invalid transaction');
+      }
       await this.signAndPushProposal(components.hex, components.signatures);
     }
 
@@ -162,7 +178,7 @@ export class HathorWallet {
 
   // Functions involved in sending tokens from EVM to Hathor
 
-  private async getSignaturesToPush(): Promise<ProposalComponents> {
+  private async getSignaturesToPush(txHash: string): Promise<ProposalComponents> {
     const jsonTxs = await this.getHistory();
 
     const txs: HathorTx[] = [];
@@ -174,10 +190,13 @@ export class HathorWallet {
     });
 
     //TODO filter by tx-hash
-    const hex = txs.find((tx) => tx.haveCustomData('hex'));
-    const signatures = txs.filter((tx) => tx.haveCustomData('sig'));
+    const hex = txs.find((tx) => tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash);
+    const signatures = txs.filter((tx) => tx.haveCustomData('sig') && tx.getCustomData('hsh') === txHash);
 
-    return { hex: hex.getCustomData(), signatures: signatures.map((sig) => sig.getCustomData()) };
+    return {
+      hex: hex.getCustomData('hex'),
+      signatures: signatures.map((sig) => sig.getCustomData('sig')),
+    };
   }
 
   private async getHistory() {
@@ -238,23 +257,35 @@ export class HathorWallet {
     return hathorTokenAddress;
   }
 
-  private async broadcastProposal(txHex: string, txId: string) {
+  private async broadcastProposal(txHex: string, txHash: string) {
     const data = {
-      outputs: await this.wrapData('hex', txHex, txId),
+      outputs: await this.wrapData('hex', txHex),
     };
+    data.outputs.push(await this.wrapData('hsh', txHash));
     await this.broadcastDataToMultisig(data);
   }
 
-  private async sendMySignaturesToProposal(txHex: string) {
-    // TODO Validate proposal content
-    // const transaction = await this.decodeTxHex(txHex);
+  private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<string> {
+    if (!this.validateTx(txHex, txHash)) {
+      throw Error('Invalid tx!');
+    }
     // this.logger.info(transaction);
     const signature = await this.getMySignatures(txHex);
     const wrappedSig = await this.wrapData('sig', signature);
     const data = {
       outputs: wrappedSig,
     };
+    data.outputs.push(await this.wrapData('hsh', txHash));
     await this.broadcastDataToMultisig(data);
+
+    return signature;
+  }
+
+  private async validateTx(txHex: string, txHash: string): Promise<boolean> {
+    // const tx = await this.decodeTxHex(txHex);
+    // TODO: check tx decoded data against the EVM events using the txHash
+
+    return true;
   }
 
   private async decodeTxHex(txHex: string): Promise<Data> {
@@ -346,7 +377,7 @@ export class HathorWallet {
     }
   }
 
-  private async wrapData(dataType: string, data: string, txId = ''): Promise<any[]> {
+  private async wrapData(dataType: string, data: string): Promise<any[]> {
     const outputs = [];
     /* dataLimit: the max amount of caracters a data field can get, 
         descounted the hex and positional caracters, ex: hex01{145 caracters}
