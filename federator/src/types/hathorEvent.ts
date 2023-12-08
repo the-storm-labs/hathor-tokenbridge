@@ -39,6 +39,7 @@ export interface Output {
   decoded: Decoded2;
   token: string;
   spent_by?: string;
+  type: string;
 }
 
 export interface Decoded2 {

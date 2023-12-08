@@ -40,7 +40,7 @@ export default class FederatorHTR extends Federator {
     bridgeFactory: BridgeFactory;
     federationFactory: FederationFactory;
   }): Promise<boolean> {
-    const currentBlock = await this.getMainChainWeb3().eth.getBlockNumber();
+    const currentBlock = 4614547; //await this.getMainChainWeb3().eth.getBlockNumber();
     const mainChainId = await this.getCurrentChainId();
     // TODO: Get rid of fixed id
     const sideChainId = await 31;
@@ -287,31 +287,24 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const dataToHash = {
-      to: processTransactionParams.receiver,
-      amount: processTransactionParams.amount,
-      blockHash: processTransactionParams.log.blockHash,
-      transactionHash: processTransactionParams.log.transactionHash,
-      logIndex: processTransactionParams.log.logIndex,
-      originChainId: processTransactionParams.originChainId,
-      destinationChainId: processTransactionParams.destinationChainId,
-    };
-
-    this.logger.info('===dataToHash===', dataToHash);
-    this.logger.warn('===log===', processTransactionParams.log);
+    // const dataToHash = {
+    //   to: processTransactionParams.receiver,
+    //   amount: processTransactionParams.amount,
+    //   blockHash: processTransactionParams.log.blockHash,
+    //   transactionHash: processTransactionParams.log.transactionHash,
+    //   logIndex: processTransactionParams.log.logIndex,
+    //   originChainId: processTransactionParams.originChainId,
+    //   destinationChainId: processTransactionParams.destinationChainId,
+    // };
 
     const hathorWallet = new HathorWallet(this.config, this.logger);
-
     const amount = web3.utils.fromWei(processTransactionParams.amount);
-    this.logger.info('===amount===', amount);
-    this.logger.info('===receiver===', processTransactionParams.receiver);
 
     await hathorWallet.sendTokensToHathor(
-      // web3.utils.hexToAscii(processTransactionParams.receiver),
-      'wY5dNSAqCsmcimkgHig3CzZPjYRDyBWbjv',
+      processTransactionParams.receiver,
       amount,
       processTransactionParams.tokenAddress,
-      processTransactionParams.transactionId,
+      processTransactionParams.log.transactionHash,
     );
   }
 

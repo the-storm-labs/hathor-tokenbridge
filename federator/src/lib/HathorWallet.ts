@@ -9,8 +9,9 @@ import { HathorTx } from '../types/HathorTx';
 import { HathorUtxo } from '../types/HathorUtxo';
 import { Data } from '../types/hathorEvent';
 import { HathorException } from '../types/HathorException';
+import Web3 from 'web3';
 
-// axiosCurlirize(axios);
+axiosCurlirize(axios);
 
 type Response = {
   success: boolean;
@@ -45,7 +46,6 @@ export class HathorWallet {
   private WALLET_STATUS_READY = 3;
   private nonRetriableErrors = ['Invalid transaction. At least one of your inputs has already been spent.'];
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor(config: ConfigData, logger: LogWrapper) {
     this.config = config;
     this.logger = logger;
@@ -66,13 +66,29 @@ export class HathorWallet {
     this.multisigOrder = chainConfig.multisigOrder;
     this.eventQueueType = chainConfig.eventQueueType;
     this.pubsubProjectId = chainConfig.pubsubProjectId;
+
+    this.web3ByHost = new Map<string, Web3>();
+  }
+
+  public web3ByHost: Map<string, Web3>;
+
+  getWeb3(host: string): Web3 {
+    let hostWeb3 = this.web3ByHost.get(host);
+    if (!hostWeb3) {
+      hostWeb3 = new Web3(host);
+      this.web3ByHost.set(host, hostWeb3);
+    }
+    return hostWeb3;
   }
 
   async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
     if (this.multisigOrder > 1) {
-      //TODO Log that ack the request, but is not the correct federator
-      // Maybe, save data to evaluate later when signing?
-      return;
+      const txs = this.castHistoryToTx(await this.getHistory());
+      const proposals = txs.filter(
+        (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
+      );
+
+      if (proposals.length > 0) return;
     }
 
     await this.isWalletReady(true);
@@ -148,6 +164,7 @@ export class HathorWallet {
       // this.logger.info(txHex);
       await this.isWalletReady(true);
       await this.isWalletReady(false);
+      //TODO validate if a proposal was not signed before. Maybe check history?
       await this.sendMySignaturesToProposal(txHex, txHash);
 
       return;
@@ -179,17 +196,7 @@ export class HathorWallet {
   // Functions involved in sending tokens from EVM to Hathor
 
   private async getSignaturesToPush(txHash: string): Promise<ProposalComponents> {
-    const jsonTxs = await this.getHistory();
-
-    const txs: HathorTx[] = [];
-
-    jsonTxs.forEach((data) => {
-      const utxos = data.outputs.map((o) => new HathorUtxo(o.script));
-      const tx = new HathorTx(data.tx_id, data.timestamp, utxos);
-      txs.push(tx);
-    });
-
-    //TODO filter by tx-hash
+    const txs = this.castHistoryToTx(await this.getHistory());
     const hex = txs.find((tx) => tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash);
     const signatures = txs.filter((tx) => tx.haveCustomData('sig') && tx.getCustomData('hsh') === txHash);
 
@@ -197,6 +204,17 @@ export class HathorWallet {
       hex: hex.getCustomData('hex'),
       signatures: signatures.map((sig) => sig.getCustomData('sig')),
     };
+  }
+
+  private castHistoryToTx(history: Data[]): HathorTx[] {
+    const txs: HathorTx[] = [];
+    history.forEach((data) => {
+      const utxos = data.outputs.map((o) => new HathorUtxo(o.script));
+      const tx = new HathorTx(data.tx_id, data.timestamp, utxos);
+      txs.push(tx);
+    });
+
+    return txs;
   }
 
   private async getHistory() {
@@ -223,7 +241,7 @@ export class HathorWallet {
   }
 
   private async sendTransactionProposal(receiverAddress: string, qtd: string, token: string) {
-    const hathorTokenAddress = this.getHathorTokenAddress(token);
+    const hathorTokenAddress = await this.getHathorTokenAddress(token);
     const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/mint-tokens`;
     const config = {
       headers: {
@@ -238,15 +256,16 @@ export class HathorWallet {
       token: `${hathorTokenAddress}`,
     };
 
-    try {
-      const response = await axios.post<CreateProposalResponse>(url, data, config);
-      if (response.status == 200 && response.data.success) {
-        return response.data.txHex;
-      }
-      throw Error(`${response.status} - ${response.statusText} - ${response.data}`);
-    } catch (error) {
-      throw Error(`Failed to send transaction proposal: ${error}`);
+    const response = await axios.post<CreateProposalResponse>(url, data, config);
+    if (response.status == 200 && response.data.success) {
+      return response.data.txHex;
     }
+    throw new HathorException(
+      `Unable to send a transaction proposal ${response.status} - ${response.statusText} - ${JSON.stringify(
+        response.data,
+      )}`,
+      response.data.message ?? response.data.error,
+    );
   }
 
   private async getHathorTokenAddress(evmTokenAddress: string) {
@@ -261,12 +280,16 @@ export class HathorWallet {
     const data = {
       outputs: await this.wrapData('hex', txHex),
     };
-    data.outputs.push(await this.wrapData('hsh', txHash));
+    data.outputs = data.outputs.concat(await this.wrapData('hsh', txHash));
+    data.outputs.push({
+      address: await this.getMultiSigAddress(),
+      value: 1,
+    });
     await this.broadcastDataToMultisig(data);
   }
 
   private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<string> {
-    if (!this.validateTx(txHex, txHash)) {
+    if (!(await this.validateTx(txHex, txHash))) {
       throw Error('Invalid tx!');
     }
     // this.logger.info(transaction);
@@ -275,16 +298,32 @@ export class HathorWallet {
     const data = {
       outputs: wrappedSig,
     };
-    data.outputs.push(await this.wrapData('hsh', txHash));
+    data.outputs = data.outputs.concat(await this.wrapData('hsh', txHash));
+    data.outputs.push({
+      address: await this.getMultiSigAddress(),
+      value: 1,
+    });
     await this.broadcastDataToMultisig(data);
 
     return signature;
   }
 
   private async validateTx(txHex: string, txHash: string): Promise<boolean> {
-    // const tx = await this.decodeTxHex(txHex);
-    // TODO: check tx decoded data against the EVM events using the txHash
-
+    // const hathorTx = await this.decodeTxHex(txHex);
+    // const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
+    // const txOutput = hathorTx.outputs.find((o) => o.type === 'p2pkh');
+    // if (!(txOutput.decoded.address === evmTx.to)) {
+    //   this.logger.error(
+    //     `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${evmTx.to}.`,
+    //   );
+    //   return false;
+    // }
+    // if (!(txOutput.value === parseInt(evmTx.value))) {
+    //   this.logger.error(
+    //     `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${evmTx.value}.`,
+    //   );
+    //   return false;
+    // } // that is 100% wrong, mus fix it
     return true;
   }
 
@@ -380,7 +419,7 @@ export class HathorWallet {
   private async wrapData(dataType: string, data: string): Promise<any[]> {
     const outputs = [];
     /* dataLimit: the max amount of caracters a data field can get, 
-        descounted the hex and positional caracters, ex: hex01{145 caracters}
+        descounted the dataType and positional caracters, ex: hex01{145 caracters}
     */
     const dataLimit = 145;
 
@@ -396,11 +435,6 @@ export class HathorWallet {
         data: `${dataType}${i}${arraySize}${part}`,
       });
     }
-
-    outputs.push({
-      address: await this.getMultiSigAddress(),
-      value: 1,
-    });
 
     return outputs;
   }
