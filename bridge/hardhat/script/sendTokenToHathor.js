@@ -6,24 +6,21 @@ async function main() {
     const {deployer} = await getNamedAccounts();
     console.log(deployer);
 
+    const Token = await deployments.get('MainToken');
+    const token = new web3.eth.Contract(Token.abi, Token.address)
     const Bridge = await deployments.get('Bridge');
     const BridgeProxy = await deployments.get('BridgeProxy');
     const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address)
 
-    // const methodReceiveTokensTo = bridge.methods
-    //     .receiveTokensTo(31, 
-    //     '0x2bfe63ddb1de113f337ae454edf8bd1d4a19ee14', 
-    //     'wY5dNSAqCsmcimkgHig3CzZPjYRDyBWbjv', 
-    //     1000000000000000000n);
+    const result = await token.methods.approve(BridgeProxy.address, '3000000000000000000').send({from: deployer, gasLimit: 3000000});
 
-    // const result = await methodReceiveTokensTo.call({ from: deployer.address });
-    // console.log('Send tokens result', result);  
+    console.log("Tokens approved, txHash: ", result.transactionHash);
     
-    const receipt = await bridge.methodsS
+    const receipt = await bridge.methods
         .receiveTokensTo(31, 
-        '0x2bfe63ddb1de113f337ae454edf8bd1d4a19ee14', 
-        'wY5dNSAqCsmcimkgHig3CzZPjYRDyBWbjv', 
-        1000000000000000000n).send({ from: deployer, gasLimit: 3000000 });
+        '0x247d6326586a111860D103dB009c3FB4317C8444', 
+        'WjDz74uofMpF87xy9F9F1HYs9rjU6vY8Gr', 
+        '3000000000000000000').send({ from: deployer, gasLimit: 3000000 });
 
     console.log("Tokens sent, txHash: ", receipt.transactionHash);
 }
