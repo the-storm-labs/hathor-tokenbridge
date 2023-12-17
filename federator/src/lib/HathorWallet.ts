@@ -82,13 +82,14 @@ export class HathorWallet {
   }
 
   async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
-    if (this.multisigOrder > 1) {
-      const txs = this.castHistoryToTx(await this.getHistory());
-      const proposals = txs.filter(
-        (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
-      );
+    const txs = this.castHistoryToTx(await this.getHistory());
+    const proposals = txs.filter(
+      (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
+    );
 
-      if (proposals.length > 0) return;
+    if (proposals.length > 0) {
+      this.logger.info('Proposal already sent.');
+      return;
     }
 
     await this.isWalletReady(true);
@@ -161,12 +162,9 @@ export class HathorWallet {
     if (isProposal) {
       const txHex = tx.getCustomData('hex');
       const txHash = tx.getCustomData('hsh');
-      // this.logger.info(txHex);
       await this.isWalletReady(true);
       await this.isWalletReady(false);
-      //TODO validate if a proposal was not signed before. Maybe check history?
       await this.sendMySignaturesToProposal(txHex, txHash);
-
       return;
     }
 
@@ -288,12 +286,16 @@ export class HathorWallet {
     await this.broadcastDataToMultisig(data);
   }
 
-  private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<string> {
+  private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<void> {
     if (!(await this.validateTx(txHex, txHash))) {
       throw Error('Invalid tx!');
     }
-    // this.logger.info(transaction);
+
     const signature = await this.getMySignatures(txHex);
+    if (await this.haveISignedBefore(signature, txHash)) {
+      this.logger.info(`Tx ${txHash} was already signed before.`);
+      return;
+    }
     const wrappedSig = await this.wrapData('sig', signature);
     const data = {
       outputs: wrappedSig,
@@ -304,8 +306,26 @@ export class HathorWallet {
       value: 1,
     });
     await this.broadcastDataToMultisig(data);
+  }
 
-    return signature;
+  private async haveISignedBefore(signature: string, txHash: string) {
+    const historyTxs = this.castHistoryToTx(await this.getHistory());
+    let response = false;
+    for (let index = 0; index < historyTxs.length; index++) {
+      const tx = historyTxs[index];
+
+      if (
+        tx.haveCustomData('hsh') &&
+        tx.haveCustomData('sig') &&
+        tx.getCustomData('hsh') === txHash &&
+        tx.getCustomData('sig') === signature
+      ) {
+        response = true;
+        break;
+      }
+    }
+
+    return response;
   }
 
   private async validateTx(txHex: string, txHash: string): Promise<boolean> {

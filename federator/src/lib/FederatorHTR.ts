@@ -40,7 +40,7 @@ export default class FederatorHTR extends Federator {
     bridgeFactory: BridgeFactory;
     federationFactory: FederationFactory;
   }): Promise<boolean> {
-    const currentBlock = 4614547; //await this.getMainChainWeb3().eth.getBlockNumber();
+    const currentBlock = await this.getMainChainWeb3().eth.getBlockNumber();
     const mainChainId = await this.getCurrentChainId();
     // TODO: Get rid of fixed id
     const sideChainId = await 31;
