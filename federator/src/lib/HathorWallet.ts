@@ -44,7 +44,7 @@ export class HathorWallet {
   private WALLET_STATUS_CONNECTING = 1;
   private WALLET_STATUS_SYNCING = 2;
   private WALLET_STATUS_READY = 3;
-  private nonRetriableErrors = ['Invalid transaction. At least one of your inputs has already been spent.'];
+  private nonRetriableErrors = ['Invalid transaction. At least one of your inputs has already been spent.', 'Transaction already exists'];
 
   constructor(config: ConfigData, logger: LogWrapper) {
     this.config = config;
@@ -82,6 +82,11 @@ export class HathorWallet {
   }
 
   async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
+    if (this.multisigOrder > 1) return;
+
+    await this.isWalletReady(true);
+    await this.isWalletReady(false);
+    
     const txs = this.castHistoryToTx(await this.getHistory());
     const proposals = txs.filter(
       (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
@@ -91,9 +96,6 @@ export class HathorWallet {
       this.logger.info('Proposal already sent.');
       return;
     }
-
-    await this.isWalletReady(true);
-    await this.isWalletReady(false);
 
     const txHex = await this.sendTransactionProposal(receiverAddress, qtd, tokenAddress);
     await this.broadcastProposal(txHex, txHash);
@@ -160,6 +162,7 @@ export class HathorWallet {
     const isProposal = tx.haveCustomData('hex');
 
     if (isProposal) {
+      this.logger.info('Evaluating proposal...');
       const txHex = tx.getCustomData('hex');
       const txHash = tx.getCustomData('hsh');
       await this.isWalletReady(true);
@@ -172,9 +175,11 @@ export class HathorWallet {
 
     if (isSignature && this.multisigOrder >= this.multisigRequiredSignatures) {
       //TODO: check if tx are not completed before - test if is required
+      this.logger.info('Evaluating signature...');
       const txHash = tx.getCustomData('hsh');
+      await this.isWalletReady(true);
+      await this.isWalletReady(false);
       const components = await this.getSignaturesToPush(txHash);
-      // this.logger.info(components);
       if (components.signatures.length < this.multisigRequiredSignatures) {
         this.logger.info(
           `Number of signatures not reached. Require ${this.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
@@ -268,7 +273,7 @@ export class HathorWallet {
 
   private async getHathorTokenAddress(evmTokenAddress: string) {
     //TODO this has to change later
-    const j = JSON.parse(fs.readFileSync('./db/tokenMapping.json', 'utf8'));
+    const j = JSON.parse(fs.readFileSync('../../db/tokenMapping.json', 'utf8'));
     const hathorTokenAddress = j.tokens.find((token) => token.evmaddress == evmTokenAddress).htraddress;
     this.logger.info(`Getting hathor token: ${hathorTokenAddress} for evm ${evmTokenAddress}`);
     return hathorTokenAddress;
