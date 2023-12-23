@@ -19,3 +19,5 @@ federator.log
 /built
 /abis
 .env
+etherscan.key
+package-lock.json

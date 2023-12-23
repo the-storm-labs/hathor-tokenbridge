@@ -62,6 +62,7 @@ module.exports = {
       goerli: ETHERESCAN_KEY,
       kovan: ETHERESCAN_KEY,
       sepolia: ETHERESCAN_KEY,
+      mumbai: ETHERESCAN_KEY,
     }
   },
   networks: {
@@ -144,7 +145,19 @@ module.exports = {
       network_id: chains.SEPOLIA_TEST_NET_CHAIN_ID,
       token_symbol: 'e',
       gas: 6700000,
-      gasPrice: 10000000000,
+      gasPrice: 60000000000,
+      accounts: {
+        mnemonic: MNEMONIC,
+      },
+      tags: ['staging'],
+    },
+    mumbai: {
+      live: false,
+      url: 'https://rpc-mumbai.maticvigil.com',
+      network_id: chains.MUMBAI_TEST_NET_CHAIN_ID,
+      token_symbol: 'p',
+      gas: 6700000,
+      gasPrice: 5000000000,
       accounts: {
         mnemonic: MNEMONIC,
       },
