@@ -2,12 +2,18 @@
 const hre = require("hardhat");
 
 async function main() {
+
+  console.log('starting')
+
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
-  const transactionEtherValue = 0;
-  const memberFederatorAddress = "0x0e6fa08809bc166ab5ce237fdccb1802fdf13b27";
 
-  const Federation = await deployments.get('FederationV2');
+  console.log(1)
+
+  const transactionEtherValue = 0;
+  const memberFederatorAddress = "0xCC3CF44397Daa4572CDb20f72dee5700507454E4";
+
+  const Federation = await deployments.get('Federation');
   const FederationProxy = await deployments.get('FederationProxy');
   const MultiSigWallet = await deployments.get('MultiSigWallet');
 

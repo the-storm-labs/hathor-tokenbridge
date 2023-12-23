@@ -10,3 +10,5 @@ federator.log
 .env.prod
 
 federator/built
+
+federator/package-lock.json
