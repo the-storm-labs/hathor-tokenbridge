@@ -1,4 +1,4 @@
-// How to run the script: npx hardhat run ./hardhat/script/isTokenAllowed.js --network rsktestnet
+// How to run the script: npx hardhat run ./hardhat/script/sendTokenToHathor.js --network mumbai
 const hre = require('hardhat');
 
 async function main() {
@@ -14,11 +14,12 @@ async function main() {
 
     const result = await token.methods.approve(BridgeProxy.address, '3000000000000000000').send({from: deployer, gasLimit: 3000000});
 
+    console.log(`Is ${Token.address} correct? 0x9956d17a0615e2af9f3745c87a55db05fcc50329`);
     console.log("Tokens approved, txHash: ", result.transactionHash);
     
     const receipt = await bridge.methods
         .receiveTokensTo(31, 
-        '0x247d6326586a111860D103dB009c3FB4317C8444', 
+        Token.address, 
         'WjDz74uofMpF87xy9F9F1HYs9rjU6vY8Gr', 
         '1000000000000000000').send({ from: deployer, gasLimit: 3000000 });
 

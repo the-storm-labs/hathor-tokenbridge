@@ -1,4 +1,4 @@
-import axiosCurlirize from 'axios-curlirize';
+// import axiosCurlirize from 'axios-curlirize';
 import axios from 'axios';
 import fs from 'fs';
 import { LogWrapper } from './logWrapper';
@@ -10,8 +10,10 @@ import { HathorUtxo } from '../types/HathorUtxo';
 import { Data } from '../types/hathorEvent';
 import { HathorException } from '../types/HathorException';
 import Web3 from 'web3';
+import { BridgeFactory } from '../contracts/BridgeFactory';
+import { IBridgeV4 } from '../contracts/IBridgeV4';
 
-axiosCurlirize(axios);
+// axiosCurlirize(axios);
 
 type Response = {
   success: boolean;
@@ -31,6 +33,7 @@ export class HathorWallet {
   public logger: LogWrapper;
   public config: ConfigData;
   public metricCollector: MetricCollector;
+  public bridgeFactory: BridgeFactory;
   private walletUrl: string;
   private singleWalletId: string;
   private singleSeedKey: string;
@@ -44,11 +47,15 @@ export class HathorWallet {
   private WALLET_STATUS_CONNECTING = 1;
   private WALLET_STATUS_SYNCING = 2;
   private WALLET_STATUS_READY = 3;
-  private nonRetriableErrors = ['Invalid transaction. At least one of your inputs has already been spent.', 'Transaction already exists'];
+  private nonRetriableErrors = [
+    'Invalid transaction. At least one of your inputs has already been spent.',
+    'Transaction already exists',
+  ];
 
-  constructor(config: ConfigData, logger: LogWrapper) {
+  constructor(config: ConfigData, logger: LogWrapper, bridgeFactory: BridgeFactory) {
     this.config = config;
     this.logger = logger;
+    this.bridgeFactory = bridgeFactory;
 
     if (this.logger.upsertContext) {
       this.logger.upsertContext('service', this.constructor.name);
@@ -86,7 +93,7 @@ export class HathorWallet {
 
     await this.isWalletReady(true);
     await this.isWalletReady(false);
-    
+
     const txs = this.castHistoryToTx(await this.getHistory());
     const proposals = txs.filter(
       (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
@@ -98,7 +105,7 @@ export class HathorWallet {
     }
 
     const txHex = await this.sendTransactionProposal(receiverAddress, qtd, tokenAddress);
-    await this.broadcastProposal(txHex, txHash);
+    // await this.broadcastProposal(txHex, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -271,11 +278,9 @@ export class HathorWallet {
     );
   }
 
-  private async getHathorTokenAddress(evmTokenAddress: string) {
-    //TODO this has to change later
-    const j = JSON.parse(fs.readFileSync('../../db/tokenMapping.json', 'utf8'));
-    const hathorTokenAddress = j.tokens.find((token) => token.evmaddress == evmTokenAddress).htraddress;
-    this.logger.info(`Getting hathor token: ${hathorTokenAddress} for evm ${evmTokenAddress}`);
+  private async getHathorTokenAddress(evmTokenAddress: string): Promise<string> {
+    const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    const hathorTokenAddress = originBridge.EvmToHathorTokenMap(evmTokenAddress);
     return hathorTokenAddress;
   }
 

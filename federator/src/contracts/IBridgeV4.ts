@@ -59,4 +59,8 @@ export class IBridgeV4 implements IBridge {
       .sideTokenByOriginalToken(paramsObj.chainId, paramsObj.originalTokenAddress)
       .call();
   }
+
+  EvmToHathorTokenMap(mainToken: string): Promise<string> {
+    return this.bridgeContract.methods.EvmToHathorTokenMap(mainToken).call();
+  }
 }

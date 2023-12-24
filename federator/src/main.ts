@@ -52,7 +52,7 @@ export class Main {
   }
 
   async start() {
-    this.listenToHathorTransactions();
+    // this.listenToHathorTransactions();
     this.scheduleFederatorProcesses();
     // TODO uncoment this after tests
     // this.scheduleHeartbeatProcesses();
@@ -94,7 +94,7 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    const wallet = new HathorWallet(this.config, this.logger);
+    const wallet = new HathorWallet(this.config, this.logger, null);
     wallet.listenToEventQueue();
   }
 
