@@ -109,6 +109,7 @@ export class HathorWallet {
   }
 
   async listenToEventQueue(): Promise<void> {
+    await this.isWalletReady(true);
     switch (this.eventQueueType) {
       case 'pubsub':
         this.listenToPubSubEventQueue();
@@ -351,21 +352,21 @@ export class HathorWallet {
   }
 
   private async validateTx(txHex: string, txHash: string): Promise<boolean> {
-    // const hathorTx = await this.decodeTxHex(txHex);
-    // const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
-    // const txOutput = hathorTx.outputs.find((o) => o.type === 'p2pkh');
-    // if (!(txOutput.decoded.address === evmTx.to)) {
-    //   this.logger.error(
-    //     `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${evmTx.to}.`,
-    //   );
-    //   return false;
-    // }
-    // if (!(txOutput.value === parseInt(evmTx.value))) {
-    //   this.logger.error(
-    //     `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${evmTx.value}.`,
-    //   );
-    //   return false;
-    // } // that is 100% wrong, mus fix it
+    const hathorTx = await this.decodeTxHex(txHex);
+    const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
+    const txOutput = hathorTx.outputs.find((o) => o.type === 'p2pkh');
+    if (!(txOutput.decoded.address === evmTx.to)) {
+      this.logger.error(
+        `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${evmTx.to}.`,
+      );
+      return false;
+    }
+    if (!(txOutput.value === parseInt(evmTx.value))) {
+      this.logger.error(
+        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${evmTx.value}.`,
+      );
+      return false;
+    } // that is 100% wrong, mus fix it
     return true;
   }
 
