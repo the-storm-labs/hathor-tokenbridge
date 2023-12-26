@@ -6,6 +6,6 @@
     "allowTokens": "0x458ae8c887440e89251d6be560d11802aad606fd",
     "chainId": 80001,
     "testToken": "0x9956d17a0615e2af9f3745c87a55db05fcc50329",
-    "host": "https://rpc-mumbai.maticvigil.com",
-    "fromBlock": 43832813
+    "host": "https://polygon-mumbai.infura.io/v3/399500b5679b442eb991fefee1c5bfdc",
+    "fromBlock": 43918284
 }

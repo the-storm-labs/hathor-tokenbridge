@@ -15,7 +15,6 @@ COPY --chown=node:node ./federator/ ./federator/
 
 WORKDIR ./federator
 RUN (cd ./config/ && cp config.sample.js config.js) && \
-    (cd ./db/ && cp tokenMapping.sample.json tokenMapping.json) && \
     npx tsc --build
 
 WORKDIR ./built/federator

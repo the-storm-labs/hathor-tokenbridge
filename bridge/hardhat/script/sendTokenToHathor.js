@@ -21,7 +21,7 @@ async function main() {
         .receiveTokensTo(31, 
         Token.address, 
         'WjDz74uofMpF87xy9F9F1HYs9rjU6vY8Gr', 
-        '1000000000000000000').send({ from: deployer, gasLimit: 3000000 });
+        '3000000000000000000').send({ from: deployer, gasLimit: 3000000 });
 
     console.log("Tokens sent, txHash: ", receipt.transactionHash);
 }

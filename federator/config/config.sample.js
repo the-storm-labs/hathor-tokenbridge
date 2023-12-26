@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 module.exports = {
-  mainchain: require("./sepolia.json"), //the json containing the smart contract addresses in rsk
+  mainchain: require(process.env.EVM_CONFIG), //the json containing the smart contract addresses in rsk
   sidechain: [
     require(process.env.HTR_CONFIG), //the json containing the smart contract addresses in eth
   ],

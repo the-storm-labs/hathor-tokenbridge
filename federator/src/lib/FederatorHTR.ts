@@ -49,6 +49,7 @@ export default class FederatorHTR extends Federator {
     const allowTokensFactory = new AllowTokensFactory();
 
     this.logger.trace(`Federator Run started currentBlock: ${currentBlock}, currentChainId: ${mainChainId}`);
+
     const isMainSyncing = await this.getMainChainWeb3().eth.isSyncing();
     if (isMainSyncing !== false) {
       this.logger.warn(

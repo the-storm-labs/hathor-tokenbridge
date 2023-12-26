@@ -48,8 +48,8 @@ export class HathorWallet {
   private WALLET_STATUS_SYNCING = 2;
   private WALLET_STATUS_READY = 3;
   private nonRetriableErrors = [
-    'Invalid transaction. At least one of your inputs has already been spent.',
-    'Transaction already exists',
+    /Invalid transaction. At least one of your inputs has already been spent./,
+    /Transaction already exists/,
   ];
 
   constructor(config: ConfigData, logger: LogWrapper, bridgeFactory: BridgeFactory) {
@@ -105,7 +105,7 @@ export class HathorWallet {
     }
 
     const txHex = await this.sendTransactionProposal(receiverAddress, qtd, tokenAddress);
-    // await this.broadcastProposal(txHex, txHash);
+    await this.broadcastProposal(txHex, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -139,8 +139,20 @@ export class HathorWallet {
         } catch (error) {
           // TODO retry policy if fails to parse and resolve
           this.logger.error(`Fail to processing hathor event: ${error}`);
+          let isNonRetriable = false;          
           if (error instanceof HathorException) {
-            if (this.nonRetriableErrors.includes((error as HathorException).getOriginalMessage())) {
+
+            const originalError = (error as HathorException).getOriginalMessage();
+
+            for (let index = 0; index < this.nonRetriableErrors.length; index++) {
+              const rgxError = this.nonRetriableErrors[index];
+              if (originalError.match(rgxError)) {
+                isNonRetriable = true;
+                break;
+              }
+            }
+
+            if (isNonRetriable) {
               message.ack();
               return;
             }

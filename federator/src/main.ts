@@ -52,7 +52,7 @@ export class Main {
   }
 
   async start() {
-    // this.listenToHathorTransactions();
+    this.listenToHathorTransactions();
     this.scheduleFederatorProcesses();
     // TODO uncoment this after tests
     // this.scheduleHeartbeatProcesses();
