@@ -288,12 +288,11 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const hathorWallet = new HathorWallet(this.config, this.logger, processTransactionParams.bridgeFactory);
-    const amount = web3.utils.fromWei(processTransactionParams.amount);
+    const hathorWallet = new HathorWallet(this.config, this.logger, processTransactionParams.bridgeFactory);    
 
     await hathorWallet.sendTokensToHathor(
       processTransactionParams.receiver,
-      amount,
+      processTransactionParams.amount.toString(),
       processTransactionParams.tokenAddress,
       processTransactionParams.log.transactionHash,
     );

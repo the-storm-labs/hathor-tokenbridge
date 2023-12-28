@@ -16,6 +16,7 @@ import {
   LOGGER_CATEGORY_ENDPOINT,
 } from './lib/logs';
 import { HathorWallet } from './lib/HathorWallet';
+import { BridgeFactory } from './contracts/BridgeFactory';
 
 export class Main {
   logger: LogWrapper;
@@ -94,7 +95,7 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    const wallet = new HathorWallet(this.config, this.logger, null);
+    const wallet = new HathorWallet(this.config, this.logger, new BridgeFactory());
     wallet.listenToEventQueue();
   }
 

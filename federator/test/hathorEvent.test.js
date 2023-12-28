@@ -1,10 +1,6 @@
 const hathorTx = require("../src/types/HathorTx");
 const hathorUtxo = require("../src/types/HathorUtxo");
 
-const config  = {
-  
-}
-
 describe("Hathor Tx Data tests", () => {
   beforeEach(async function () {
     jest.clearAllMocks();
@@ -69,7 +65,7 @@ describe("Hathor Tx Data tests", () => {
     expect(tx.getCustomData('hex')).toEqual(hex);
   });
 
-  it("Should validate if a Hathor TxHex has the correct parameters for it's EVM TxHash", async () => {
-    const hathorWallet = new hathorWallet.default()
-  });
+  // it("Should validate if a Hathor TxHex has the correct parameters for it's EVM TxHash", async () => {
+  //   const hathorWallet = new hathorWallet.default()
+  // });
 });

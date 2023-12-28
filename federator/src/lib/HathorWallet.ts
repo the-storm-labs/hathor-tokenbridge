@@ -140,9 +140,8 @@ export class HathorWallet {
         } catch (error) {
           // TODO retry policy if fails to parse and resolve
           this.logger.error(`Fail to processing hathor event: ${error}`);
-          let isNonRetriable = false;          
+          let isNonRetriable = false;
           if (error instanceof HathorException) {
-
             const originalError = (error as HathorException).getOriginalMessage();
 
             for (let index = 0; index < this.nonRetriableErrors.length; index++) {
@@ -354,19 +353,39 @@ export class HathorWallet {
   private async validateTx(txHex: string, txHash: string): Promise<boolean> {
     const hathorTx = await this.decodeTxHex(txHex);
     const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
-    const txOutput = hathorTx.outputs.find((o) => o.type === 'p2pkh');
-    if (!(txOutput.decoded.address === evmTx.to)) {
+    const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    const events = await bridge.getPastEvents('Cross', this.config.sidechain[0].chainId, {
+      fromBlock: evmTx.blockNumber,
+      toBlock: evmTx.blockNumber,
+    });
+    const event = events.find((e) => e.transactionHash === txHash);
+
+    if (!event) {
+      this.logger.error(`Invalid tx. Unable to find event on EVM. HEX: ${txHex} | HASH: ${txHash}`);
+      return false;
+    }
+
+    const evmTranslatedToken = await bridge.EvmToHathorTokenMap(event.returnValues['_tokenAddress']);
+
+    const txOutput = hathorTx.outputs.find((o) => o.token === evmTranslatedToken);
+
+    if (!txOutput) {
+      this.logger.error(`Invalid tx. Unable to find token on hathoro tx outputs. HEX: ${txHex} | HASH: ${txHash}`);
+      return false;
+    }
+
+    if (!(txOutput.decoded.address === event.returnValues['_to'])) {
       this.logger.error(
-        `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${evmTx.to}.`,
+        `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${event.returnValues['_to']}.`,
       );
       return false;
     }
-    if (!(txOutput.value === parseInt(evmTx.value))) {
+    if (!(txOutput.value === parseInt(event.returnValues['_amount']))) {
       this.logger.error(
-        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${evmTx.value}.`,
+        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${event.returnValues['_amount']}.`,
       );
       return false;
-    } // that is 100% wrong, mus fix it
+    }
     return true;
   }
 
