@@ -50,6 +50,7 @@ export class HathorWallet {
   private nonRetriableErrors = [
     /Invalid transaction. At least one of your inputs has already been spent./,
     /Transaction already exists/,
+    /Invalid tx/,
   ];
 
   constructor(config: ConfigData, logger: LogWrapper, bridgeFactory: BridgeFactory) {
@@ -193,7 +194,6 @@ export class HathorWallet {
     const isSignature = tx.haveCustomData('sig');
 
     if (isSignature && this.multisigOrder >= this.multisigRequiredSignatures) {
-      //TODO: check if tx are not completed before - test if is required
       this.logger.info('Evaluating signature...');
       const txHash = tx.getCustomData('hsh');
       await this.isWalletReady(true);
@@ -207,7 +207,7 @@ export class HathorWallet {
       }
 
       if (!this.validateTx(components.hex, txHash)) {
-        this.logger.error('Invalid transaction');
+        throw new HathorException('Invalid tx', 'Invalid tx');
       }
       await this.signAndPushProposal(components.hex, components.signatures);
     }
@@ -310,7 +310,7 @@ export class HathorWallet {
 
   private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<void> {
     if (!(await this.validateTx(txHex, txHash))) {
-      throw Error('Invalid tx!');
+      throw new HathorException('Invalid tx', 'Invalid tx');
     }
 
     const signature = await this.getMySignatures(txHex);
