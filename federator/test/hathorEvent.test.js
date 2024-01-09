@@ -1,9 +1,22 @@
 const hathorTx = require("../src/types/HathorTx");
 const hathorUtxo = require("../src/types/HathorUtxo");
+const HathorWallet = require("../src/lib/HathorWallet");
+
+const logger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+};
+const config = {
+  sidechain: []
+}
 
 describe("Hathor Tx Data tests", () => {
   beforeEach(async function () {
     jest.clearAllMocks();
+    config.sidechain.push({});
   });
 
   it("Should check if can read translate partial outputs", () => {
@@ -63,6 +76,18 @@ describe("Hathor Tx Data tests", () => {
       utxos
     );
     expect(tx.getCustomData('hex')).toEqual(hex);
+  });
+
+  it("Should correctly convert evm token decimals to hathor", async () => {
+      let wallet = new HathorWallet.default(config, logger, {});
+      let originWithDecimals = "200000000000000"; 
+      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(0);
+
+      originWithDecimals = "80000000000000000"; 
+      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(8);
+
+      originWithDecimals = "3025000000000000000"; 
+      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(302);
   });
 
   // it("Should validate if a Hathor TxHex has the correct parameters for it's EVM TxHash", async () => {

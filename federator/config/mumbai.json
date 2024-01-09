@@ -7,5 +7,5 @@
     "chainId": 80001,
     "testToken": "0x9956d17a0615e2af9f3745c87a55db05fcc50329",
     "host": "https://polygon-mumbai.infura.io/v3/399500b5679b442eb991fefee1c5bfdc",
-    "fromBlock": 43918284
+    "fromBlock": 43918256
 }

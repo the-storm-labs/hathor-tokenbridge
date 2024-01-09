@@ -12,6 +12,8 @@ import { HathorException } from '../types/HathorException';
 import Web3 from 'web3';
 import { BridgeFactory } from '../contracts/BridgeFactory';
 import { IBridgeV4 } from '../contracts/IBridgeV4';
+import { TokenFactory } from '../contracts/TokenFactory';
+import { ITokenV0 } from '../contracts/ITokenV0';
 
 // axiosCurlirize(axios);
 
@@ -105,7 +107,16 @@ export class HathorWallet {
       return;
     }
 
-    const txHex = await this.sendTransactionProposal(receiverAddress, qtd, tokenAddress);
+    const tokenDecimals = await this.getTokenDecimals(tokenAddress);
+    const convertedQuantity = this.convertDecimals(qtd, tokenDecimals);
+    if (convertedQuantity <= 0) {
+      this.logger.info(
+        `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${qtd}, Token decimals ${tokenDecimals}.`,
+      );
+      return;
+    }
+
+    const txHex = await this.sendTransactionProposal(receiverAddress, convertedQuantity, tokenAddress);
     await this.broadcastProposal(txHex, txHash);
   }
 
@@ -262,7 +273,7 @@ export class HathorWallet {
     }
   }
 
-  private async sendTransactionProposal(receiverAddress: string, qtd: string, token: string) {
+  private async sendTransactionProposal(receiverAddress: string, qtd: number, token: string) {
     const hathorTokenAddress = await this.getHathorTokenAddress(token);
     const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/mint-tokens`;
     const config = {
@@ -455,6 +466,17 @@ export class HathorWallet {
     }
   }
 
+  private async getTokenDecimals(tokenAddress: string): Promise<number> {
+    const tokenFactory = new TokenFactory();
+    const tokenContract = (await tokenFactory.createInstance(this.config.mainchain, tokenAddress)) as ITokenV0;
+    return await tokenContract.getDecimals();
+  }
+
+  private convertDecimals(originalQtd: string, tokenDecimals: number): number {
+    const hathorPrecision = tokenDecimals - 2;
+    return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
+  }
+
   // Base functions
 
   private async getMultiSigAddress() {
@@ -591,3 +613,5 @@ export class HathorWallet {
     return new Promise((resolve) => setTimeout(resolve, time));
   }
 }
+
+export default HathorWallet;
