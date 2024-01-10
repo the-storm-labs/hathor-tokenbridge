@@ -20,7 +20,7 @@ async function main() {
     const BridgeProxy = await deployments.get('BridgeProxy');
     const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address)
 
-    const result = await token.methods.approve(BridgeProxy.address, '3000000000000000000').send({from: deployer, gasLimit: 3000000});
+    const result = await token.methods.approve(BridgeProxy.address, '3025000000000000000').send({from: deployer, gasLimit: 3000000});
 
     // console.log(`Is ${Token.address} correct? 0x9956d17a0615e2af9f3745c87a55db05fcc50329`);
     console.log("Tokens approved, txHash: ", result.transactionHash);
@@ -29,7 +29,7 @@ async function main() {
         .receiveTokensTo(31, 
         Token.address, 
         'WjDz74uofMpF87xy9F9F1HYs9rjU6vY8Gr', 
-        '200000000000000').send({ from: deployer, gasLimit: 3000000 });
+        '3025000000000000000').send({ from: deployer, gasLimit: 3000000 });
 
     console.log("Tokens sent, txHash: ", receipt.transactionHash);
 }

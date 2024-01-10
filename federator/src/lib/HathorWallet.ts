@@ -391,9 +391,13 @@ export class HathorWallet {
       );
       return false;
     }
-    if (!(txOutput.value === parseInt(event.returnValues['_amount']))) {
+
+    const tokenDecimals = await this.getTokenDecimals(event.returnValues['_tokenAddress']);
+    const convertedQuantity = this.convertDecimals(event.returnValues['_amount'], tokenDecimals);
+
+    if (!(txOutput.value === convertedQuantity)) {
       this.logger.error(
-        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${event.returnValues['_amount']}.`,
+        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${convertedQuantity}.`,
       );
       return false;
     }
