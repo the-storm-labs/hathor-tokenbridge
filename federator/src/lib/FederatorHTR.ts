@@ -16,10 +16,10 @@ import { LogWrapper } from './logWrapper';
 import { HathorWallet } from './HathorWallet';
 import {
   GetLogsParams,
+  ProcessLogsParams,
   ProcessToHathorLogParams,
   ProcessToHathorTransactionParams,
-  ProcessLogsParams,
-  VoteTransactionParams,
+  VoteHathorTransactionParams,
 } from '../types/federator';
 
 export default class FederatorHTR extends Federator {
@@ -288,7 +288,12 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const hathorWallet = new HathorWallet(this.config, this.logger, processTransactionParams.bridgeFactory);    
+    const hathorWallet = new HathorWallet(
+      this.config,
+      this.logger,
+      processTransactionParams.bridgeFactory,
+      processTransactionParams.federationFactory,
+    );
 
     await hathorWallet.sendTokensToHathor(
       processTransactionParams.receiver,
@@ -298,59 +303,10 @@ export default class FederatorHTR extends Federator {
     );
   }
 
-  // async processTransaction(processTransactionParams: ProcessTransactionParams) {
-  //   const dataToHash = {
-  //     to: processTransactionParams.receiver,
-  //     amount: processTransactionParams.amount,
-  //     blockHash: processTransactionParams.log.blockHash,
-  //     transactionHash: processTransactionParams.log.transactionHash,
-  //     logIndex: processTransactionParams.log.logIndex,
-  //     originChainId: processTransactionParams.originChainId,
-  //     destinationChainId: processTransactionParams.destinationChainId,
-  //   };
-  //   this.logger.info('===dataToHash===', dataToHash);
-  //   this.logger.warn('===log===', processTransactionParams.log);
-  //   const transactionDataHash = await typescriptUtils.retryNTimes(
-  //     processTransactionParams.sideBridgeContract.getTransactionDataHash(dataToHash),
-  //   );
-  //   const wasProcessed = await typescriptUtils.retryNTimes(
-  //     processTransactionParams.sideBridgeContract.getProcessed(transactionDataHash),
-  //   );
-  //   if (wasProcessed) {
-  //     this.logger.info(
-  //       `Already processed Block: ${processTransactionParams.log.blockHash} Tx: ${processTransactionParams.log.transactionHash}
-  //         originalTokenAddress: ${processTransactionParams.tokenAddress}`,
-  //     );
-  //     return;
-  //   }
-  //   const hasVoted = await processTransactionParams.sideFedContract.hasVoted(
-  //     processTransactionParams.transactionId,
-  //     processTransactionParams.federatorAddress,
-  //   );
-  //   if (hasVoted) {
-  //     this.logger.debug(
-  //       `Block: ${processTransactionParams.log.blockHash} Tx: ${processTransactionParams.log.transactionHash}
-  //       originalTokenAddress: ${processTransactionParams.tokenAddress}  has already been voted by us`,
-  //     );
-  //     return;
-  //   }
-  //   this.logger.info(
-  //     `Voting tx: ${processTransactionParams.log.transactionHash} block: ${processTransactionParams.log.blockHash}
-  //     originalTokenAddress: ${processTransactionParams.tokenAddress}`,
-  //   );
-  //   await this._voteTransaction({
-  //     ...processTransactionParams,
-  //     blockHash: processTransactionParams.log.blockHash,
-  //     transactionHash: processTransactionParams.log.transactionHash,
-  //     logIndex: processTransactionParams.log.logIndex,
-  //   });
-  // }
-
   async _processLogs(processLogsParams: ProcessLogsParams) {
     try {
       const allowTokens = await processLogsParams.allowTokensFactory.createInstance(this.config.mainchain);
       for (const log of processLogsParams.logs) {
-        console.log(log);
         await this.processLog({
           ...processLogsParams,
           log,
@@ -364,7 +320,7 @@ export default class FederatorHTR extends Federator {
     }
   }
 
-  async _voteTransaction(voteTransactionParams: VoteTransactionParams) {
+  async _voteTransaction(voteTransactionParams: VoteHathorTransactionParams) {
     try {
       voteTransactionParams.transactionId = voteTransactionParams.transactionId.toLowerCase();
       this.logger.info(

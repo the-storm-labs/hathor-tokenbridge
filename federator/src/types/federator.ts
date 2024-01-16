@@ -65,6 +65,25 @@ export interface ProcessToHathorTransactionParams extends ProcessToHathorLogPara
   destinationChainId: number;
 }
 
+export interface VoteHathorTransactionParams {
+  sideChainId: number;
+  mainChainId: number;
+  transactionSender: TransactionSender;
+  sideChainConfig: ConfigChain;
+  sideFedContract: IFederation;
+  federatorAddress: string;
+  tokenAddress: string;
+  senderAddress: string;
+  receiver: string;
+  amount: BN;
+  transactionId: string;
+  originChainId: number;
+  destinationChainId: number;
+  blockHash: string;
+  transactionHash: string;
+  logIndex: number;
+}
+
 export interface VoteTransactionParams extends ProcessTransactionParams {
   blockHash: string;
   transactionHash: string;

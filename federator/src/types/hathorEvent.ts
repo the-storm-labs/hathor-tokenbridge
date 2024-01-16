@@ -9,7 +9,7 @@ export interface Data {
   tx_id: string;
   version: number;
   weight: number;
-  timestamp: number;
+  timestamp: string;
   is_voided: boolean;
   inputs: Input[];
   outputs: Output[];

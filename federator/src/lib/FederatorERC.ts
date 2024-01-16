@@ -57,16 +57,15 @@ export default class FederatorERC extends Federator {
       return false;
     }
 
-    // TODO: REPLACE???
-    // const isSideSyncing = await sideChainWeb3.eth.isSyncing();
-    // if (isSideSyncing !== false) {
-    //   this.logger.warn(
-    //     `ChainId ${sideChainId} is Syncing, ${JSON.stringify(
-    //       isSideSyncing,
-    //     )}. Federator won't process requests till is synced`,
-    //   );
-    //   return false;
-    // }
+    const isSideSyncing = await sideChainWeb3.eth.isSyncing();
+    if (isSideSyncing !== false) {
+      this.logger.warn(
+        `ChainId ${sideChainId} is Syncing, ${JSON.stringify(
+          isSideSyncing,
+        )}. Federator won't process requests till is synced`,
+      );
+      return false;
+    }
 
     this.logger.trace(`Current Block ${currentBlock} ChainId ${mainChainId}`);
     const allowTokens = await allowTokensFactory.createInstance(this.config.mainchain);
@@ -149,7 +148,6 @@ export default class FederatorERC extends Federator {
       this.logger.debug(`Page ${currentPage} getting events from block ${fromPageBlock} to ${toPagedBlock}`);
       this.logger.upsertContext('fromBlock', fromPageBlock);
       this.logger.upsertContext('toBlock', toPagedBlock);
-      console.log(getLogParams.sideChainId);
       const logs = await mainBridge.getPastEvents('Cross', getLogParams.sideChainId, {
         fromBlock: fromPageBlock,
         toBlock: toPagedBlock,
@@ -341,30 +339,27 @@ export default class FederatorERC extends Federator {
 
   async _processLogs(processLogsParams: ProcessLogsParams) {
     try {
-      // TODO Substituir por hathor
-      // const federatorAddress = await processLogsParams.transactionSender.getAddress(this.config.privateKey);
-      // const sideFedContract = await processLogsParams.federationFactory.createInstance(
-      //   processLogsParams.sideChainConfig,
-      //   this.config.privateKey,
-      // );
-      // const sideBridgeContract = await processLogsParams.bridgeFactory.createInstance(
-      //   processLogsParams.sideChainConfig,
-      // );
-      // const allowTokens = await processLogsParams.allowTokensFactory.createInstance(this.config.mainchain);
+      const federatorAddress = await processLogsParams.transactionSender.getAddress(this.config.privateKey);
+      const sideFedContract = await processLogsParams.federationFactory.createInstance(
+        processLogsParams.sideChainConfig,
+        this.config.privateKey,
+      );
+      const sideBridgeContract = await processLogsParams.bridgeFactory.createInstance(
+        processLogsParams.sideChainConfig,
+      );
+      const allowTokens = await processLogsParams.allowTokensFactory.createInstance(this.config.mainchain);
 
-      // await this.checkFederatorIsMember(sideFedContract, federatorAddress);
-      console.log('now where talking');
+      await this.checkFederatorIsMember(sideFedContract, federatorAddress);
+
       for (const log of processLogsParams.logs) {
-        console.log(log);
-        // TODO Substituir por hathor
-        // await this.processLog({
-        //   ...processLogsParams,
-        //   log,
-        //   sideFedContract,
-        //   allowTokens,
-        //   federatorAddress,
-        //   sideBridgeContract,
-        // });
+        await this.processLog({
+          ...processLogsParams,
+          log,
+          sideFedContract,
+          allowTokens,
+          federatorAddress,
+          sideBridgeContract,
+        });
       }
 
       return true;

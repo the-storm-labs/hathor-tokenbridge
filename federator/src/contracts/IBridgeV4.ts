@@ -63,4 +63,8 @@ export class IBridgeV4 implements IBridge {
   EvmToHathorTokenMap(mainToken: string): Promise<string> {
     return this.bridgeContract.methods.EvmToHathorTokenMap(mainToken).call();
   }
+
+  HathorToEvmTokenMap(mainToken: string): Promise<string> {
+    return this.bridgeContract.methods.HathorToEvmTokenMap(mainToken).call();
+  }
 }

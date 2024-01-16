@@ -37,7 +37,11 @@ describe("Hathor Tx Data tests", () => {
   it("Should check if can find a txHex in a tx", async () => {
     const jsonTx = require("./resources/tx-example.json");
     const utxos = jsonTx.data.outputs.map(
-      (o) => new hathorUtxo.default(o.script)
+      (o) => new hathorUtxo.default(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        })
     );
     let tx = new hathorTx.default(
       jsonTx.data.tx_id,
@@ -51,7 +55,12 @@ describe("Hathor Tx Data tests", () => {
   it("Should not find a txHex in a tx", async () => {
     const jsonTx = require('./resources/tx-without-hex-example.json');
     const utxos = jsonTx.data.outputs.map(
-      (o) => new hathorUtxo.default(o.script)
+      (o) =>
+        new hathorUtxo.default(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        })
     );
     let tx = new hathorTx.default(
       jsonTx.data.tx_id,
@@ -68,7 +77,11 @@ describe("Hathor Tx Data tests", () => {
 
     const jsonTx = require('./resources/tx-example.json');
     const utxos = jsonTx.data.outputs.map(
-      (o) => new hathorUtxo.default(o.script)
+      (o) => new hathorUtxo.default(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        })
     );
     let tx = new hathorTx.default(
       jsonTx.data.tx_id,
@@ -81,16 +94,105 @@ describe("Hathor Tx Data tests", () => {
   it("Should correctly convert evm token decimals to hathor", async () => {
       let wallet = new HathorWallet.default(config, logger, {});
       let originWithDecimals = "200000000000000"; 
-      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(0);
+      expect(wallet.convertToHathorDecimals(originWithDecimals, 18)).toEqual(0);
 
       originWithDecimals = "80000000000000000"; 
-      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(8);
+      expect(wallet.convertToHathorDecimals(originWithDecimals, 18)).toEqual(8);
 
       originWithDecimals = "3025000000000000000"; 
-      expect(wallet.convertDecimals(originWithDecimals, 18)).toEqual(302);
+      expect(wallet.convertToHathorDecimals(originWithDecimals, 18)).toEqual(302);
   });
 
-  // it("Should validate if a Hathor TxHex has the correct parameters for it's EVM TxHash", async () => {
-  //   const hathorWallet = new hathorWallet.default()
-  // });
+  it("Should correctly convert hathor token decimals to evm", async () => {
+      let wallet = new HathorWallet.default(config, logger, {});
+
+      let originWithDecimals = 8; 
+      expect(wallet.convertToEvmDecimals(originWithDecimals, 18)).toEqual("80000000000000000");
+
+      originWithDecimals = 302; 
+      expect(wallet.convertToEvmDecimals(originWithDecimals, 18)).toEqual("3020000000000000000");
+  });
+
+  it("Should find a custom address in a tx", async () => {
+    const jsonTx = require("./resources/tx-transfer-to-evm.json");
+    const outUtxos = jsonTx.data.outputs.map(
+      (o) =>
+        new hathorUtxo.default(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        })
+    );
+    const inUtxos = jsonTx.data.inputs.map(
+      (i) =>
+        new hathorUtxo.default(i.script, i.token, i.value, {
+          type: i.decoded.type,
+          address: i.decoded.address,
+          timelock: i.decoded.timelock,
+        })
+    );
+    let tx = new hathorTx.default(
+      jsonTx.data.tx_id,
+      jsonTx.data.timestamp,
+      outUtxos,
+      inUtxos
+    );
+    const hasTx = tx.haveCustomData("addr");
+    expect(hasTx).toEqual(true);
+  });
+
+  it("Should get receiver adress from a tx", async () => {
+    const jsonTx = require("./resources/tx-transfer-to-evm.json");
+    const outUtxos = jsonTx.data.outputs.map(
+      (o) => new hathorUtxo.default(o.script, o.token, o.value)
+    );
+    const inUtxos = jsonTx.data.inputs.map(
+      (i) =>
+        new hathorUtxo.default(i.script, i.token, i.value, {
+          type: i.decoded.type,
+          address: i.decoded.address,
+          timelock: i.decoded.timelock,
+        })
+    );
+    let tx = new hathorTx.default(
+      jsonTx.data.tx_id,
+      jsonTx.data.timestamp,
+      outUtxos,
+      inUtxos
+    );
+    const senderAddress = tx.getCustomData("addr");
+    expect(senderAddress).toEqual("0xE23d59ef0c1F63B53234b00a1e1EaBEf822397D2");
+  });
+
+  it("Should get hathor token data from a tx", async () => {
+    const jsonTx = require("./resources/tx-transfer-to-evm.json");
+    const outUtxos = jsonTx.data.outputs.map(
+      (o) =>
+        new hathorUtxo.default(o.script, o.token, o.value, {
+          type: o.decoded.type,
+          address: o.decoded.address,
+          timelock: o.decoded.timelock,
+        })
+    );
+    const inUtxos = jsonTx.data.inputs.map(
+      (i) =>
+        new hathorUtxo.default(i.script, i.token, i.value, {
+          type: i.decoded.type,
+          address: i.decoded.address,
+          timelock: i.decoded.timelock,
+        })
+    );
+    let tx = new hathorTx.default(
+      jsonTx.data.tx_id,
+      jsonTx.data.timestamp,
+      outUtxos,
+      inUtxos
+    );
+    const tokenData = tx.getCustomTokenData()[0];
+    expect(tokenData).toEqual({
+      value: 1,
+      token: "000001f8107c19b57397acb4d44d66208015b6c0eb6cbc3c46651c6fc1e43cdd",
+      sender: "WjTMMX5Rs8oinnpRQfyMuxFYYaPWEPSRPm",
+    });
+  });
 });

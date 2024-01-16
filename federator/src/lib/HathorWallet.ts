@@ -1,6 +1,5 @@
 // import axiosCurlirize from 'axios-curlirize';
 import axios from 'axios';
-import fs from 'fs';
 import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
 import { MetricCollector } from './MetricCollector';
@@ -14,6 +13,10 @@ import { BridgeFactory } from '../contracts/BridgeFactory';
 import { IBridgeV4 } from '../contracts/IBridgeV4';
 import { TokenFactory } from '../contracts/TokenFactory';
 import { ITokenV0 } from '../contracts/ITokenV0';
+import FederatorHTR from './FederatorHTR';
+import { BN } from 'ethereumjs-util';
+import TransactionSender from './TransactionSender';
+import { FederationFactory } from '../contracts/FederationFactory';
 
 // axiosCurlirize(axios);
 
@@ -36,6 +39,7 @@ export class HathorWallet {
   public config: ConfigData;
   public metricCollector: MetricCollector;
   public bridgeFactory: BridgeFactory;
+  public federationFactory: FederationFactory;
   private walletUrl: string;
   private singleWalletId: string;
   private singleSeedKey: string;
@@ -55,10 +59,16 @@ export class HathorWallet {
     /Invalid tx/,
   ];
 
-  constructor(config: ConfigData, logger: LogWrapper, bridgeFactory: BridgeFactory) {
+  constructor(
+    config: ConfigData,
+    logger: LogWrapper,
+    bridgeFactory: BridgeFactory,
+    federationFactory: FederationFactory,
+  ) {
     this.config = config;
     this.logger = logger;
     this.bridgeFactory = bridgeFactory;
+    this.federationFactory = federationFactory;
 
     if (this.logger.upsertContext) {
       this.logger.upsertContext('service', this.constructor.name);
@@ -108,7 +118,7 @@ export class HathorWallet {
     }
 
     const tokenDecimals = await this.getTokenDecimals(tokenAddress);
-    const convertedQuantity = this.convertDecimals(qtd, tokenDecimals);
+    const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
     if (convertedQuantity <= 0) {
       this.logger.info(
         `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${qtd}, Token decimals ${tokenDecimals}.`,
@@ -187,9 +197,25 @@ export class HathorWallet {
     if (event.type !== 'wallet:new-tx') return;
 
     // this.logger.info(JSON.stringify(event));
-    const utxos = event.data.outputs.map((o) => new HathorUtxo(o.script));
-    const tx = new HathorTx(event.data.tx_id, event.data.timestamp, utxos);
-    // TODO: if tx proposal to send to hathor, collect signature, and if last one, get others and sign and push
+    const outUtxos = event.data.outputs.map(
+      (o) =>
+        new HathorUtxo(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        }),
+    );
+
+    const inUtxos = event.data.inputs.map(
+      (o) =>
+        new HathorUtxo(o.script, o.token, o.value, {
+          type: o.decoded?.type,
+          address: o.decoded?.address,
+          timelock: o.decoded?.timelock,
+        }),
+    );
+    const tx = new HathorTx(event.data.tx_id, event.data.timestamp, outUtxos, inUtxos);
+
     const isProposal = tx.haveCustomData('hex');
 
     if (isProposal) {
@@ -221,9 +247,29 @@ export class HathorWallet {
         throw new HathorException('Invalid tx', 'Invalid tx');
       }
       await this.signAndPushProposal(components.hex, components.signatures);
+      return;
     }
 
-    // TODO: if tokens sent to evm melt and send event to federator here
+    const isHathorToEvm = tx.haveCustomData('addr');
+
+    if (isHathorToEvm) {
+      const tokenData = tx.getCustomTokenData()[0];
+      const result = await this.sendTokensFromHathor(
+        tx.getCustomData('addr'),
+        tokenData.value,
+        tokenData.token,
+        tx.tx_id,
+        tokenData.sender,
+        tx.timestamp,
+      );
+      if (!result) {
+        throw new HathorException('Invalid tx', 'Invalid tx'); //change exception type
+      }
+
+      // TODO decide if melt is necessary
+
+      return;
+    }
   }
 
   // Functions involved in sending tokens from EVM to Hathor
@@ -305,6 +351,12 @@ export class HathorWallet {
     const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
     const hathorTokenAddress = originBridge.EvmToHathorTokenMap(evmTokenAddress);
     return hathorTokenAddress;
+  }
+
+  private async getEvmTokenAddress(hathorTokenAddress: string): Promise<string> {
+    const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    const evmTokenAddress = originBridge.HathorToEvmTokenMap(hathorTokenAddress);
+    return evmTokenAddress;
   }
 
   private async broadcastProposal(txHex: string, txHash: string) {
@@ -393,7 +445,7 @@ export class HathorWallet {
     }
 
     const tokenDecimals = await this.getTokenDecimals(event.returnValues['_tokenAddress']);
-    const convertedQuantity = this.convertDecimals(event.returnValues['_amount'], tokenDecimals);
+    const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
 
     if (!(txOutput.value === convertedQuantity)) {
       this.logger.error(
@@ -476,9 +528,57 @@ export class HathorWallet {
     return await tokenContract.getDecimals();
   }
 
-  private convertDecimals(originalQtd: string, tokenDecimals: number): number {
+  private convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
     const hathorPrecision = tokenDecimals - 2;
     return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
+  }
+
+  private convertToEvmDecimals(originalQtd: string, tokenDecimals: number): string {
+    const hathorPrecision = tokenDecimals - 2;
+    return (Number.parseInt(originalQtd) * Math.pow(10, hathorPrecision)).toString();
+  }
+
+  // Functions involved in sending tokens from Hathor to EVM
+
+  private async sendTokensFromHathor(
+    receiverAddress: string,
+    qtd: string,
+    tokenAddress: string,
+    txId: string,
+    ogSenderAddress: string,
+    timestamp: string,
+  ): Promise<boolean> {
+    const federator = new FederatorHTR(this.config, this.logger, null);
+
+    const evmTokenAddr = await this.getEvmTokenAddress(tokenAddress);
+    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddr);
+
+    const sender = Web3.utils.keccak256(ogSenderAddress);
+    const thirdTwoBytesSender = sender.substring(0, 42);
+    const idHash = Web3.utils.keccak256(txId);
+    const convertedAmount = new BN(this.convertToEvmDecimals(qtd, evmTokenDecimals));
+    const timestampHash = Web3.utils.soliditySha3(timestamp);
+
+    const txParams = {
+      sideChainId: this.config.mainchain.chainId,
+      mainChainId: this.config.sidechain[0].chainId,
+      transactionSender: new TransactionSender(this.getWeb3(this.config.mainchain.host), this.logger, this.config),
+      sideChainConfig: this.config.mainchain,
+      sideFedContract: await this.federationFactory.createInstance(this.config.mainchain, this.config.privateKey),
+      federatorAddress: this.config.mainchain.federation,
+      tokenAddress: evmTokenAddr,
+      senderAddress: thirdTwoBytesSender,
+      receiver: receiverAddress,
+      amount: convertedAmount,
+      transactionId: txId,
+      originChainId: this.config.sidechain[0].chainId,
+      destinationChainId: this.config.mainchain.chainId,
+      blockHash: timestampHash,
+      transactionHash: idHash,
+      logIndex: 129,
+    };
+
+    return await federator._voteTransaction(txParams);
   }
 
   // Base functions
