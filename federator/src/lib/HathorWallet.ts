@@ -2,53 +2,26 @@
 import axios from 'axios';
 import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
-import { MetricCollector } from './MetricCollector';
 import { PubSub } from '@google-cloud/pubsub';
 import { HathorTx } from '../types/HathorTx';
 import { HathorUtxo } from '../types/HathorUtxo';
-import { Data } from '../types/hathorEvent';
 import { HathorException } from '../types/HathorException';
-import Web3 from 'web3';
 import { BridgeFactory } from '../contracts/BridgeFactory';
-import { IBridgeV4 } from '../contracts/IBridgeV4';
-import { TokenFactory } from '../contracts/TokenFactory';
-import { ITokenV0 } from '../contracts/ITokenV0';
-import FederatorHTR from './FederatorHTR';
-import { BN } from 'ethereumjs-util';
-import TransactionSender from './TransactionSender';
 import { FederationFactory } from '../contracts/FederationFactory';
+import { EvmBroker } from './Broker/EvmBroker';
+import { Broker } from './Broker/Broker';
+import { HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
+import { ConfigChain } from './configChain';
+import { HathorBroker } from './Broker/HathorBroker';
 
 // axiosCurlirize(axios);
-
-type Response = {
-  success: boolean;
-  message?: string;
-  error?: string;
-  errorCode?: string;
-};
-type CreateProposalResponse = Response & { txHex: string };
-type GetAddressResponse = Response & { address: string };
-type GetMySignatureResponse = Response & { signatures: string };
-type StatusResponse = Response & { statusCode: number; statusMessage: string };
-type DecodeResponse = Response & { tx: Data };
-
-type ProposalComponents = { hex: string; signatures: string[] };
 
 export class HathorWallet {
   public logger: LogWrapper;
   public config: ConfigData;
-  public metricCollector: MetricCollector;
   public bridgeFactory: BridgeFactory;
   public federationFactory: FederationFactory;
-  private walletUrl: string;
-  private singleWalletId: string;
-  private singleSeedKey: string;
-  private multisigWalletId: string;
-  private multisigSeedKey: string;
-  private multisigRequiredSignatures: number;
-  private multisigOrder: number;
-  private eventQueueType: string;
-  private pubsubProjectId: string;
+  protected chainConfig: ConfigChain;
 
   private WALLET_STATUS_CONNECTING = 1;
   private WALLET_STATUS_SYNCING = 2;
@@ -67,72 +40,24 @@ export class HathorWallet {
   ) {
     this.config = config;
     this.logger = logger;
+    this.chainConfig = config.sidechain[0];
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
-
-    if (this.logger.upsertContext) {
-      this.logger.upsertContext('service', this.constructor.name);
-    }
-
-    // const chainConfig = config.sidechain.find((chain) => chain.isHathor);
-    const chainConfig = config.sidechain[0];
-
-    this.walletUrl = chainConfig.walletUrl;
-    this.singleWalletId = chainConfig.singleWalletId;
-    this.singleSeedKey = chainConfig.singleSeedKey;
-    this.multisigWalletId = chainConfig.multisigWalletId;
-    this.multisigSeedKey = chainConfig.multisigSeedKey;
-    this.multisigRequiredSignatures = chainConfig.multisigRequiredSignatures;
-    this.multisigOrder = chainConfig.multisigOrder;
-    this.eventQueueType = chainConfig.eventQueueType;
-    this.pubsubProjectId = chainConfig.pubsubProjectId;
-
-    this.web3ByHost = new Map<string, Web3>();
-  }
-
-  public web3ByHost: Map<string, Web3>;
-
-  getWeb3(host: string): Web3 {
-    let hostWeb3 = this.web3ByHost.get(host);
-    if (!hostWeb3) {
-      hostWeb3 = new Web3(host);
-      this.web3ByHost.set(host, hostWeb3);
-    }
-    return hostWeb3;
   }
 
   async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
-    if (this.multisigOrder > 1) return;
+    if (this.chainConfig.multisigOrder > 1) return;
 
     await this.isWalletReady(true);
     await this.isWalletReady(false);
 
-    const txs = this.castHistoryToTx(await this.getHistory());
-    const proposals = txs.filter(
-      (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
-    );
-
-    if (proposals.length > 0) {
-      this.logger.info('Proposal already sent.');
-      return;
-    }
-
-    const tokenDecimals = await this.getTokenDecimals(tokenAddress);
-    const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
-    if (convertedQuantity <= 0) {
-      this.logger.info(
-        `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${qtd}, Token decimals ${tokenDecimals}.`,
-      );
-      return;
-    }
-
-    const txHex = await this.sendTransactionProposal(receiverAddress, convertedQuantity, tokenAddress);
-    await this.broadcastProposal(txHex, txHash);
+    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+    await broker.sendTokensToHathor(receiverAddress, qtd, tokenAddress, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
     await this.isWalletReady(true);
-    switch (this.eventQueueType) {
+    switch (this.chainConfig.eventQueueType) {
       case 'pubsub':
         this.listenToPubSubEventQueue();
         break;
@@ -146,11 +71,13 @@ export class HathorWallet {
   }
 
   private async listenToPubSubEventQueue() {
-    const pubsub = new PubSub({ projectId: this.pubsubProjectId });
+    const pubsub = new PubSub({ projectId: this.chainConfig.pubsubProjectId });
 
     const [subscriptions] = await pubsub.getSubscriptions();
     const subscription = subscriptions.find(
-      (sub) => sub.name === `projects/${this.pubsubProjectId}/subscriptions/hathor-federator-${this.multisigOrder}-sub`,
+      (sub) =>
+        sub.name ===
+        `projects/${this.chainConfig.pubsubProjectId}/subscriptions/hathor-federator-${this.chainConfig.multisigOrder}-sub`,
     );
 
     if (subscription) {
@@ -185,18 +112,22 @@ export class HathorWallet {
       });
       subscription.on('error', (error) => {
         this.logger.error(
-          `Unable to subscribe to topic hathor-federator-${this.multisigOrder}. Make sure it exists. Error: ${error}`,
+          `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists. Error: ${error}`,
         );
       });
     } else {
-      this.logger.error(`Unable to subscribe to topic hathor-federator-${this.multisigOrder}. Make sure it exists.`);
+      this.logger.error(
+        `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists.`,
+      );
     }
   }
 
   private async parseHathorLogs(event: any) {
     if (event.type !== 'wallet:new-tx') return;
 
-    // this.logger.info(JSON.stringify(event));
+    await this.isWalletReady(true);
+    await this.isWalletReady(false);
+
     const outUtxos = event.data.outputs.map(
       (o) =>
         new HathorUtxo(o.script, o.token, o.value, {
@@ -221,40 +152,37 @@ export class HathorWallet {
     if (isProposal) {
       this.logger.info('Evaluating proposal...');
       const txHex = tx.getCustomData('hex');
-      const txHash = tx.getCustomData('hsh');
-      await this.isWalletReady(true);
-      await this.isWalletReady(false);
-      await this.sendMySignaturesToProposal(txHex, txHash);
+      const [broker, dataType] = this.getBrokerAndDataType(tx);
+      await broker.sendMySignaturesToProposal(txHex, tx.getCustomData(dataType));
       return;
     }
 
     const isSignature = tx.haveCustomData('sig');
 
-    if (isSignature && this.multisigOrder >= this.multisigRequiredSignatures) {
+    if (isSignature && this.chainConfig.multisigOrder >= this.chainConfig.multisigRequiredSignatures) {
       this.logger.info('Evaluating signature...');
-      const txHash = tx.getCustomData('hsh');
-      await this.isWalletReady(true);
-      await this.isWalletReady(false);
-      const components = await this.getSignaturesToPush(txHash);
-      if (components.signatures.length < this.multisigRequiredSignatures) {
+      const [broker, dataType] = this.getBrokerAndDataType(tx);
+      const txId = tx.getCustomData(dataType);
+      const components = await broker.getSignaturesToPush(txId);
+
+      if (components.signatures.length < this.chainConfig.multisigRequiredSignatures) {
         this.logger.info(
-          `Number of signatures not reached. Require ${this.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
+          `Number of signatures not reached. Require ${this.chainConfig.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
         );
         return;
       }
 
-      if (!this.validateTx(components.hex, txHash)) {
-        throw new HathorException('Invalid tx', 'Invalid tx');
-      }
-      await this.signAndPushProposal(components.hex, components.signatures);
+      await broker.signAndPushProposal(components.hex, txId, components.signatures);
       return;
     }
 
     const isHathorToEvm = tx.haveCustomData('addr');
 
     if (isHathorToEvm) {
+      const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
       const tokenData = tx.getCustomTokenData()[0];
-      const result = await this.sendTokensFromHathor(
+
+      const result = await broker.sendTokensFromHathor(
         tx.getCustomData('addr'),
         tokenData.value,
         tokenData.token,
@@ -263,406 +191,33 @@ export class HathorWallet {
         tx.timestamp,
       );
       if (!result) {
-        throw new HathorException('Invalid tx', 'Invalid tx'); //change exception type
+        throw new HathorException('Invalid tx', 'Invalid tx'); //TODO change exception type
       }
-
-      // TODO decide if melt is necessary
-
       return;
     }
   }
 
-  // Functions involved in sending tokens from EVM to Hathor
-
-  private async getSignaturesToPush(txHash: string): Promise<ProposalComponents> {
-    const txs = this.castHistoryToTx(await this.getHistory());
-    const hex = txs.find((tx) => tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash);
-    const signatures = txs.filter((tx) => tx.haveCustomData('sig') && tx.getCustomData('hsh') === txHash);
-
-    return {
-      hex: hex.getCustomData('hex'),
-      signatures: signatures.map((sig) => sig.getCustomData('sig')),
-    };
-  }
-
-  private castHistoryToTx(history: Data[]): HathorTx[] {
-    const txs: HathorTx[] = [];
-    history.forEach((data) => {
-      const utxos = data.outputs.map((o) => new HathorUtxo(o.script));
-      const tx = new HathorTx(data.tx_id, data.timestamp, utxos);
-      txs.push(tx);
-    });
-
-    return txs;
-  }
-
-  private async getHistory() {
-    const url = `${this.walletUrl}/wallet/tx-history`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-      params: { limit: 50 },
-    };
-
-    try {
-      const response = await axios.get<Data[]>(url, config);
-
-      if (response.status == 200) {
-        return response.data;
-      }
-
-      throw Error(`${response.status} - ${response.data}`);
-    } catch (error) {
-      throw Error(`Fail to getHistory: ${error}`);
+  private getBrokerAndDataType(tx: HathorTx): [Broker, string] {
+    const customDataType = tx.getCustomDataType();
+    switch (customDataType) {
+      case 'hsh':
+        return [new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
+      case 'hid':
+        return [new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
     }
   }
 
-  private async sendTransactionProposal(receiverAddress: string, qtd: number, token: string) {
-    const hathorTokenAddress = await this.getHathorTokenAddress(token);
-    const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/mint-tokens`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    const data = {
-      address: `${receiverAddress}`,
-      amount: qtd,
-      token: `${hathorTokenAddress}`,
-    };
-
-    const response = await axios.post<CreateProposalResponse>(url, data, config);
-    if (response.status == 200 && response.data.success) {
-      return response.data.txHex;
-    }
-    throw new HathorException(
-      `Unable to send a transaction proposal ${response.status} - ${response.statusText} - ${JSON.stringify(
-        response.data,
-      )}`,
-      response.data.message ?? response.data.error,
-    );
-  }
-
-  private async getHathorTokenAddress(evmTokenAddress: string): Promise<string> {
-    const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
-    const hathorTokenAddress = originBridge.EvmToHathorTokenMap(evmTokenAddress);
-    return hathorTokenAddress;
-  }
-
-  private async getEvmTokenAddress(hathorTokenAddress: string): Promise<string> {
-    const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
-    const evmTokenAddress = originBridge.HathorToEvmTokenMap(hathorTokenAddress);
-    return evmTokenAddress;
-  }
-
-  private async broadcastProposal(txHex: string, txHash: string) {
-    const data = {
-      outputs: await this.wrapData('hex', txHex),
-    };
-    data.outputs = data.outputs.concat(await this.wrapData('hsh', txHash));
-    data.outputs.push({
-      address: await this.getMultiSigAddress(),
-      value: 1,
-    });
-    await this.broadcastDataToMultisig(data);
-  }
-
-  private async sendMySignaturesToProposal(txHex: string, txHash: string): Promise<void> {
-    if (!(await this.validateTx(txHex, txHash))) {
-      throw new HathorException('Invalid tx', 'Invalid tx');
-    }
-
-    const signature = await this.getMySignatures(txHex);
-    if (await this.haveISignedBefore(signature, txHash)) {
-      this.logger.info(`Tx ${txHash} was already signed before.`);
-      return;
-    }
-    const wrappedSig = await this.wrapData('sig', signature);
-    const data = {
-      outputs: wrappedSig,
-    };
-    data.outputs = data.outputs.concat(await this.wrapData('hsh', txHash));
-    data.outputs.push({
-      address: await this.getMultiSigAddress(),
-      value: 1,
-    });
-    await this.broadcastDataToMultisig(data);
-  }
-
-  private async haveISignedBefore(signature: string, txHash: string) {
-    const historyTxs = this.castHistoryToTx(await this.getHistory());
-    let response = false;
-    for (let index = 0; index < historyTxs.length; index++) {
-      const tx = historyTxs[index];
-
-      if (
-        tx.haveCustomData('hsh') &&
-        tx.haveCustomData('sig') &&
-        tx.getCustomData('hsh') === txHash &&
-        tx.getCustomData('sig') === signature
-      ) {
-        response = true;
-        break;
-      }
-    }
-
-    return response;
-  }
-
-  private async validateTx(txHex: string, txHash: string): Promise<boolean> {
-    const hathorTx = await this.decodeTxHex(txHex);
-    const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
-    const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
-    const events = await bridge.getPastEvents('Cross', this.config.sidechain[0].chainId, {
-      fromBlock: evmTx.blockNumber,
-      toBlock: evmTx.blockNumber,
-    });
-    const event = events.find((e) => e.transactionHash === txHash);
-
-    if (!event) {
-      this.logger.error(`Invalid tx. Unable to find event on EVM. HEX: ${txHex} | HASH: ${txHash}`);
-      return false;
-    }
-
-    const evmTranslatedToken = await bridge.EvmToHathorTokenMap(event.returnValues['_tokenAddress']);
-
-    const txOutput = hathorTx.outputs.find((o) => o.token === evmTranslatedToken);
-
-    if (!txOutput) {
-      this.logger.error(`Invalid tx. Unable to find token on hathoro tx outputs. HEX: ${txHex} | HASH: ${txHash}`);
-      return false;
-    }
-
-    if (!(txOutput.decoded.address === event.returnValues['_to'])) {
-      this.logger.error(
-        `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${event.returnValues['_to']}.`,
-      );
-      return false;
-    }
-
-    const tokenDecimals = await this.getTokenDecimals(event.returnValues['_tokenAddress']);
-    const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
-
-    if (!(txOutput.value === convertedQuantity)) {
-      this.logger.error(
-        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${convertedQuantity}.`,
-      );
-      return false;
-    }
-    return true;
-  }
-
-  private async decodeTxHex(txHex: string): Promise<Data> {
-    const url = `${this.walletUrl}/wallet/decode`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    try {
-      const response = await axios.post<DecodeResponse>(url, { txHex: txHex }, config);
-
-      if (response.status == 200 && response.data.success) {
-        return response.data.tx;
-      }
-
-      throw Error(`${response.status} - ${response.data}`);
-    } catch (error) {
-      throw Error(`Error on decodeTxHex: ${error}`);
-    }
-  }
-
-  private async getMySignatures(txHex: string) {
-    const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/get-my-signatures`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    try {
-      const response = await axios.post<GetMySignatureResponse>(url, { txHex: txHex }, config);
-
-      if (response.status == 200 && response.data.success) {
-        return response.data.signatures;
-      }
-
-      throw Error(`${response.status} - ${response.data}`);
-    } catch (error) {
-      throw Error(`Fail to getMySignature: ${error}`);
-    }
-  }
-
-  private async signAndPushProposal(txHex: string, signatures: string[]) {
-    const url = `${this.walletUrl}/wallet/p2sh/tx-proposal/sign-and-push`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    const data = {
-      txHex: `${txHex}`,
-      signatures: signatures,
-    };
-
-    const response = await axios.post<Response>(url, data, config);
-
-    if (response.status != 200 || !response.data.success) {
-      const fullMessage = `${response.status} - ${response.statusText} - ${JSON.stringify(response.data)}`;
-      throw new HathorException(fullMessage, response.data.error);
-    }
-  }
-
-  private async getTokenDecimals(tokenAddress: string): Promise<number> {
-    const tokenFactory = new TokenFactory();
-    const tokenContract = (await tokenFactory.createInstance(this.config.mainchain, tokenAddress)) as ITokenV0;
-    return await tokenContract.getDecimals();
-  }
-
-  private convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
-    const hathorPrecision = tokenDecimals - 2;
-    return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
-  }
-
-  private convertToEvmDecimals(originalQtd: string, tokenDecimals: number): string {
-    const hathorPrecision = tokenDecimals - 2;
-    return (Number.parseInt(originalQtd) * Math.pow(10, hathorPrecision)).toString();
-  }
-
-  // Functions involved in sending tokens from Hathor to EVM
-
-  private async sendTokensFromHathor(
-    receiverAddress: string,
-    qtd: string,
-    tokenAddress: string,
-    txId: string,
-    ogSenderAddress: string,
-    timestamp: string,
-  ): Promise<boolean> {
-    const federator = new FederatorHTR(this.config, this.logger, null);
-
-    const evmTokenAddr = await this.getEvmTokenAddress(tokenAddress);
-    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddr);
-
-    const sender = Web3.utils.keccak256(ogSenderAddress);
-    const thirdTwoBytesSender = sender.substring(0, 42);
-    const idHash = Web3.utils.keccak256(txId);
-    const convertedAmount = new BN(this.convertToEvmDecimals(qtd, evmTokenDecimals));
-    const timestampHash = Web3.utils.soliditySha3(timestamp);
-
-    const txParams = {
-      sideChainId: this.config.mainchain.chainId,
-      mainChainId: this.config.sidechain[0].chainId,
-      transactionSender: new TransactionSender(this.getWeb3(this.config.mainchain.host), this.logger, this.config),
-      sideChainConfig: this.config.mainchain,
-      sideFedContract: await this.federationFactory.createInstance(this.config.mainchain, this.config.privateKey),
-      federatorAddress: this.config.mainchain.federation,
-      tokenAddress: evmTokenAddr,
-      senderAddress: thirdTwoBytesSender,
-      receiver: receiverAddress,
-      amount: convertedAmount,
-      transactionId: txId,
-      originChainId: this.config.sidechain[0].chainId,
-      destinationChainId: this.config.mainchain.chainId,
-      blockHash: timestampHash,
-      transactionHash: idHash,
-      logIndex: 129,
-    };
-
-    return await federator._voteTransaction(txParams);
-  }
-
-  // Base functions
-
-  private async getMultiSigAddress() {
-    // TODO Provide cache strategy
-    const url = `${this.walletUrl}/wallet/address`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    try {
-      const response = await axios.get<GetAddressResponse>(url, config);
-      if (response.status == 200) {
-        return response.data.address;
-      }
-      throw Error(`${response.status} - ${response.statusText} | ${response.data}`);
-    } catch (error) {
-      throw Error(`Fail to getMultiSigAddress: ${error}`);
-    }
-  }
-
-  private async wrapData(dataType: string, data: string): Promise<any[]> {
-    const outputs = [];
-    /* dataLimit: the max amount of caracters a data field can get, 
-        descounted the dataType and positional caracters, ex: hex01{145 caracters}
-    */
-    const dataLimit = 145;
-
-    const dataLength = data.length;
-    const arraySize = Math.ceil(dataLength / dataLimit);
-
-    for (let i = 0; i < arraySize; i++) {
-      const start = i * dataLimit;
-      const end = start + dataLimit;
-      const part = data.substring(start, end);
-      outputs.push({
-        type: 'data',
-        data: `${dataType}${i}${arraySize}${part}`,
-      });
-    }
-
-    return outputs;
-  }
-
-  private async broadcastDataToMultisig(data: any): Promise<boolean> {
-    const url = `${this.walletUrl}/wallet/send-tx`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.singleWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
-    try {
-      const response = await axios.post<Response>(url, data, config);
-
-      if (response.status != 200) {
-        throw Error(`Response status: ${response.status} - status message: ${response.statusText}`);
-      }
-      if (response.status == 200 && !response.data.success) {
-        throw Error(`Error message: ${response.data.error}`);
-      }
-
-      return true;
-    } catch (error) {
-      throw Error(`Fail to broadcast data to multisig: ${error}`);
-    }
-  }
-
-  private async isWalletReady(multisig: boolean, retry = 1): Promise<boolean> {
-    const id = multisig ? this.multisigWalletId : this.singleWalletId;
+  protected async isWalletReady(multisig: boolean, retry = 1): Promise<boolean> {
+    const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
     if (retry > 3) {
       this.logger.error(`Fail to start ${id} wallet: Maximum number of retries reached.`);
       return false;
     }
     this.logger.info(`Checking ${id} wallet status for the ${retry} time`);
-    const url = `${this.walletUrl}/wallet/status`;
+    const url = `${this.chainConfig.walletUrl}/wallet/status`;
     const config = {
       headers: {
-        'x-wallet-id': multisig ? this.multisigWalletId : this.singleWalletId,
+        'x-wallet-id': multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId,
         'Content-type': 'application/json',
       },
     };
@@ -690,10 +245,10 @@ export class HathorWallet {
   }
 
   private async startWallet(multisig: boolean): Promise<boolean> {
-    const id = multisig ? this.multisigWalletId : this.singleWalletId;
-    const seedKey = multisig ? this.multisigSeedKey : this.singleSeedKey;
+    const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
+    const seedKey = multisig ? this.chainConfig.multisigSeedKey : this.chainConfig.singleSeedKey;
     this.logger.info(`Trying to start ${id} wallet.`);
-    const url = `${this.walletUrl}/start`;
+    const url = `${this.chainConfig.walletUrl}/start`;
     const config = {
       headers: {
         'Content-type': 'application/json',
@@ -706,7 +261,7 @@ export class HathorWallet {
     };
 
     try {
-      const response = await axios.post<Response>(url, data, config);
+      const response = await axios.post<HathorResponse>(url, data, config);
       return response.status == 200 && response.data.success;
     } catch (error) {
       throw Error(`Fail to start wallet: ${error}`);

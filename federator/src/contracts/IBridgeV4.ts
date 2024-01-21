@@ -6,6 +6,11 @@ interface SideTokenAddressByOriginalTokenInterface {
   chainId: number;
 }
 
+interface OriginalToken {
+  tokenAddress: string;
+  originChainId: number;
+}
+
 export class IBridgeV4 implements IBridge {
   bridgeContract: Contract;
   chainId: number;
@@ -64,7 +69,7 @@ export class IBridgeV4 implements IBridge {
     return this.bridgeContract.methods.EvmToHathorTokenMap(mainToken).call();
   }
 
-  HathorToEvmTokenMap(mainToken: string): Promise<string> {
+  HathorToEvmTokenMap(mainToken: string): Promise<OriginalToken> {
     return this.bridgeContract.methods.HathorToEvmTokenMap(mainToken).call();
   }
 }

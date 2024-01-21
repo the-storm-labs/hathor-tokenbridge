@@ -14,6 +14,11 @@ export class HathorTx {
     this.inputs = inputs;
   }
 
+  getCustomDataType(): string {
+    if (this.haveCustomData('hsh')) return 'hsh';
+    if (this.haveCustomData('hid')) return 'hid';
+  }
+
   haveCustomData(dataType: string = null): boolean {
     if (dataType != null)
       return this.outputs.some((utxo) => utxo.haveCustomData && utxo.customData?.dataType === dataType);
