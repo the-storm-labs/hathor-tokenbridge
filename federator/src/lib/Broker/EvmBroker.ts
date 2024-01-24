@@ -32,7 +32,9 @@ export class EvmBroker extends Broker {
       return;
     }
 
-    const tokenDecimals = await this.getTokenDecimals(tokenAddress);
+    const [hathorTokenAddress, originalChainId] = await this.getHathorTokenAddress(tokenAddress);
+
+    const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
     const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
     if (convertedQuantity <= 0) {
       this.logger.info(
@@ -40,8 +42,6 @@ export class EvmBroker extends Broker {
       );
       return;
     }
-
-    const [hathorTokenAddress, originalChainId] = await this.getHathorTokenAddress(tokenAddress);
     const txHex =
       originalChainId == this.config.mainchain.chainId
         ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
@@ -81,7 +81,9 @@ export class EvmBroker extends Broker {
       return false;
     }
 
-    const tokenDecimals = await this.getTokenDecimals(event.returnValues['_tokenAddress']);
+    const originalToken = await bridge.HathorToEvmTokenMap(evmTranslatedToken);
+
+    const tokenDecimals = await this.getTokenDecimals(originalToken.tokenAddress, originalToken.originChainId);
     const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
 
     if (!(txOutput.value === convertedQuantity)) {

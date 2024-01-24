@@ -437,8 +437,13 @@
     "outputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "tokenAddress",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "originChainId",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -525,6 +530,11 @@
   },
   {
     "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "originalChainId",
+        "type": "uint256"
+      },
       {
         "internalType": "address",
         "name": "token",

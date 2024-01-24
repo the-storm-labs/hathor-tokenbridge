@@ -3,12 +3,9 @@ const hre = require('hardhat');
 
 async function main() {
     const {getNamedAccounts, deployments} = hre;
-    let {deployer} = await getNamedAccounts();
+    // let {deployer} = await getNamedAccounts();    
+    let deployer = '0xE23d59ef0c1F63B53234b00a1e1EaBEf822397D2';
     // console.log(deployer);
-
-    deployer = '0xE23d59ef0c1F63B53234b00a1e1EaBEf822397D2'
-
-    const Token = await deployments.get('MainToken');
     
     const Bridge = await deployments.get('Bridge');
     const BridgeProxy = await deployments.get('BridgeProxy');
@@ -17,8 +14,8 @@ async function main() {
     const claim = {
         to: '0xE23d59ef0c1F63B53234b00a1e1EaBEf822397D2',
 		amount: '10000000000000000',
-		blockHash: '0xa56085e3f4b749fa220fcd355c5fb8f426200fa673a9c662551bf5390e11492c',
-		transactionHash: '0x7ffa6dcb752f216e02d30a563e250b2c33c0e13fc73ca2c06748c78e20962357',
+		blockHash: '0x4682bcf4371729e37b229e29674d75afafa95677f994c2787ffb30eb6ec12d16',
+		transactionHash: '0x8f04d52f3b6b4c28d025aae10bd34af9579c7414db72aa2779cb2447ec89036c',
 		logIndex: 129,
 		originChainId: 31,
     }

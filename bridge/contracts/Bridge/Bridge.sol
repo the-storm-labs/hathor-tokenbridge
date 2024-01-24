@@ -74,7 +74,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	mapping (address => OriginalToken) public originalTokenBySideToken; // SideTokenAddress => struct {}
 	mapping (uint256 => mapping(address => bool)) public knownTokenByChain; // chainId => OriginalToken Address => Know
 	mapping (address => string) public EvmToHathorTokenMap;
-	mapping (string => address) public HathorToEvmTokenMap;
+	mapping (string => OriginalToken) public HathorToEvmTokenMap;	
 
 	event AllowTokensChanged(address _newAllowTokens);
 	event FederationChanged(address _newFederation);
@@ -708,9 +708,9 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
         return address(uint160(bytes20(hash)));
     }
 
-	function addHathorToken(address token, string memory uid) public onlyOwner {
+	function addHathorToken(uint256 originalChainId, address token, string memory uid) public onlyOwner {
 		EvmToHathorTokenMap[token] = uid;
-		HathorToEvmTokenMap[uid] = token;
+		HathorToEvmTokenMap[uid] = OriginalToken(token, originalChainId);
 		emit HathorTokenMapped(token, uid);
 	}
 

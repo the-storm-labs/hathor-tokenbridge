@@ -8,8 +8,6 @@ async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
 
-  console.log(1)
-
   const transactionEtherValue = 0;
   const memberFederatorAddress = "0x1aA9D0b1063d8b0D2a51F805b86462dBB95a2902";
 

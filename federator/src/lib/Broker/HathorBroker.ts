@@ -84,34 +84,114 @@ export class HathorBroker extends Broker {
     }
     const federator = new FederatorHTR(this.config, this.logger, null);
 
-    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress);
+    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
 
     const sender = Web3.utils.keccak256(ogSenderAddress);
     const thirdTwoBytesSender = sender.substring(0, 42);
     const idHash = Web3.utils.keccak256(txId);
     const convertedAmount = new BN(this.convertToEvmDecimals(qtd, evmTokenDecimals));
     const timestampHash = Web3.utils.soliditySha3(timestamp);
+    const logIndex = 129;
+
+    const transactionSender = new TransactionSender(this.getWeb3(this.config.mainchain.host), this.logger, this.config);
+    const federatorAddress = await transactionSender.getAddress(this.config.privateKey);
+    const federatorContract = await this.federationFactory.createInstance(
+      this.config.mainchain,
+      this.config.privateKey,
+    );
+
+    const transactionId = await federatorContract.getTransactionId({
+      originalTokenAddress: evmTokenAddress,
+      sender: thirdTwoBytesSender,
+      receiver: receiverAddress,
+      amount: convertedAmount,
+      blockHash: timestampHash,
+      transactionHash: idHash,
+      logIndex: logIndex,
+      originChainId: this.config.sidechain[0].chainId,
+      destinationChainId: this.config.mainchain.chainId,
+    });
+
+    const isTransactionVotedOrProcessed = await this.isTransactionVotedOrProcessed(
+      receiverAddress,
+      convertedAmount,
+      timestampHash,
+      idHash,
+      logIndex,
+      this.config.sidechain[0].chainId,
+      this.config.mainchain.chainId,
+      evmTokenAddress,
+      transactionId,
+      federatorAddress,
+    );
+
+    if (isTransactionVotedOrProcessed) return true;
 
     const txParams = {
       sideChainId: this.config.mainchain.chainId,
       mainChainId: this.config.sidechain[0].chainId,
-      transactionSender: new TransactionSender(this.getWeb3(this.config.mainchain.host), this.logger, this.config),
+      transactionSender: transactionSender,
       sideChainConfig: this.config.mainchain,
-      sideFedContract: await this.federationFactory.createInstance(this.config.mainchain, this.config.privateKey),
-      federatorAddress: this.config.mainchain.federation,
+      sideFedContract: federatorContract,
+      federatorAddress: federatorAddress,
       tokenAddress: evmTokenAddress,
       senderAddress: thirdTwoBytesSender,
       receiver: receiverAddress,
       amount: convertedAmount,
-      transactionId: txId,
+      transactionId: transactionId,
       originChainId: this.config.sidechain[0].chainId,
       destinationChainId: this.config.mainchain.chainId,
       blockHash: timestampHash,
       transactionHash: idHash,
-      logIndex: 129,
+      logIndex: logIndex,
     };
 
     return await federator._voteTransaction(txParams);
+  }
+
+  async isTransactionVotedOrProcessed(
+    receiver: string,
+    amount: BN,
+    blockHash: string,
+    transactionHash: string,
+    logIndex: number,
+    originChainId: number,
+    destinationChainId: number,
+    tokenAddress: string,
+    txId: string,
+    federatorAddress: string,
+  ): Promise<boolean> {
+    const dataToHash = {
+      to: receiver,
+      amount: amount,
+      blockHash: blockHash,
+      transactionHash: transactionHash,
+      logIndex: logIndex,
+      originChainId: originChainId,
+      destinationChainId: destinationChainId,
+    };
+    this.logger.info('===dataToHash===', dataToHash);
+    const bridge = await this.bridgeFactory.createInstance(this.config.mainchain);
+    const transactionDataHash = await bridge.getTransactionDataHash(dataToHash);
+    const wasProcessed = await bridge.getProcessed(transactionDataHash);
+    if (wasProcessed) {
+      this.logger.info(
+        `Already processed Block: ${blockHash} Tx: ${transactionHash}
+          originalTokenAddress: ${tokenAddress}`,
+      );
+      return true;
+    }
+    const federation = await this.federationFactory.createInstance(this.config.mainchain, this.chainConfig.federation);
+    const hasVoted = await federation.hasVoted(txId, federatorAddress);
+    if (hasVoted) {
+      this.logger.debug(
+        `Block: ${blockHash} Tx: ${transactionHash}
+        originalTokenAddress: ${tokenAddress}  has already been voted by us`,
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private convertToEvmDecimals(originalQtd: number, tokenDecimals: number): string {

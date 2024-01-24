@@ -153,7 +153,7 @@ module.exports = {
     },
     mumbai: {
       live: false,
-      url: 'https://rpc-mumbai.maticvigil.com',
+      url: 'https://polygon-mumbai.infura.io/v3/' + INFURA_PROJECT_ID,
       network_id: chains.MUMBAI_TEST_NET_CHAIN_ID,
       token_symbol: 'p',
       gas: 6700000,

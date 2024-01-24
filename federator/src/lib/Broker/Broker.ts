@@ -18,6 +18,7 @@ import {
   GetMySignatureResponse,
   HathorResponse,
 } from '../../types/HathorResponseTypes';
+import { IBridgeV4 } from '../../contracts/IBridgeV4';
 
 type ProposalComponents = { hex: string; signatures: string[] };
 
@@ -185,8 +186,12 @@ export abstract class Broker {
     return txs;
   }
 
-  protected async getTokenDecimals(tokenAddress: string): Promise<number> {
+  protected async getTokenDecimals(tokenAddress: string, originalChainId: number): Promise<number> {
     const tokenFactory = new TokenFactory();
+    if (originalChainId == this.config.sidechain[0].chainId) {
+      const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+      tokenAddress = await bridge.sideTokenByOriginalToken(originalChainId, tokenAddress);
+    }
     const tokenContract = (await tokenFactory.createInstance(this.config.mainchain, tokenAddress)) as ITokenV0;
     return await tokenContract.getDecimals();
   }

@@ -1,5 +1,6 @@
 module.exports = async function (hre) { // HardhatRuntimeEnvironment
-  const {deployments} = hre;
+  const {getNamedAccounts, deployments} = hre;
+  const {deployer} = await getNamedAccounts();
 
   const MultiSigWallet = await deployments.getArtifact('MultiSigWallet');
   const Federation = await deployments.getArtifact('Federation');
