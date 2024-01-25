@@ -8,6 +8,7 @@ export type HathorResponse = {
 };
 export type CreateProposalResponse = HathorResponse & { txHex: string };
 export type GetAddressResponse = HathorResponse & { address: string };
+export type GetConfirmationResponse = HathorResponse & { confirmationNumber: number };
 export type GetMySignatureResponse = HathorResponse & { signatures: string };
 export type StatusResponse = HathorResponse & { statusCode: number; statusMessage: string };
 export type DecodeResponse = HathorResponse & { tx: Data };

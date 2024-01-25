@@ -83,9 +83,13 @@ export class HathorWallet {
     if (subscription) {
       subscription.on('message', async (message) => {
         try {
-          // this.logger.info(`Evento puro: ${message.data.toString()}`);
-          await this.parseHathorLogs(JSON.parse(message.data.toString()));
-          message.ack();
+          const response = await this.parseHathorLogs(JSON.parse(message.data.toString()));
+          if (response) {
+            message.ack();
+            return;
+          }
+          message.nack();
+          return;
         } catch (error) {
           // TODO retry policy if fails to parse and resolve
           this.logger.error(`Fail to processing hathor event: ${error}`);
@@ -122,8 +126,8 @@ export class HathorWallet {
     }
   }
 
-  private async parseHathorLogs(event: any) {
-    if (event.type !== 'wallet:new-tx') return;
+  private async parseHathorLogs(event: any): Promise<boolean> {
+    if (event.type !== 'wallet:new-tx') return true;
 
     await this.isWalletReady(true);
     await this.isWalletReady(false);
@@ -153,8 +157,12 @@ export class HathorWallet {
       this.logger.info('Evaluating proposal...');
       const txHex = tx.getCustomData('hex');
       const [broker, dataType] = this.getBrokerAndDataType(tx);
+      const confirmed = await broker.isTxConfirmed(tx.tx_id);
+      if (!confirmed) {
+        return false;
+      }
       await broker.sendMySignaturesToProposal(txHex, tx.getCustomData(dataType));
-      return;
+      return true;
     }
 
     const isSignature = tx.haveCustomData('sig');
@@ -162,6 +170,12 @@ export class HathorWallet {
     if (isSignature && this.chainConfig.multisigOrder >= this.chainConfig.multisigRequiredSignatures) {
       this.logger.info('Evaluating signature...');
       const [broker, dataType] = this.getBrokerAndDataType(tx);
+
+      const confirmed = await broker.isTxConfirmed(tx.tx_id);
+      if (!confirmed) {
+        return false;
+      }
+
       const txId = tx.getCustomData(dataType);
       const components = await broker.getSignaturesToPush(txId);
 
@@ -169,17 +183,23 @@ export class HathorWallet {
         this.logger.info(
           `Number of signatures not reached. Require ${this.chainConfig.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
         );
-        return;
+        return false;
       }
 
       await broker.signAndPushProposal(components.hex, txId, components.signatures);
-      return;
+      return true;
     }
 
     const isHathorToEvm = tx.haveCustomData('addr');
 
     if (isHathorToEvm) {
       const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+
+      const confirmed = await broker.isTxConfirmed(tx.tx_id);
+      if (!confirmed) {
+        return false;
+      }
+
       const tokenData = tx.getCustomTokenData()[0];
 
       const result = await broker.sendTokensFromHathor(
@@ -193,7 +213,7 @@ export class HathorWallet {
       if (!result) {
         throw new HathorException('Invalid tx', 'Invalid tx'); //TODO change exception type
       }
-      return;
+      return true;
     }
   }
 

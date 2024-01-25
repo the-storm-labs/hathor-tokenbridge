@@ -15,6 +15,7 @@ import { ConfigChain } from '../configChain';
 import {
   DecodeResponse,
   GetAddressResponse,
+  GetConfirmationResponse,
   GetMySignatureResponse,
   HathorResponse,
 } from '../../types/HathorResponseTypes';
@@ -184,6 +185,42 @@ export abstract class Broker {
     });
 
     return txs;
+  }
+
+  async isTxConfirmed(transactionId: string): Promise<boolean> {
+    const confirmations = await this.getTransactionConfirmation(transactionId);
+    //so every federator has to wait more than the last one.
+    const expectedConfirmations = this.chainConfig.minimumConfirmations * this.chainConfig.multisigOrder;
+    const confirmed = confirmations >= expectedConfirmations;
+    if (!confirmed) {
+      this.logger.info(
+        `Not enough confirmations for tx ${transactionId}. Expected ${expectedConfirmations} had ${confirmations}`,
+      );
+    }
+    return confirmed;
+  }
+
+  protected async getTransactionConfirmation(transactionId: string): Promise<number> {
+    const url = `${this.chainConfig.walletUrl}/wallet/tx-confirmation-blocks`;
+    const config = {
+      headers: {
+        'X-Wallet-Id': this.chainConfig.multisigWalletId,
+        'Content-type': 'application/json',
+      },
+      params: { id: transactionId },
+    };
+
+    try {
+      const response = await axios.get<GetConfirmationResponse>(url, config);
+
+      if (response.status == 200 && response.data.success) {
+        return response.data.confirmationNumber;
+      }
+
+      throw Error(`${response.status} - ${response.data}`);
+    } catch (error) {
+      throw new HathorException(`Fail to getTransactionConfirmation`, error);
+    }
   }
 
   protected async getTokenDecimals(tokenAddress: string, originalChainId: number): Promise<number> {

@@ -19,6 +19,7 @@ export interface ConfigChainParams {
   multisigSeedKey?: string;
   multisigRequiredSignatures?: number;
   multisigOrder?: number;
+  minimumConfirmations?: number;
   eventQueueType?: string;
   pubsubProjectId?: string;
 }
@@ -41,6 +42,7 @@ export class ConfigChain {
   multisigSeedKey?: string;
   multisigRequiredSignatures?: number;
   multisigOrder?: number;
+  minimumConfirmations?: number;
   eventQueueType?: string;
   pubsubProjectId?: string;
 
@@ -62,6 +64,7 @@ export class ConfigChain {
     this.multisigSeedKey = chainConfig?.multisigSeedKey;
     this.multisigRequiredSignatures = chainConfig?.multisigRequiredSignatures;
     this.multisigOrder = chainConfig?.multisigOrder;
+    this.minimumConfirmations = chainConfig?.minimumConfirmations;
     this.eventQueueType = chainConfig?.eventQueueType;
     this.pubsubProjectId = chainConfig?.pubsubProjectId;
   }

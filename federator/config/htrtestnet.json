@@ -2,13 +2,14 @@
     "name": "golf",
     "chainId": 31,
     "fromBlock": 4613473,
-    "walletUrl": "http://localhost:8002",
+    "walletUrl": "http://localhost:8001",
     "singleWalletId": "single",
     "singleSeedKey": "default",
     "multisigWalletId": "multi",
     "multisigSeedKey": "default",
     "multisigRequiredSignatures": 1,
-    "multisigOrder": 2,
+    "multisigOrder": 1,
+    "minimumConfirmations": 2,
     "eventQueueType": "pubsub",
     "pubsubProjectId": "hathor-coordinator"
 }
