@@ -15,9 +15,10 @@ import {
   LOGGER_CATEGORY_HEARTBEAT,
   LOGGER_CATEGORY_ENDPOINT,
 } from './lib/logs';
-import { HathorWallet } from './lib/HathorWallet';
+import HathorService from './lib/HathorService';
 import { BridgeFactory } from './contracts/BridgeFactory';
 import { FederationFactory } from './contracts/FederationFactory';
+import { HathorWallet } from './lib/HathorWallet';
 
 export class Main {
   logger: LogWrapper;
@@ -54,8 +55,20 @@ export class Main {
   }
 
   async start() {
-    this.listenToHathorTransactions();
-    this.scheduleFederatorProcesses();
+    const wallet = HathorWallet.getInstance(this.config, this.logger);
+    const [ready, walletEmmiter] = await wallet.areWalletsReady();
+
+    if (ready) {
+      this.listenToHathorTransactions();
+      this.scheduleFederatorProcesses();
+      return;
+    }
+
+    walletEmmiter.on('wallets-ready', () => {
+      this.listenToHathorTransactions();
+      this.scheduleFederatorProcesses();
+    });
+
     // TODO uncoment this after tests
     // this.scheduleHeartbeatProcesses();
   }
@@ -96,8 +109,8 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    const wallet = new HathorWallet(this.config, this.logger, new BridgeFactory(), new FederationFactory());
-    wallet.listenToEventQueue();
+    const service = new HathorService(this.config, this.logger, new BridgeFactory(), new FederationFactory());
+    service.listenToEventQueue();
   }
 
   async scheduleFederatorProcesses() {

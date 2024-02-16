@@ -28,6 +28,9 @@ export class HathorBroker extends Broker {
     const hathorTx = await this.decodeTxHex(txHex);
     const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
 
+    // TODO validate if the txHex comes from a tx that was initiated by the multisig? does it make sense? or it has to be?
+    // TODO think what's importante to validate here
+
     // get token from event
     // const evmTranslatedToken = await bridge.EvmToHathorTokenMap(hathorTx);
 

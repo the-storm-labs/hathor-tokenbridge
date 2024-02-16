@@ -13,7 +13,7 @@ import Federator from './Federator';
 import { ConfigChain } from './configChain';
 import { IFederation } from '../contracts/IFederation';
 import { LogWrapper } from './logWrapper';
-import { HathorWallet } from './HathorWallet';
+import { HathorService } from './HathorService';
 import {
   GetLogsParams,
   ProcessLogsParams,
@@ -288,14 +288,14 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const hathorWallet = new HathorWallet(
+    const hathorService = new HathorService(
       this.config,
       this.logger,
       processTransactionParams.bridgeFactory,
       processTransactionParams.federationFactory,
     );
 
-    await hathorWallet.sendTokensToHathor(
+    await hathorService.sendTokensToHathor(
       processTransactionParams.receiver,
       processTransactionParams.amount.toString(),
       processTransactionParams.tokenAddress,

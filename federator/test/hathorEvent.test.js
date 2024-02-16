@@ -1,6 +1,6 @@
 const hathorTx = require("../src/types/HathorTx");
 const hathorUtxo = require("../src/types/HathorUtxo");
-const HathorWallet = require("../src/lib/HathorWallet");
+const HathorService = require("../src/lib/HathorService");
 
 const logger = {
     trace: jest.fn(),
@@ -92,7 +92,7 @@ describe("Hathor Tx Data tests", () => {
   });
 
   it("Should correctly convert evm token decimals to hathor", async () => {
-      let wallet = new HathorWallet.default(config, logger, {});
+      let wallet = new HathorService.default(config, logger, {});
       let originWithDecimals = "200000000000000"; 
       expect(wallet.convertToHathorDecimals(originWithDecimals, 18)).toEqual(0);
 
@@ -104,7 +104,7 @@ describe("Hathor Tx Data tests", () => {
   });
 
   it("Should correctly convert hathor token decimals to evm", async () => {
-      let wallet = new HathorWallet.default(config, logger, {});
+      let wallet = new HathorService.default(config, logger, {});
 
       let originWithDecimals = 8; 
       expect(wallet.convertToEvmDecimals(originWithDecimals, 18)).toEqual("80000000000000000");
