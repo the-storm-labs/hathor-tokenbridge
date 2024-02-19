@@ -152,7 +152,7 @@ export class HathorService {
 
     const isSignature = tx.haveCustomData('sig');
 
-    if (isSignature && this.chainConfig.multisigOrder >= this.chainConfig.multisigRequiredSignatures) {
+    if (isSignature) {
       this.logger.info('Evaluating signature...');
       const [broker, dataType] = this.getBrokerAndDataType(tx);
 

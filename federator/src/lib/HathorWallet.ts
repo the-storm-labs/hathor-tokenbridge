@@ -23,9 +23,13 @@ export class HathorWallet {
   public logger: LogWrapper;
   public chainConfig: ConfigChain;
   private wallets: Map<string, Wallet>;
-  public walletEmmiter = new EventEmmiter();
+  public walletEmmiter: EventEmmiter;
+
+  private baseDelay = 10000;
 
   private constructor(config: ConfigData, logger: LogWrapper) {
+    logger.info('New instance of the wallet class');
+    this.walletEmmiter = new EventEmmiter();
     this.logger = logger;
     this.chainConfig = config.sidechain[0];
     this.wallets = new Map<string, Wallet>();
@@ -46,10 +50,12 @@ export class HathorWallet {
     const currentTime = new Date();
     const oneHourAgo = currentTime.getTime() - 10 * 60 * 1000;
 
+    // The ideia is to do this asyncronously, but for some reason,
+    // it is not working on the google cloud, so it stays syncronous for the time being
     if (multisig.lastCheck.getTime() < oneHourAgo || single.lastCheck.getTime() < oneHourAgo) {
-      this.isReady(true);
-      this.isReady(false);
-      return [false, this.walletEmmiter];
+      const multisigReady = await this.isReady(true);
+      const singleReady = await this.isReady(false);
+      return [multisigReady && singleReady, this.walletEmmiter];
     }
 
     if (multisig.ready && single.ready) {
@@ -61,14 +67,17 @@ export class HathorWallet {
 
   private setWalletReady(wallet: string) {
     this.wallets.set(wallet, { ready: true, lastCheck: new Date() });
+    this.logger.info(`Setting ${wallet} wallet as ready`);
     if (this.wallets.get('multisig').ready && this.wallets.get('single').ready) {
+      this.logger.info('All wallets are ready');
+      this.logger.info(`From HathorWallet.ts, we have ${this.walletEmmiter.listenerCount('wallets-ready')} listeners`);
       this.walletEmmiter.emit('wallets-ready');
     }
   }
 
   private async isReady(multisig: boolean, retry = 1): Promise<boolean> {
     const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
-    if (retry > 3) {
+    if (retry > 5) {
       this.logger.error(`Fail to start ${id} wallet: Maximum number of retries reached.`);
       return false;
     }
@@ -90,13 +99,13 @@ export class HathorWallet {
       }
       if ([this.WALLET_STATUS_CONNECTING, this.WALLET_STATUS_SYNCING].includes(response.data.statusCode)) {
         this.logger.info(`${id} wallet is ${response.data.statusMessage ?? response.data.message}.`);
-        await this.delay(10000);
+        await this.delay(this.baseDelay * retry);
         return this.isReady(multisig, ++retry);
       }
       if (!response.data.success && response.data.statusMessage === '') {
         this.logger.info(`${id} wallet looks stopped.`);
         await this.start(multisig);
-        await this.delay(10000);
+        await this.delay(this.baseDelay * retry);
         return this.isReady(multisig, ++retry);
       }
     } catch (error) {

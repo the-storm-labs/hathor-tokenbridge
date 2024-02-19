@@ -59,15 +59,20 @@ export class Main {
     const [ready, walletEmmiter] = await wallet.areWalletsReady();
 
     if (ready) {
+      this.logger.info('No need to wait, the wallets are ready, lets go.');
       this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
       return;
     }
 
-    walletEmmiter.on('wallets-ready', () => {
+    this.logger.info('It seems the wallets are not ready, lets wait for the event');
+    walletEmmiter.on('wallets-ready', async () => {
+      this.logger.info('Event emmited, we can start the wallet');
       this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
     });
+
+    this.logger.info(`From main.ts, we have ${walletEmmiter.listenerCount('wallets-ready')} listeners`);
 
     // TODO uncoment this after tests
     // this.scheduleHeartbeatProcesses();
