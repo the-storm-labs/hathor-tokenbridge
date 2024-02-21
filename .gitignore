@@ -12,3 +12,5 @@ federator.log
 federator/built
 
 federator/package-lock.json
+
+.tfvars
