@@ -1,6 +1,6 @@
 import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
-import { PubSub } from '@google-cloud/pubsub';
+import { PubSub, Subscription } from '@google-cloud/pubsub';
 import { HathorTx } from '../types/HathorTx';
 import { HathorUtxo } from '../types/HathorUtxo';
 import { HathorException } from '../types/HathorException';
@@ -59,59 +59,75 @@ export class HathorService {
   }
 
   private async listenToPubSubEventQueue() {
-    const pubsub = new PubSub({ projectId: this.chainConfig.pubsubProjectId });
+    const subscription = await this.getOrCreateSubscrition();
 
-    const [subscriptions] = await pubsub.getSubscriptions();
-    const subscription = subscriptions.find(
-      (sub) =>
-        sub.name ===
-        `projects/${this.chainConfig.pubsubProjectId}/subscriptions/hathor-federator-${this.chainConfig.multisigOrder}-sub`,
-    );
+    subscription.on('message', async (message) => {
+      try {
+        const response = await this.parseHathorLogs(JSON.parse(message.data.toString()));
+        if (response) {
+          message.ack();
+          return;
+        }
+        message.nack();
+        return;
+      } catch (error) {
+        // TODO retry policy if fails to parse and resolve
+        this.logger.error(`Fail to processing hathor event: ${error}`);
+        let isNonRetriable = false;
+        if (error instanceof HathorException) {
+          const originalError = (error as HathorException).getOriginalMessage();
 
-    if (subscription) {
-      subscription.on('message', async (message) => {
-        try {
-          const response = await this.parseHathorLogs(JSON.parse(message.data.toString()));
-          if (response) {
+          for (let index = 0; index < this.nonRetriableErrors.length; index++) {
+            const rgxError = this.nonRetriableErrors[index];
+            if (originalError.match(rgxError)) {
+              isNonRetriable = true;
+              break;
+            }
+          }
+
+          if (isNonRetriable) {
             message.ack();
             return;
           }
-          message.nack();
-          return;
-        } catch (error) {
-          // TODO retry policy if fails to parse and resolve
-          this.logger.error(`Fail to processing hathor event: ${error}`);
-          let isNonRetriable = false;
-          if (error instanceof HathorException) {
-            const originalError = (error as HathorException).getOriginalMessage();
-
-            for (let index = 0; index < this.nonRetriableErrors.length; index++) {
-              const rgxError = this.nonRetriableErrors[index];
-              if (originalError.match(rgxError)) {
-                isNonRetriable = true;
-                break;
-              }
-            }
-
-            if (isNonRetriable) {
-              message.ack();
-              return;
-            }
-          }
-
-          message.nack();
         }
-      });
-      subscription.on('error', (error) => {
-        this.logger.error(
-          `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists. Error: ${error}`,
-        );
-      });
-    } else {
+
+        message.nack();
+      }
+    });
+    subscription.on('error', (error) => {
       this.logger.error(
-        `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists.`,
+        `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists. Error: ${error}`,
       );
+    });
+  }
+
+  private async getOrCreateSubscrition(): Promise<Subscription> {
+    const pubsub = new PubSub({ projectId: this.chainConfig.pubsubProjectId });
+
+    const [subscriptions] = await pubsub.getSubscriptions();
+    const subscriptionName = `projects/${this.chainConfig.pubsubProjectId}/subscriptions/hathor-federator-${this.chainConfig.multisigOrder}-sub`;
+    const subscription = subscriptions.find((sub) => sub.name === subscriptionName);
+
+    if (subscription) {
+      return subscription;
     }
+
+    const topicName = `projects/${this.chainConfig.pubsubProjectId}/topics/hathor-federator-${this.chainConfig.multisigOrder}`;
+    const [newSubscription] = await pubsub.createSubscription(topicName, subscriptionName, {
+      ackDeadlineSeconds: 60,
+      enableMessageOrdering: true,
+      enableExactlyOnceDelivery: true,
+      retryPolicy: {
+        minimumBackoff: {
+          seconds: 60,
+        },
+        maximumBackoff: {
+          seconds: 120,
+        },
+      },
+    });
+
+    return newSubscription;
   }
 
   private async parseHathorLogs(event: any): Promise<boolean> {
