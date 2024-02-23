@@ -2,12 +2,13 @@ provider "google" {
   project = "hathor-coordinator"
 }
 
-variable "wallet_container_name" {
-  type = string
+variable "federator_number" {
+  type = number
 }
 
 variable "wallet_seed" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "wallet_network" {
@@ -27,7 +28,8 @@ variable "wallet_multisig_num_signatures" {
 }
 
 variable "wallet_pubkeys" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "wallet_debug_long" {
@@ -50,38 +52,78 @@ variable "wallet_plugin_pubsub_project" {
   type = string
 }
 
-variable "wallet_plugin_pubsub_topic" {
-  type = string
-}
-
-variable "federator_container_name" {
-  type = string
-}
-
 variable "federator_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "etherscan_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "evm_network" {
   type = string
 }
 
-variable "evm_config" {
+variable "bridge_address" {
   type = string
 }
 
-variable "htr_config" {
+variable "federation_address" {
+  type = string
+}
+
+variable "evm_multisig_address" {
+  type = string
+}
+
+variable "allow_tokens_address" {
+  type = string
+}
+
+variable "evm_chain_id" {
+  type = number
+}
+
+variable "test_token" {
+  type = string
+}
+
+variable "evm_host" {
+  type = string
+  sensitive = true
+}
+
+variable "from_block" {
+  type = number
+}
+
+variable "hathor_network" {
+  type = string
+}
+
+variable "hathor_chain_id" {
+  type = number
+}
+
+variable "hathor_min_confirmations" {
+  type = number
+}
+
+variable "gcp_project_id" {
   type = string
 }
 
 resource "google_pubsub_topic" "hathor-topic" {
-  name = var.wallet_plugin_pubsub_topic
+  name = "hathor-federator-${var.federator_number}"
 }
 
 resource "google_cloud_run_v2_service" "hathor-wallet" {
-  name     = var.wallet_container_name
+  name     = "hathor-wallet-${var.federator_number}"
   location = "us-central1"
   client   = "terraform"
+  # ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
     containers {
@@ -133,7 +175,7 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
       }
       env {
         name  = "HEADLESS_PLUGIN_PUBSUB_TOPIC_NAME"
-        value = var.wallet_plugin_pubsub_topic
+        value = "hathor-wallet-${var.federator_number}"
       }
       ports {
         name           = "http1"
@@ -175,13 +217,15 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
 }
 
 locals {
-  updated_htr_config = replace(var.htr_config, "placeholder_for_url", google_cloud_run_v2_service.hathor-wallet.uri)
+  htr_config = "{\"name\":\"${var.hathor_network}\",\"chainId\":${var.hathor_chain_id},\"fromBlock\":0,\"walletUrl\":\"${google_cloud_run_v2_service.hathor-wallet.uri}\",\"singleWalletId\":\"single\",\"singleSeedKey\":\"default\",\"multisigWalletId\":\"multi\",\"multisigSeedKey\":\"default\",\"multisigRequiredSignatures\":${var.wallet_multisig_num_signatures},\"multisigOrder\":${var.federator_number},\"minimumConfirmations\":${var.hathor_min_confirmations},\"eventQueueType\":\"pubsub\",\"pubsubProjectId\":\"${var.gcp_project_id}\"}"
+  evm_config = "{\"name\":\"${var.evm_network}\",\"bridge\":\"${var.bridge_address}\",\"federation\":\"${var.federation_address}\",\"multiSig\":\"${var.evm_multisig_address}\",\"allowTokens\":\"${var.allow_tokens_address}\",\"chainId\":${var.evm_chain_id},\"testToken\":\"${var.test_token}\",\"host\":\"${var.evm_host}\",\"fromBlock\":${var.from_block}}"
 }
 
 resource "google_cloud_run_v2_service" "hathor-federator" {
-  name     = var.federator_container_name
+  name     = "hathor-federator-${var.federator_number}"
   location = "us-central1"
   client   = "terraform"
+  # ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
     containers {
@@ -189,11 +233,11 @@ resource "google_cloud_run_v2_service" "hathor-federator" {
 
       env {
         name  = "EVM_CONFIG"
-        value = var.evm_config
+        value = local.evm_config
       }
       env {
         name  = "HTR_CONFIG"
-        value = local.updated_htr_config
+        value = local.htr_config
       }
       env {
         name  = "FEDERATOR_KEY"
