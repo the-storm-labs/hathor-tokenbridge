@@ -108,9 +108,11 @@ export class HathorService {
     const subscriptionName = `projects/${this.chainConfig.pubsubProjectId}/subscriptions/hathor-federator-${this.chainConfig.multisigOrder}-sub`;
     const subscription = subscriptions.find((sub) => sub.name === subscriptionName);
 
-    if (subscription) {
+    if (subscription && subscription.topic) {
       return subscription;
     }
+
+    await subscription.delete();
 
     const topicName = `projects/${this.chainConfig.pubsubProjectId}/topics/hathor-federator-${this.chainConfig.multisigOrder}`;
     const [newSubscription] = await pubsub.createSubscription(topicName, subscriptionName, {

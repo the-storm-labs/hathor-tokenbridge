@@ -1,5 +1,5 @@
 provider "google" {
-  project = "hathor-coordinator"
+  project = var.gcp_project_id
 }
 
 variable "federator_number" {
@@ -48,10 +48,6 @@ variable "wallet_plugin_file" {
   type = string
 }
 
-variable "wallet_plugin_pubsub_project" {
-  type = string
-}
-
 variable "federator_key" {
   type      = string
   sensitive = true
@@ -91,7 +87,7 @@ variable "test_token" {
 }
 
 variable "evm_host" {
-  type = string
+  type      = string
   sensitive = true
 }
 
@@ -115,6 +111,15 @@ variable "gcp_project_id" {
   type = string
 }
 
+variable "gcp_repository" {
+  type = string
+}
+
+variable "wallet_key" {
+  type      = string
+  sensitive = true
+}
+
 resource "google_pubsub_topic" "hathor-topic" {
   name = "hathor-federator-${var.federator_number}"
 }
@@ -127,11 +132,15 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
 
   template {
     containers {
-      image = "us-central1-docker.pkg.dev/hathor-coordinator/hathor/hathor-wallet-pubsub:v1.0.1.5"
+      image = "us-central1-docker.pkg.dev/${var.gcp_project_id}/${var.gcp_repository}/hathor-wallet-pubsub:v1.0.1.5"
 
       env {
         name  = "HEADLESS_SEED_DEFAULT"
         value = var.wallet_seed
+      }
+      env {
+        name  = "HEADLESS_API_KEY"
+        value = var.wallet_key
       }
       env {
         name  = "HEADLESS_NETWORK"
@@ -171,11 +180,11 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
       }
       env {
         name  = "HEADLESS_PLUGIN_PUBSUB_PROJECT"
-        value = var.wallet_plugin_pubsub_project
+        value = var.gcp_project_id
       }
       env {
         name  = "HEADLESS_PLUGIN_PUBSUB_TOPIC_NAME"
-        value = "hathor-wallet-${var.federator_number}"
+        value = google_pubsub_topic.hathor-topic.name
       }
       ports {
         name           = "http1"
@@ -189,12 +198,20 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
         http_get {
           path = "/"
           port = 8000
+          http_headers {
+            name  = "X-API-Key"
+            value = var.wallet_key
+          }
         }
       }
       liveness_probe {
         http_get {
           path = "/"
           port = 8000
+          http_headers {
+            name  = "X-API-Key"
+            value = var.wallet_key
+          }
         }
         initial_delay_seconds = 30
         period_seconds        = 60
@@ -217,7 +234,7 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
 }
 
 locals {
-  htr_config = "{\"name\":\"${var.hathor_network}\",\"chainId\":${var.hathor_chain_id},\"fromBlock\":0,\"walletUrl\":\"${google_cloud_run_v2_service.hathor-wallet.uri}\",\"singleWalletId\":\"single\",\"singleSeedKey\":\"default\",\"multisigWalletId\":\"multi\",\"multisigSeedKey\":\"default\",\"multisigRequiredSignatures\":${var.wallet_multisig_num_signatures},\"multisigOrder\":${var.federator_number},\"minimumConfirmations\":${var.hathor_min_confirmations},\"eventQueueType\":\"pubsub\",\"pubsubProjectId\":\"${var.gcp_project_id}\"}"
+  htr_config = "{\"name\":\"${var.hathor_network}\",\"chainId\":${var.hathor_chain_id},\"fromBlock\":0,\"walletUrl\":\"${google_cloud_run_v2_service.hathor-wallet.uri}\",\"walletKey\":\"${var.wallet_key}\",\"singleWalletId\":\"single\",\"singleSeedKey\":\"default\",\"multisigWalletId\":\"multi\",\"multisigSeedKey\":\"default\",\"multisigRequiredSignatures\":${var.wallet_multisig_num_signatures},\"multisigOrder\":${var.federator_number},\"minimumConfirmations\":${var.hathor_min_confirmations},\"eventQueueType\":\"pubsub\",\"pubsubProjectId\":\"${var.gcp_project_id}\"}"
   evm_config = "{\"name\":\"${var.evm_network}\",\"bridge\":\"${var.bridge_address}\",\"federation\":\"${var.federation_address}\",\"multiSig\":\"${var.evm_multisig_address}\",\"allowTokens\":\"${var.allow_tokens_address}\",\"chainId\":${var.evm_chain_id},\"testToken\":\"${var.test_token}\",\"host\":\"${var.evm_host}\",\"fromBlock\":${var.from_block}}"
 }
 
@@ -229,7 +246,7 @@ resource "google_cloud_run_v2_service" "hathor-federator" {
 
   template {
     containers {
-      image = "us-central1-docker.pkg.dev/hathor-coordinator/hathor/token-bridge:v0.9.1.7"
+      image = "us-central1-docker.pkg.dev/${var.gcp_project_id}/${var.gcp_repository}/hathor-tokenbridge:latest"
 
       env {
         name  = "EVM_CONFIG"

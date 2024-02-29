@@ -13,6 +13,7 @@ export interface ConfigChainParams {
   blockTimeMs?: number;
   isHathor?: boolean;
   walletUrl?: string;
+  walletKey?: string;
   singleWalletId?: string;
   singleSeedKey?: string;
   multisigWalletId?: string;
@@ -36,6 +37,7 @@ export class ConfigChain {
   blockTimeMs: number;
   isHathor: boolean;
   walletUrl?: string;
+  walletKey?: string;
   singleWalletId?: string;
   singleSeedKey?: string;
   multisigWalletId?: string;
@@ -58,6 +60,7 @@ export class ConfigChain {
     this.blockTimeMs = chainConfig?.blockTimeMs ?? DEFAULT_BLOCK_TIME_MS;
     this.isHathor = chainConfig?.isHathor ?? false;
     this.walletUrl = chainConfig?.walletUrl;
+    this.walletKey = chainConfig?.walletKey;
     this.singleWalletId = chainConfig?.singleWalletId;
     this.singleSeedKey = chainConfig?.singleSeedKey;
     this.multisigWalletId = chainConfig?.multisigWalletId;

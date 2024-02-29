@@ -11,6 +11,7 @@ import { BN } from 'ethereumjs-util';
 import TransactionSender from '../TransactionSender';
 import { BridgeFactory } from '../../contracts/BridgeFactory';
 import { FederationFactory } from '../../contracts/FederationFactory';
+import { HathorWallet } from '../HathorWallet';
 
 export class HathorBroker extends Broker {
   public txIdType: string;
@@ -25,8 +26,8 @@ export class HathorBroker extends Broker {
   }
 
   async validateTx(txHex: string, txId: string): Promise<boolean> {
-    const hathorTx = await this.decodeTxHex(txHex);
-    const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    // const hathorTx = await this.decodeTxHex(txHex);
+    // const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
 
     // TODO validate if the txHex comes from a tx that was initiated by the multisig? does it make sense? or it has to be?
     // TODO think what's importante to validate here
@@ -41,20 +42,19 @@ export class HathorBroker extends Broker {
   }
 
   private async sendMeltProposal(qtd: number, token: string): Promise<string> {
-    const url = `${this.chainConfig.walletUrl}/wallet/p2sh/tx-proposal/melt-tokens`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
+    const wallet = HathorWallet.getInstance(this.config, this.logger);
 
     const data = {
       amount: qtd,
       token: `${token}`,
     };
 
-    const response = await axios.post<CreateProposalResponse>(url, data, config);
+    const response = await wallet.requestWallet<CreateProposalResponse>(
+      true,
+      this.chainConfig.multisigWalletId,
+      'wallet/p2sh/tx-proposal/melt-tokens',
+      data,
+    );
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
     }

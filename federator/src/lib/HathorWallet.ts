@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import EventEmmiter from 'node:events';
 // import axiosCurlirize from 'axios-curlirize';
 import { HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
@@ -82,16 +82,8 @@ export class HathorWallet {
       return false;
     }
     this.logger.info(`Checking ${id} wallet status for the ${retry} time`);
-    const url = `${this.chainConfig.walletUrl}/wallet/status`;
-    const config = {
-      headers: {
-        'x-wallet-id': multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     try {
-      const response = await axios.get<StatusResponse>(url, config);
+      const response = await this.requestWallet<StatusResponse>(false, id, 'wallet/status');
       if (response.data.statusCode === this.WALLET_STATUS_READY) {
         this.logger.info(`${id} wallet is ready.`);
         this.setWalletReady(multisig ? 'multisig' : 'single');
@@ -116,24 +108,42 @@ export class HathorWallet {
   private async start(multisig: boolean): Promise<boolean> {
     const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
     const seedKey = multisig ? this.chainConfig.multisigSeedKey : this.chainConfig.singleSeedKey;
-    this.logger.info(`Trying to start ${id} wallet.`);
-    const url = `${this.chainConfig.walletUrl}/start`;
-    const config = {
-      headers: {
-        'Content-type': 'application/json',
-      },
-    };
     const data = {
       'wallet-id': id,
       seedKey: seedKey,
       multisig: multisig,
     };
-
+    this.logger.info(`Trying to start ${id} wallet.`);
     try {
-      const response = await axios.post<HathorResponse>(url, data, config);
+      const response = await this.requestWallet<HathorResponse>(true, id, 'start', data);
       return response.status == 200 && response.data.success;
     } catch (error) {
       throw Error(`Fail to start wallet: ${error}`);
+    }
+  }
+
+  public async requestWallet<Type>(
+    post: boolean,
+    id: string,
+    path: string,
+    data?: any,
+    params?: any,
+  ): Promise<AxiosResponse<Type>> {
+    const url = `${this.chainConfig.walletUrl}/${path}`;
+    const config = {
+      headers: {
+        'Content-type': 'application/json',
+        'x-api-key': this.chainConfig.walletKey,
+        'x-wallet-id': id,
+      },
+      params: params,
+    };
+
+    try {
+      if (post) return await axios.post<Type>(url, data, config);
+      return await axios.get<Type>(url, config);
+    } catch (error) {
+      throw Error(`Fail to request to hathor wallet endpoint: ${error}`);
     }
   }
 

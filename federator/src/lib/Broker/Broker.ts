@@ -20,6 +20,7 @@ import {
   HathorResponse,
 } from '../../types/HathorResponseTypes';
 import { IBridgeV4 } from '../../contracts/IBridgeV4';
+import { HathorWallet } from '../HathorWallet';
 
 type ProposalComponents = { hex: string; signatures: string[] };
 
@@ -30,6 +31,7 @@ export abstract class Broker {
   public federationFactory: FederationFactory;
   public abstract txIdType: string;
   protected chainConfig: ConfigChain;
+  private wallet: HathorWallet;
 
   constructor(
     config: ConfigData,
@@ -48,6 +50,8 @@ export abstract class Broker {
     this.chainConfig = config.sidechain[0];
 
     this.web3ByHost = new Map<string, Web3>();
+
+    this.wallet = HathorWallet.getInstance(this.config, this.logger);
   }
 
   public web3ByHost: Map<string, Web3>;
@@ -78,21 +82,16 @@ export abstract class Broker {
     if (!(await this.validateTx(txHex, txId))) {
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
-    const url = `${this.chainConfig.walletUrl}/wallet/p2sh/tx-proposal/sign-and-push`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     const data = {
       txHex: `${txHex}`,
       signatures: signatures,
     };
-
-    const response = await axios.post<HathorResponse>(url, data, config);
-
+    const response = await this.wallet.requestWallet<HathorResponse>(
+      true,
+      this.chainConfig.singleWalletId,
+      'wallet/p2sh/tx-proposal/sign-and-push',
+      data,
+    );
     if (response.status != 200 || !response.data.success) {
       const fullMessage = `${response.status} - ${response.statusText} - ${JSON.stringify(response.data)}`;
       throw new HathorException(fullMessage, response.data.error);
@@ -153,19 +152,15 @@ export abstract class Broker {
     return response;
   }
 
-  protected async getHistory() {
-    const url = `${this.chainConfig.walletUrl}/wallet/tx-history`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-      params: { limit: 50 },
-    };
-
+  protected async getHistory(): Promise<Data[]> {
     try {
-      const response = await axios.get<Data[]>(url, config);
-
+      const response = await this.wallet.requestWallet<Data[]>(
+        false,
+        this.chainConfig.multisigWalletId,
+        'wallet/tx-history',
+        null,
+        { limit: 50 },
+      );
       if (response.status == 200) {
         return response.data;
       }
@@ -201,18 +196,14 @@ export abstract class Broker {
   }
 
   protected async getTransactionConfirmation(transactionId: string): Promise<number> {
-    const url = `${this.chainConfig.walletUrl}/wallet/tx-confirmation-blocks`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-      params: { id: transactionId },
-    };
-
     try {
-      const response = await axios.get<GetConfirmationResponse>(url, config);
-
+      const response = await this.wallet.requestWallet<GetConfirmationResponse>(
+        false,
+        this.chainConfig.multisigWalletId,
+        'wallet/tx-confirmation-blocks',
+        null,
+        { id: transactionId },
+      );
       if (response.status == 200 && response.data.success) {
         return response.data.confirmationNumber;
       }
@@ -234,17 +225,13 @@ export abstract class Broker {
   }
 
   protected async decodeTxHex(txHex: string): Promise<Data> {
-    const url = `${this.chainConfig.walletUrl}/wallet/decode`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     try {
-      const response = await axios.post<DecodeResponse>(url, { txHex: txHex }, config);
-
+      const response = await this.wallet.requestWallet<DecodeResponse>(
+        true,
+        this.chainConfig.multisigWalletId,
+        'wallet/decode',
+        { txHex: txHex },
+      );
       if (response.status == 200 && response.data.success) {
         return response.data.tx;
       }
@@ -256,17 +243,13 @@ export abstract class Broker {
   }
 
   private async getMySignatures(txHex: string) {
-    const url = `${this.chainConfig.walletUrl}/wallet/p2sh/tx-proposal/get-my-signatures`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     try {
-      const response = await axios.post<GetMySignatureResponse>(url, { txHex: txHex }, config);
-
+      const response = await this.wallet.requestWallet<GetMySignatureResponse>(
+        true,
+        this.chainConfig.multisigWalletId,
+        'wallet/p2sh/tx-proposal/get-my-signatures',
+        { txHex: txHex },
+      );
       if (response.status == 200 && response.data.success) {
         return response.data.signatures;
       }
@@ -279,16 +262,12 @@ export abstract class Broker {
 
   protected async getMultiSigAddress() {
     // TODO Provide cache strategy
-    const url = `${this.chainConfig.walletUrl}/wallet/address`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     try {
-      const response = await axios.get<GetAddressResponse>(url, config);
+      const response = await this.wallet.requestWallet<GetAddressResponse>(
+        false,
+        this.chainConfig.multisigWalletId,
+        'wallet/address',
+      );
       if (response.status == 200) {
         return response.data.address;
       }
@@ -322,17 +301,13 @@ export abstract class Broker {
   }
 
   protected async broadcastDataToMultisig(data: any): Promise<boolean> {
-    const url = `${this.chainConfig.walletUrl}/wallet/send-tx`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.singleWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
     try {
-      const response = await axios.post<HathorResponse>(url, data, config);
-
+      const response = await this.wallet.requestWallet<HathorResponse>(
+        true,
+        this.chainConfig.singleWalletId,
+        'wallet/send-tx',
+        data,
+      );
       if (response.status != 200) {
         throw Error(`Response status: ${response.status} - status message: ${response.statusText}`);
       }

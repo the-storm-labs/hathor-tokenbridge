@@ -2,11 +2,11 @@ import { Broker } from './Broker';
 import { LogWrapper } from '../logWrapper';
 import { ConfigData } from '../config';
 import HathorException from '../../types/HathorException';
-import axios from 'axios';
 import { IBridgeV4 } from '../../contracts/IBridgeV4';
 import { CreateProposalResponse } from '../../types/HathorResponseTypes';
 import { FederationFactory } from '../../contracts/FederationFactory';
 import { BridgeFactory } from '../../contracts/BridgeFactory';
+import { HathorWallet } from '../HathorWallet';
 
 export class EvmBroker extends Broker {
   public txIdType: string;
@@ -96,21 +96,19 @@ export class EvmBroker extends Broker {
   }
 
   private async sendMintProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
-    const url = `${this.chainConfig.walletUrl}/wallet/p2sh/tx-proposal/mint-tokens`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
-
+    const wallet = HathorWallet.getInstance(this.config, this.logger);
     const data = {
       address: `${receiverAddress}`,
       amount: qtd,
       token: `${token}`,
     };
 
-    const response = await axios.post<CreateProposalResponse>(url, data, config);
+    const response = await wallet.requestWallet<CreateProposalResponse>(
+      true,
+      this.chainConfig.multisigWalletId,
+      'wallet/p2sh/tx-proposal/mint-tokens',
+      data,
+    );
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
     }
@@ -121,24 +119,23 @@ export class EvmBroker extends Broker {
   }
 
   private async sendTransferProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
-    const url = `${this.chainConfig.walletUrl}/wallet/tx-proposal`;
-    const config = {
-      headers: {
-        'X-Wallet-Id': this.chainConfig.multisigWalletId,
-        'Content-type': 'application/json',
-      },
-    };
+    const wallet = HathorWallet.getInstance(this.config, this.logger);
 
     const output = {
       address: `${receiverAddress}`,
       value: qtd,
       token: `${token}`,
     };
-
     const outputs = [];
     outputs.push(output);
 
-    const response = await axios.post<CreateProposalResponse>(url, { outputs }, config);
+    const response = await wallet.requestWallet<CreateProposalResponse>(
+      true,
+      this.chainConfig.multisigWalletId,
+      'wallet/tx-proposal',
+      { outputs },
+    );
+
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
     }
