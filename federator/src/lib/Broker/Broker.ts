@@ -88,7 +88,7 @@ export abstract class Broker {
     };
     const response = await this.wallet.requestWallet<HathorResponse>(
       true,
-      this.chainConfig.singleWalletId,
+      this.chainConfig.multisigWalletId,
       'wallet/p2sh/tx-proposal/sign-and-push',
       data,
     );
