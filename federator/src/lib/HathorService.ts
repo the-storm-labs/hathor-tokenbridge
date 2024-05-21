@@ -112,7 +112,9 @@ export class HathorService {
       return subscription;
     }
 
-    await subscription.delete();
+    if (subscription) {
+      await subscription.delete();
+    }
 
     const topicName = `projects/${this.chainConfig.pubsubProjectId}/topics/hathor-federator-${this.chainConfig.multisigOrder}`;
     const [newSubscription] = await pubsub.createSubscription(topicName, subscriptionName, {

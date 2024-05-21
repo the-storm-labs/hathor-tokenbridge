@@ -12,8 +12,8 @@ federator.log
 federator/built
 
 federator/package-lock.json
+server/package-lock.json
 
 **.tfvars
-**.tfvars.example
 **.terraform*
 **.tfstate*
