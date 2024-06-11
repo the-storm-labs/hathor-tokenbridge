@@ -132,7 +132,7 @@ resource "google_cloud_run_v2_service" "hathor-wallet" {
 
   template {
     containers {
-      image = "us-central1-docker.pkg.dev/${var.gcp_project_id}/${var.gcp_repository}/hathor-wallet-pubsub:v1.0.1.5"
+      image = "us-central1-docker.pkg.dev/${var.gcp_project_id}/${var.gcp_repository}/hathor-wallet-pubsub:latest"
 
       env {
         name  = "HEADLESS_SEED_DEFAULT"
