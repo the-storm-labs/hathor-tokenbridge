@@ -8,6 +8,7 @@ federator.log
 .env
 .env.test
 .env.prod
+**.env
 
 federator/built
 

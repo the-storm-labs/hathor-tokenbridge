@@ -23,8 +23,10 @@
   },
   "dependencies": {
     "@google-cloud/pubsub": "^4.0.7",
-    "@hathor/wallet-lib": "^1.0.3",
+    "@hathor/wallet-lib": "1.0.3",
+    "@types/amqplib": "^0.10.5",
     "abi-decoder": "^2.4.0",
+    "amqplib": "^0.10.4",
     "axios": "^0.21.2",
     "datadog-metrics": "^0.9.3",
     "dotenv": "^16.0.1",

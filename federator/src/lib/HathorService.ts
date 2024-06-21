@@ -1,6 +1,7 @@
 import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
 import { PubSub, Subscription } from '@google-cloud/pubsub';
+import * as rabbitmq from 'amqplib';
 import { HathorTx } from '../types/HathorTx';
 import { HathorUtxo } from '../types/HathorUtxo';
 import { HathorException } from '../types/HathorException';
@@ -10,6 +11,7 @@ import { EvmBroker } from './Broker/EvmBroker';
 import { Broker } from './Broker/Broker';
 import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
+import { waitBlocks } from './utils';
 
 export class HathorService {
   public logger: LogWrapper;
@@ -49,12 +51,65 @@ export class HathorService {
       case 'pubsub':
         this.listenToPubSubEventQueue();
         break;
+      case 'rabbitmq':
+        this.listenToRabbitMQEventQueue();
+        break;
       case 'sqs':
         this.logger.error('AWS SQS not implemented.');
         break;
       case 'asb':
         this.logger.error('Azure Service Bus not implemented.');
         break;
+    }
+  }
+
+  private async listenToRabbitMQEventQueue() {
+    const queue = 'main_queue';
+
+    // const retryHeader = 'x-retry-count';
+
+    try {
+      const conn = await rabbitmq.connect('amqp://localhost');
+
+      const channel = await conn.createChannel();
+      await channel.assertQueue(queue, { deadLetterExchange: 'dlx_exchange', deadLetterRoutingKey: 'dlq_queue' });
+
+      channel.consume(queue, async (message) => {
+        if (message !== null) {
+          try {
+            const response = await this.parseHathorLogs(JSON.parse(message.content.toString()));
+            if (response) {
+              channel.ack(message);
+              return;
+            }
+            channel.reject(message, false);
+          } catch (error) {
+            this.logger.error(`Fail to processing hathor event: ${error}`);
+            let isNonRetriable = false;
+            if (error instanceof HathorException) {
+              const originalError = (error as HathorException).getOriginalMessage();
+
+              for (let index = 0; index < this.nonRetriableErrors.length; index++) {
+                const rgxError = this.nonRetriableErrors[index];
+                if (originalError.match(rgxError)) {
+                  isNonRetriable = true;
+                  break;
+                }
+              }
+
+              if (isNonRetriable) {
+                channel.ack(message);
+                return;
+              }
+            }
+            channel.reject(message, false);
+          }
+        } else {
+          this.logger.error('Consumer cancelled by server');
+        }
+      });
+    } catch (error) {
+      this.logger.error(error);
     }
   }
 
