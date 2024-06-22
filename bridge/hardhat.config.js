@@ -62,7 +62,9 @@ module.exports = {
       goerli: ETHERESCAN_KEY,
       kovan: ETHERESCAN_KEY,
       sepolia: ETHERESCAN_KEY,
+      holesky: ETHERESCAN_KEY,
       mumbai: ETHERESCAN_KEY,
+      amoy: ETHERESCAN_KEY,
     }
   },
   networks: {
@@ -145,7 +147,19 @@ module.exports = {
       network_id: chains.SEPOLIA_TEST_NET_CHAIN_ID,
       token_symbol: 'e',
       gas: 6700000,
-      gasPrice: 60000000000,
+      gasPrice: 1100000000,
+      accounts: {
+        mnemonic: MNEMONIC,
+      },
+      tags: ['staging'],
+    },    
+    holesky: {
+      live: false,
+      url: 'https://holesky.infura.io/v3/' + INFURA_PROJECT_ID,
+      network_id: chains.HOLESKY_TEST_NET_CHAIN_ID,
+      token_symbol: 'e',
+      gas: 6700000,
+      gasPrice: 10000000000,
       accounts: {
         mnemonic: MNEMONIC,
       },
@@ -163,6 +177,18 @@ module.exports = {
       },
       tags: ['staging'],
     },
+    amoy: {
+      live: false,
+      url: 'https://polygon-amoy.infura.io/v3/' + INFURA_PROJECT_ID,
+      network_id: chains.AMOY_TEST_NET_CHAIN_ID,
+      token_symbol: 'p',
+      gas: 6700000,
+      gasPrice: 2000000000,
+      accounts: {
+        mnemonic: MNEMONIC,
+      },
+      tags: ['staging'],
+    },    
     rinkeby: {
       live: true,
       url: 'https://rinkeby.infura.io/v3/' + INFURA_PROJECT_ID,
