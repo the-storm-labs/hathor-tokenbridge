@@ -69,7 +69,11 @@ export class HathorService {
     // const retryHeader = 'x-retry-count';
 
     try {
-      const conn = await rabbitmq.connect('amqp://localhost');
+      const conn = await rabbitmq.connect('amqp://guest:guest@rabbitmq:5672');
+
+      if (conn) {
+        this.logger.info('Connected to rabbitmq');
+      }
 
       const channel = await conn.createChannel();
       await channel.assertQueue(queue, { deadLetterExchange: 'dlx_exchange', deadLetterRoutingKey: 'dlq_queue' });
