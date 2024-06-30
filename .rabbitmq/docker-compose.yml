@@ -39,7 +39,7 @@ services:
 
   hathor-wallet:
     env_file:
-      - hathor.env
+      - .env
     image: toggera/hathor-wallet-rabbitmq:latest
     container_name: hathor_wallet_container
     depends_on:
