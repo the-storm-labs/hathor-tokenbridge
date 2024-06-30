@@ -1,11 +1,11 @@
 {
     "name": "sepolia",
-    "bridge": "0xf17b82bf492cc329ea8c52df9f103a5dae8342fd",
-    "federation": "0x59604f34e1819c36273343f2259e760546a85886",
-    "multiSig": "0x9d7c899cdb900b908864be2a2991f3cbe9e6b71a",
-    "allowTokens": "0x2bfe63ddb1de113f337ae454edf8bd1d4a19ee14",
+    "bridge": "0x9c3af23d1767257171525a4b136d447a87cb13e8",
+    "federation": "0x5ff99359f5b0a5cec7e517280067f3cb6cffa721",
+    "multiSig": "0x97bd0f4e1b651fb588dd56efa29028b76c9be674",
+    "allowTokens": "0x46f7d11498c58529126f1029e9bed6062e2b5346",
     "chainId": 11155111,
-    "testToken": "0x247d6326586a111860d103db009c3fb4317c8444",
+    "testToken": "0xabff984025540bb69955ba9574c1a185415d9ab5",
     "host": "https://sepolia.infura.io/v3/399500b5679b442eb991fefee1c5bfdc",
-    "fromBlock": 4613473
+    "fromBlock": 6115713
 }

@@ -65,6 +65,7 @@ module.exports = {
       holesky: ETHERESCAN_KEY,
       mumbai: ETHERESCAN_KEY,
       amoy: ETHERESCAN_KEY,
+      sepolia_arbitrum: ETHERESCAN_KEY
     }
   },
   networks: {
@@ -153,6 +154,18 @@ module.exports = {
       },
       tags: ['staging'],
     },    
+    sepolia_arbitrum: {
+      live: false,
+      url: 'https://arbitrum-sepolia.infura.io/v3/' + INFURA_PROJECT_ID,
+      network_id: chains.SEPOLIA_ARBITRUM_TEST_NET_CHAIN_ID,
+      token_symbol: 'e',
+      gas: 6700000,
+      gasPrice: 150000000,
+      accounts: {
+        mnemonic: MNEMONIC,
+      },
+      tags: ['staging'],
+    },
     holesky: {
       live: false,
       url: 'https://holesky.infura.io/v3/' + INFURA_PROJECT_ID,
@@ -183,7 +196,7 @@ module.exports = {
       network_id: chains.AMOY_TEST_NET_CHAIN_ID,
       token_symbol: 'p',
       gas: 6700000,
-      gasPrice: 2000000000,
+      gasPrice: 160000000000,
       accounts: {
         mnemonic: MNEMONIC,
       },
