@@ -6,6 +6,6 @@
     "allowTokens": "0xbf52a73032039f274155e2467aa31de6ef1310f5",
     "chainId": 80001,
     "testToken": "0x995491ebafe3e286201bf22af1af9803b5c5d9b5",
-    "host": "https://polygon-mumbai.infura.io/v3/399500b5679b442eb991fefee1c5bfdc",
+    "host": "https://polygon-mumbai.infura.io/v3/",
     "fromBlock": 44851963
 }
