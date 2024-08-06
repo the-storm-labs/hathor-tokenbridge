@@ -43,7 +43,7 @@ export default class FederatorHTR extends Federator {
     const currentBlock = await this.getMainChainWeb3().eth.getBlockNumber();
     const mainChainId = await this.getCurrentChainId();
     // TODO: Get rid of fixed id
-    const sideChainId = await 31;
+    const sideChainId = 31;
     this.logger.upsertContext('Main Chain ID', mainChainId);
     this.logger.upsertContext('Side Chain ID', sideChainId);
     const allowTokensFactory = new AllowTokensFactory();

@@ -1,12 +1,10 @@
 import axios, { AxiosResponse } from 'axios';
 import EventEmmiter from 'node:events';
-// import axiosCurlirize from 'axios-curlirize';
 import { HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
 import { LogWrapper } from './logWrapper';
 import { ConfigChain } from './configChain';
 import { ConfigData } from './config';
 
-// axiosCurlirize(axios); // <- just for testing
 
 export type Wallet = {
   ready: boolean;
