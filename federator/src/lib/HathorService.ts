@@ -69,7 +69,7 @@ export class HathorService {
     // const retryHeader = 'x-retry-count';
 
     try {
-      const conn = await rabbitmq.connect('amqp://guest:guest@rabbitmq:5672');
+      const conn = await rabbitmq.connect(process.env.RABBIT_CONFIG);
 
       if (conn) {
         this.logger.info('Connected to rabbitmq');
