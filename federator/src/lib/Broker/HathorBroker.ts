@@ -90,7 +90,7 @@ export class HathorBroker extends Broker {
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
 
     const sender = Web3.utils.keccak256(ogSenderAddress);
-    const thirdTwoBytesSender = sender.substring(0, 42);
+    const thirdTwoBytesSender = Web3.utils.toChecksumAddress(sender.substring(0, 42));
     const idHash = Web3.utils.keccak256(txId);
     const convertedAmount = new BN(this.convertToEvmDecimals(qtd, evmTokenDecimals));
     const timestampHash = Web3.utils.soliditySha3(timestamp);
