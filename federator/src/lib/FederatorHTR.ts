@@ -270,7 +270,7 @@ export default class FederatorHTR extends Federator {
     // );
     // this.logger.info('get transaction id:', transactionId);
 
-    const transactionId = Date.now().toString(); //yes, will change that later, trust the father
+    const transactionId = Date.now().toString(); 
 
     await this.processTransaction({
       ...processLogParams,
