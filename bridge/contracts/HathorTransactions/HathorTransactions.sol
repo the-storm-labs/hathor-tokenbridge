@@ -21,17 +21,25 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     mapping(address => bool) public isMember;
 
     mapping(bytes32 => mapping(address => bool)) public haveISignedBefore;
+    mapping(bytes32 => bool) public isProcessed;
 
     modifier onlyMember() {
         require(isMember[_msgSender()], "Federation: Not Federator");
         _;
     }
 
-    event TransactionUpdated(
+    event TransactionSignatureUpdated(
         bytes32 indexed transactionId,
         address indexed member,
         bool signed
     );
+
+    event TransactionUpdated(
+        bytes32 indexed transactionId,
+        bool processed
+    );
+
+
     event MemberAddition(address indexed member);
     event MemberRemoval(address indexed member);
 
@@ -55,12 +63,20 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         }
     }
 
-    function updateTransactionState(
+    function updatesignatureState(
         bytes32 transactionId,
         bool signed
     ) external onlyMember {
         haveISignedBefore[transactionId][_msgSender()] = signed;
-        emit TransactionUpdated(transactionId, _msgSender(), signed);
+        emit TransactionSignatureUpdated(transactionId, _msgSender(), signed);
+    }
+
+    function updateTransactionState(
+        bytes32 transactionId,
+        bool sent
+    ) external onlyMember {
+        isProcessed[transactionId] = sent;
+        emit TransactionUpdated(transactionId, sent);
     }
 
     function addMember(address _newMember) external onlyOwner {
