@@ -20,7 +20,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
 
     mapping(address => bool) public isMember;
 
-    mapping(bytes32 => mapping(address => bool)) public signedTransactions;
+    mapping(bytes32 => mapping(address => bool)) public haveISignedBefore;
 
     modifier onlyMember() {
         require(isMember[_msgSender()], "Federation: Not Federator");
@@ -59,7 +59,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         bytes32 transactionId,
         bool signed
     ) external onlyMember {
-        signedTransactions[transactionId][_msgSender()] = signed;
+        haveISignedBefore[transactionId][_msgSender()] = signed;
         emit TransactionUpdated(transactionId, _msgSender(), signed);
     }
 
