@@ -55,7 +55,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         }
     }
 
-    function updateTransactionstate(
+    function updateTransactionState(
         bytes32 transactionId,
         bool signed
     ) external onlyMember {
