@@ -64,17 +64,51 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     }
 
     function updatesignatureState(
-        bytes32 transactionId,
+        bytes32 originalTokenAddress,
+        bytes32 transactionHash,
+        uint256 value,
+        address sender,
+        address receiver,
         bool signed
     ) external onlyMember {
+        
+        bytes32 transactionId = keccak256(
+			abi.encodePacked(
+				originalTokenAddress,
+				sender,
+				receiver,
+				value,				
+				transactionHash,
+				logIndex
+			)
+		);
+
+        require(haveISignedBefore[transactionId][_msgSender()] == false,"HathorTransactions: Transaction already signed");
+
         haveISignedBefore[transactionId][_msgSender()] = signed;
         emit TransactionSignatureUpdated(transactionId, _msgSender(), signed);
     }
 
     function updateTransactionState(
-        bytes32 transactionId,
+        bytes32 originalTokenAddress,
+        bytes32 transactionHash,
+        uint256 value,
+        address sender,
+        address receiver,
         bool sent
     ) external onlyMember {
+
+         bytes32 transactionId = keccak256(
+			abi.encodePacked(
+				originalTokenAddress,
+				sender,
+				receiver,
+				value,				
+				transactionHash,
+				logIndex
+			)
+		);
+        require(isProcessed[transactionId] == false,"HathorTransactions: Transaction already sent"))
         isProcessed[transactionId] = sent;
         emit TransactionUpdated(transactionId, sent);
     }
