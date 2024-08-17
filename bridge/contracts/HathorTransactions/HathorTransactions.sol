@@ -50,7 +50,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         bytes signature
     );
 
-    event ProposalSent(bytes32 indexed transactionId, bool processed);
+    event ProposalSent(bytes32 indexed transactionId,  bytes32 originalTransactionHash ,bool processed);
     event TransactionProposed(bytes32 transactionId, bytes txHex);
 
 
@@ -125,7 +125,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         require(isProposed[transactionId] == false, "HathorTransactions: already proposed");
         transactionHex[transactionId] = txHex;
         isProposed[transactionId] = true;
-        emit TransactionProposed(transactionId, txHex);
+        emit TransactionProposed(transactionId, transactionHash, txHex);
     }
 
 
