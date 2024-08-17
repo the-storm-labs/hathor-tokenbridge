@@ -34,11 +34,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         bool signed
     );
 
-    event TransactionUpdated(
-        bytes32 indexed transactionId,
-        bool processed
-    );
-
+    event TransactionUpdated(bytes32 indexed transactionId, bool processed);
 
     event MemberAddition(address indexed member);
     event MemberRemoval(address indexed member);
@@ -71,18 +67,20 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         address receiver,
         bool signed
     ) external onlyMember {
-        
         bytes32 transactionId = keccak256(
-			abi.encodePacked(
-				originalTokenAddress,
-				sender,
-				receiver,
-				value,				
-				transactionHash			
-			)
-		);
+            abi.encodePacked(
+                originalTokenAddress,
+                sender,
+                receiver,
+                value,
+                transactionHash
+            )
+        );
 
-        require(haveISignedBefore[transactionId][_msgSender()] == false,"HathorTransactions: Transaction already signed");
+        require(
+            haveISignedBefore[transactionId][_msgSender()] == false,
+            "HathorTransactions: Transaction already signed"
+        );
 
         haveISignedBefore[transactionId][_msgSender()] = signed;
         emit TransactionSignatureUpdated(transactionId, _msgSender(), signed);
@@ -96,17 +94,19 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         address receiver,
         bool sent
     ) external onlyMember {
-
-         bytes32 transactionId = keccak256(
-			abi.encodePacked(
-				originalTokenAddress,
-				sender,
-				receiver,
-				value,				
-				transactionHash				
-			)
-		);
-        require(isProcessed[transactionId] == false,"HathorTransactions: Transaction already sent");
+        bytes32 transactionId = keccak256(
+            abi.encodePacked(
+                originalTokenAddress,
+                sender,
+                receiver,
+                value,
+                transactionHash
+            )
+        );
+        require(
+            isProcessed[transactionId] == false,
+            "HathorTransactions: Transaction already sent"
+        );
         isProcessed[transactionId] = sent;
         emit TransactionUpdated(transactionId, sent);
     }
