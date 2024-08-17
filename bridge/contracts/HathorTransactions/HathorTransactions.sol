@@ -63,7 +63,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         }
     }
 
-    function updatesignatureState(
+    function updateSignatureState(
         bytes32 originalTokenAddress,
         bytes32 transactionHash,
         uint256 value,
@@ -78,8 +78,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
 				sender,
 				receiver,
 				value,				
-				transactionHash,
-				logIndex
+				transactionHash			
 			)
 		);
 
@@ -104,11 +103,10 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
 				sender,
 				receiver,
 				value,				
-				transactionHash,
-				logIndex
+				transactionHash				
 			)
 		);
-        require(isProcessed[transactionId] == false,"HathorTransactions: Transaction already sent"))
+        require(isProcessed[transactionId] == false,"HathorTransactions: Transaction already sent");
         isProcessed[transactionId] = sent;
         emit TransactionUpdated(transactionId, sent);
     }
