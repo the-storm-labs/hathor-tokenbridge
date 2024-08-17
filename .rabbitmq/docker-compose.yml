@@ -1,10 +1,10 @@
 services:
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: hathor_rabbitmq
+    container_name: hathor_rabbitmq_${HATHOR_MULTISIG_ORDER}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "56${HATHOR_MULTISIG_ORDER}2:5672"
+      - "156${HATHOR_MULTISIG_ORDER}2:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -14,7 +14,7 @@ services:
   
   init-rabbitmq:
     image: alpine:3.12
-    container_name: init_rabbitmq_container
+    container_name: init_rabbitmq_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       - rabbitmq
     entrypoint: |
@@ -39,22 +39,25 @@ services:
 
   hathor-wallet:
     env_file:
-      - .env
+      - fed0${HATHOR_MULTISIG_ORDER}.env
     image: toggera/hathor-wallet-rabbitmq:latest
-    container_name: hathor_wallet_container
+    container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       init-rabbitmq:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "800${HATHOR_MULTISIG_ORDER}:8000"
 
   hathor-federator:
-    image: toggera/hathor-tokenbridge:latest
-    container_name: hathor_tokenbridge
+    image: toggera/hathor-tokenbridge:1.0.10
+    container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
     depends_on:
       - hathor-wallet
     ports:
-      - "5000:5000"
+      - "500${HATHOR_MULTISIG_ORDER}:5000"
     environment:
       HTR_CONFIG: '{"name":"${HATHOR_NAME}","chainId":${HATHOR_CHAIN_ID},"fromBlock":${HATHOR_FROM_BLOCK},"walletUrl":"${HATHOR_WALLET_URL}","walletKey":"${HEADLESS_API_KEY}","singleWalletId":"${HATHOR_SINGLE_WALLET_ID}","singleSeedKey":"${HATHOR_SINGLE_SEED_KEY}","multisigWalletId":"${HATHOR_MULTISIG_WALLET_ID}","multisigSeedKey":"${HATHOR_MULTISIG_SEED_KEY}","multisigRequiredSignatures":${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES},"multisigOrder":${HATHOR_MULTISIG_ORDER},"minimumConfirmations":${HATHOR_MINIMUM_CONFIRMATIONS},"eventQueueType":"rabbitmq"}'
       EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK}}'
+      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
+      FEDERATOR_KEY: ${FEDERATOR_KEY}
+      ETHERSCAN_KEY: ${ETHERSCAN_KEY}
