@@ -24,7 +24,7 @@ module.exports = async function (hre) { // HardhatRuntimeEnvironment
 
   console.log('constructorArguments', constructorArguments)
 
-  const HathorTransactions = await ethers.getContractFactory("HathorTransactions");
+  const HathorTransactions = await ethers.getContractFactory("HathorFederation");
   const hathorTransactions = await upgrades.deployProxy(HathorTransactions, [constructorArguments]);
   await box.waitForDeployment();
   console.log("Hathor transactions deployed to:", await box.getAddress());

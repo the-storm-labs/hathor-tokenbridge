@@ -7,7 +7,7 @@ pragma abicoder v2;
 import "../zeppelin/upgradable/Initializable.sol";
 import "../zeppelin/upgradable/ownership/UpgradableOwnable.sol";
 
-contract HathorTransactions is Initializable, UpgradableOwnable {
+contract HathorFederation is Initializable, UpgradableOwnable {
     address private constant NULL_ADDRESS = address(0);
     uint public constant MAX_MEMBER_COUNT = 50;
 
@@ -18,7 +18,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     }
 
     /**
-	@notice All the addresses that are members of the HathorTransactions
+	@notice All the addresses that are members of the HathorFederation
 	@dev The address should be a member to vote in transactions
 	*/
 
@@ -39,7 +39,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     }
 
     modifier onlyMember() {
-        require(isMember[_msgSender()], "HathorTransactions: Not Federator");
+        require(isMember[_msgSender()], "HathorFederation: Not Federator");
         _;
     }
 
@@ -64,13 +64,13 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         UpgradableOwnable.initialize(owner);
         require(
             _members.length <= MAX_MEMBER_COUNT,
-            "HathorTransactions: Too many members"
+            "HathorFederation: Too many members"
         );
         members = _members;
         for (uint i = 0; i < _members.length; i++) {
             require(
                 !isMember[_members[i]] && _members[i] != NULL_ADDRESS,
-                "HathorTransactions: Invalid members"
+                "HathorFederation: Invalid members"
             );
             isMember[_members[i]] = true;
             emit MemberAddition(_members[i]);
@@ -84,7 +84,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         uint256 value,
         bytes32 sender,
         bytes32 receiver,
-        TransactionType type      
+        TransactionType transactionType      
     ) external onlyMember  returns(bytes32){
 
         bytes32 transactionId = keccak256(
@@ -94,7 +94,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 receiver,
                 value,
                 transactionHash,
-                type
+                transactionType
             )
         );
 
@@ -107,7 +107,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         uint256 value,
         bytes32 sender,
         bytes32 receiver,
-        TransactionType type,
+        TransactionType transactionType,
         bytes memory txHex) external onlyMember{
        
 
@@ -118,11 +118,11 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 receiver,
                 value,
                 transactionHash,
-                flow
+                transactionType
             )
         );
 
-        require(isProposed[transactionId] == false, "HathorTransactions: already proposed");
+        require(isProposed[transactionId] == false, "HathorFederation: already proposed");
         transactionHex[transactionId] = txHex;
         isProposed[transactionId] = true;
         emit TransactionProposed(transactionId, transactionHash, txHex);
@@ -135,7 +135,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         uint256 value,
         bytes32 sender,
         bytes32 receiver,
-        TransactionType type,
+        TransactionType transactionType,
         bytes memory signature,
         bool signed
     ) external onlyMember {
@@ -146,13 +146,13 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 receiver,
                 value,
                 transactionHash,
-                flow
+                transactionType
             )
         );
 
         require(
             isSigned[transactionId][_msgSender()] == false,
-            "HathorTransactions: Transaction already signed"
+            "HathorFederation: Transaction already signed"
         );
 
         isSigned[transactionId][_msgSender()] = signed;
@@ -167,7 +167,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         uint256 value,
         bytes32 sender,
         bytes32 receiver,
-        TransactionType type,
+        TransactionType transactionType,
         bool sent
     ) external onlyMember {
         bytes32 transactionId = keccak256(
@@ -177,20 +177,20 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 receiver,
                 value,
                 transactionHash,
-                flow
+                transactionType
             )
         );
         require(
             isProcessed[transactionId] == false,
-            "HathorTransactions: Transaction already sent"
+            "HathorFederation: Transaction already sent"
         );
         isProcessed[transactionId] = sent;
         emit ProposalSent(transactionId, sent);
     }
 
     function addMember(address _newMember) external onlyOwner {
-        require(_newMember != NULL_ADDRESS, "HathorTransactions: Empty member");
-        require(!isMember[_newMember], "HathorTransactions: Member already exists");
+        require(_newMember != NULL_ADDRESS, "HathorFederation: Empty member");
+        require(!isMember[_newMember], "HathorFederation: Member already exists");
 
         isMember[_newMember] = true;
         members.push(_newMember);
@@ -198,9 +198,9 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     }
 
     function removeMember(address _oldMember) external onlyOwner {
-        require(_oldMember != NULL_ADDRESS, "HathorTransactions: Empty member");
-        require(isMember[_oldMember], "HathorTransactions: Member doesn't exists");
-        require(members.length > 1, "HathorTransactions: Can't remove all the members");
+        require(_oldMember != NULL_ADDRESS, "HathorFederation: Empty member");
+        require(isMember[_oldMember], "HathorFederation: Member doesn't exists");
+        require(members.length > 1, "HathorFederation: Can't remove all the members");
 
         isMember[_oldMember] = false;
         for (uint i = 0; i < members.length - 1; i++) {
@@ -214,7 +214,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
     }
 
     /**
-		@notice Return all the current members of the HathorTransactions
+		@notice Return all the current members of the HathorFederation
 		@return Current members
 		*/
     function getMembers() external view returns (address[] memory) {
