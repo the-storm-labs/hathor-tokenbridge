@@ -13,6 +13,10 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
 
     address[] public members;
 
+    struct Signatures {      
+        bytes signature;
+    }
+
     /**
 	@notice All the addresses that are members of the federation
 	@dev The address should be a member to vote in transactions
@@ -20,21 +24,35 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
 
     mapping(address => bool) public isMember;
 
-    mapping(bytes32 => mapping(address => bool)) public haveISignedBefore;
+    mapping(bytes32 => mapping(address => bool)) public isSigned;
     mapping(bytes32 => bool) public isProcessed;
+    mapping (bytes32 => bool) public isProposed;
+    mapping (bytes32 => bytes) public transactionHex;
+    mapping (bytes32 => Signatures[] ) public transactionSignatures;
+
+
+    enum Flow {
+        MELT,
+        MINT,
+        TRNASFER,
+        RETURN
+    }
 
     modifier onlyMember() {
         require(isMember[_msgSender()], "Federation: Not Federator");
         _;
     }
 
-    event TransactionSignatureUpdated(
+    event ProposalSigned(
         bytes32 indexed transactionId,
         address indexed member,
-        bool signed
+        bool signed,
+        bytes signature
     );
 
-    event TransactionUpdated(bytes32 indexed transactionId, bool processed);
+    event ProposalSent(bytes32 indexed transactionId, bool processed);
+    event TransactionProposed(bytes32 transactionId, bytes txHex);
+
 
     event MemberAddition(address indexed member);
     event MemberRemoval(address indexed member);
@@ -59,12 +77,66 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
         }
     }
 
+
+    function getTransactionId(
+        bytes32 originalTokenAddress,
+        bytes32 transactionHash,
+        uint256 value,
+        bytes32 sender,
+        bytes32 receiver,
+        Flow flow       
+    ) external onlyMember  returns(bytes32){
+
+        bytes32 transactionId = keccak256(
+            abi.encodePacked(
+                originalTokenAddress,
+                sender,
+                receiver,
+                value,
+                transactionHash,
+                flow
+            )
+        );
+
+        return transactionId;
+    }
+
+
+    function sendTransactionProposal( bytes32 originalTokenAddress,
+        bytes32 transactionHash,
+        uint256 value,
+        bytes32 sender,
+        bytes32 receiver,
+        Flow flow,
+        bytes memory txHex) external onlyMember{
+       
+
+        bytes32 transactionId = keccak256(
+            abi.encodePacked(
+                originalTokenAddress,
+                sender,
+                receiver,
+                value,
+                transactionHash,
+                flow
+            )
+        );
+
+        require(isProposed[transactionId] == false, "HathorTransactions: already proposed");
+        transactionHex[transactionId] = txHex;
+        isProposed[transactionId] = true;
+        emit TransactionProposed(transactionId, txHex);
+    }
+
+
     function updateSignatureState(
         bytes32 originalTokenAddress,
         bytes32 transactionHash,
         uint256 value,
-        address sender,
-        address receiver,
+        bytes32 sender,
+        bytes32 receiver,
+        Flow flow,
+        bytes memory signature,
         bool signed
     ) external onlyMember {
         bytes32 transactionId = keccak256(
@@ -73,25 +145,29 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 sender,
                 receiver,
                 value,
-                transactionHash
+                transactionHash,
+                flow
             )
         );
 
         require(
-            haveISignedBefore[transactionId][_msgSender()] == false,
+            isSigned[transactionId][_msgSender()] == false,
             "HathorTransactions: Transaction already signed"
         );
 
-        haveISignedBefore[transactionId][_msgSender()] = signed;
-        emit TransactionSignatureUpdated(transactionId, _msgSender(), signed);
+        isSigned[transactionId][_msgSender()] = signed;
+        transactionSignatures[transactionId].push(Signatures(signature));
+
+        emit ProposalSigned(transactionId, _msgSender(), signed, signature);
     }
 
     function updateTransactionState(
         bytes32 originalTokenAddress,
         bytes32 transactionHash,
         uint256 value,
-        address sender,
-        address receiver,
+        bytes32 sender,
+        bytes32 receiver,
+        Flow flow,
         bool sent
     ) external onlyMember {
         bytes32 transactionId = keccak256(
@@ -100,7 +176,8 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
                 sender,
                 receiver,
                 value,
-                transactionHash
+                transactionHash,
+                flow
             )
         );
         require(
@@ -108,7 +185,7 @@ contract HathorTransactions is Initializable, UpgradableOwnable {
             "HathorTransactions: Transaction already sent"
         );
         isProcessed[transactionId] = sent;
-        emit TransactionUpdated(transactionId, sent);
+        emit ProposalSent(transactionId, sent);
     }
 
     function addMember(address _newMember) external onlyOwner {

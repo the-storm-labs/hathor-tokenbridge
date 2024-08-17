@@ -31,7 +31,7 @@ module.exports = async function (hre) { // HardhatRuntimeEnvironment
 }
     
 module.exports.id = 'deploy_hathorTransaction'; // id required to prevent reexecution
-module.exports.tags = ['DeployFromScratch'];
+module.exports.tags = ['DeployHathorState'];
 module.exports.dependencies = [
    'MultiSigWallet'
 ];
