@@ -10,7 +10,7 @@ export interface IHathorFederation {
   transactionHex(transactionId: string): Promise<string>;
   transactionSignatures(transactionId: string): Promise<string[]>;
   getTransactionId(originalTokenAddress, transactionHash, value, sender, receiver, transactionType): Promise<string>;
-  getSendTransactionProposalABI(
+  getSendTransactionProposalArgs(
     originalTokenAddress: string,
     transactionHash: string,
     value: number,
@@ -19,4 +19,15 @@ export interface IHathorFederation {
     transactionType: TransactionTypes,
     txHex: string,
   ): Promise<any>;
+  getUpdateSignatureStateArgs(
+    originalTokenAddress,
+    transactionHash,
+    value,
+    sender,
+    receiver,
+    transactionType,
+    signature,
+    signed
+  ) : Promise<any>;
+
 }

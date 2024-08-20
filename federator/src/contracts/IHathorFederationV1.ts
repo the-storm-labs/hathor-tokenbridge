@@ -69,7 +69,7 @@ export class IHathorFederationV1 implements IHathorFederation {
       const bytesTransactionHash = this.web3.utils.padLeft(transactionHash, 64);
       const bytesSender = this.web3.utils.padLeft(sender, 64);
       const bytesReceiver = this.web3.utils.padLeft(receiver, 64);
-  
+
       // Call the smart contract method with the formatted parameters
       return await this.hathorFederationContract.methods
         .getTransactionId(
@@ -100,7 +100,7 @@ export class IHathorFederationV1 implements IHathorFederation {
     const bytesTransactionHash = this.web3.utils.padLeft(transactionHash, 64);
     const bytesSender = this.web3.utils.padLeft(sender, 64);
     const bytesReceiver = this.web3.utils.padLeft(receiver, 64);
-  
+
     // Prepare the ABI-encoded function call
     return this.hathorFederationContract.methods
       .sendTransactionProposal(
@@ -114,4 +114,37 @@ export class IHathorFederationV1 implements IHathorFederation {
       )
       .encodeABI();
   }
+
+  async getUpdateSignatureStateArgs(
+    originalTokenAddress,
+    transactionHash,
+    value,
+    sender,
+    receiver,
+    transactionType,
+    signature,
+    signed
+  ) {
+    // Convert strings to bytes32 format
+    const bytesOriginalTokenAddress = this.web3.utils.padLeft(originalTokenAddress, 64);
+    const bytesTransactionHash = this.web3.utils.padLeft(transactionHash, 64);
+    const bytesSender = this.web3.utils.padLeft(sender, 64);
+    const bytesReceiver = this.web3.utils.padLeft(receiver, 64);
+
+    // Prepare the ABI-encoded function call
+    return this.hathorFederationContract.methods
+      .updateSignatureState(
+        bytesOriginalTokenAddress,
+        bytesTransactionHash,
+        value,
+        bytesSender,
+        bytesReceiver,
+        transactionType.valueOf(), // Convert transaction type enum to its underlying value
+        signature,signed
+      )
+      .encodeABI();
+  }
+
+
+
 }

@@ -44,8 +44,8 @@ export class EvmBroker extends Broker {
     )) as IHathorFederation;
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
     const transactionType = isTokenEvmNative ? TransactionTypes.MINT : TransactionTypes.TRANSFER;
-    
-     const transactionId = await hathorFederationContract.getTransactionId(
+
+    const transactionId = await hathorFederationContract.getTransactionId(
       tokenAddress,
       txHash,
       qtd,
@@ -55,23 +55,83 @@ export class EvmBroker extends Broker {
     );
     // the transaction has been processed before? if so, nothing to do
     const isProcessed = await hathorFederationContract.isProcessed(transactionId);
-    if (isProcessed) return;
-    // the transaction has been proposed before? if so, nothing to do
+    const isSigned = await hathorFederationContract.isSigned(transactionId);
     const isProposed = await hathorFederationContract.isProposed(transactionId);
-    if (isProposed) return;
 
-    // if not, let's propose
     const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
     const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
+
     if (convertedQuantity <= 0) {
       this.logger.info(
         `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${qtd}, Token decimals ${tokenDecimals}.`,
       );
       return;
     }
+
+
+    if (isProcessed) return; // No action needed if already processed
+
+    if (isSigned) {
+      if (!isProcessed) {
+        // Send signatures if already signed but not yet processed
+        //GET FROM Array
+
+
+        // GET FROM Events
+
+        //broadcast transaction
+
+      }
+      return;
+    }
+
+    if (isProposed) {
+      if (!isSigned) {
+        
+        // the transaction if proposed but not signed
+        
+        
+        const txHex = await hathorFederationContract.transactionHex(transactionId);
+
+        this.validateTx(txHex, transactionId);
+
+
+        const signature = await this.getMySignatures(txHex);
+
+        const args = hathorFederationContract.getUpdateSignatureStateArgs(
+          tokenAddress,
+          txHash,
+          convertedQuantity,
+          senderAddress,
+          receiverAddress,
+          transactionType,
+          signature,
+          true
+        );
+
+        const receipt = await this.transactionSender.sendTransaction(
+          process.env.HATHOR_FEDERATION,
+          args,
+          0,
+          this.config.privateKey,
+        );
+
+        if (!receipt.status) {
+          this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+        }
+
+
+      }
+      return;
+    }
+
+    //validate transaction
     const txHex = isTokenEvmNative
       ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
       : await this.sendTransferProposal(receiverAddress, convertedQuantity, hathorTokenAddress);
+
+    
+    this.validateTx(txHex, transactionId);
 
     const args = hathorFederationContract.getSendTransactionProposalArgs(
       tokenAddress,
@@ -84,7 +144,7 @@ export class EvmBroker extends Broker {
     );
 
     const receipt = await this.transactionSender.sendTransaction(
-      '0x83e114b4f071d45be22fb3ef546942ed5ca40cab',
+      process.env.HATHOR_FEDERATION,,
       args,
       0,
       this.config.privateKey,
@@ -204,4 +264,34 @@ export class EvmBroker extends Broker {
     const hathorPrecision = tokenDecimals - 2;
     return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
   }
+  private async getSignaturesFromArray(transactionId: string): Promise<string[]> {
+
+    const arrayLength = await hathorFederationContract.getSignatureCount(transactionId);
+    const signatures = [];
+
+    for (let i = 0; i < arrayLength; ++i) {
+        const signature = await hathorFederationContract.transactionSignatures(transactionId, i);
+        signatures.push(signature);
+    }
+
+    return signatures;
+  }
+
+  private async getSignaturesFromEvents(transactionId: string): Promise<string[]> {
+    const signatures: string[] = [];
+
+    const events = await hahtorFederationContract.getPastEvents('ProposalSigned', {
+        filter: { transactionId },
+        fromBlock: 0,
+        toBlock: 'latest'
+    });
+
+    // Extract signatures from the events
+    for (const event of events) {
+        signatures.push(event.returnValues.signature);
+    }
+
+    return signatures;
+}
+
 }
