@@ -83,7 +83,6 @@ export class HathorBroker extends Broker {
 
     if (originalChainId == this.config.mainchain.chainId && this.chainConfig.multisigOrder == 1) {
       const txHex = await this.sendMeltProposal(qtd, hathorTokenAddress);
-      await this.broadcastProposal(txHex, txId);
     }
     const federator = new FederatorHTR(this.config, this.logger, null);
 

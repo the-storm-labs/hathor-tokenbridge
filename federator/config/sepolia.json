@@ -6,6 +6,6 @@
     "allowTokens": "0x46f7d11498c58529126f1029e9bed6062e2b5346",
     "chainId": 11155111,
     "testToken": "0xabff984025540bb69955ba9574c1a185415d9ab5",
-    "host": "https://sepolia.infura.io/v3/",
-    "fromBlock": 6115713
+    "host": "https://sepolia.infura.io/v3/399500b5679b442eb991fefee1c5bfdc",
+    "fromBlock": 6533600
 }

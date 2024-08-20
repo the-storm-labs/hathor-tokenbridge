@@ -98,18 +98,6 @@ export abstract class Broker {
     }
   }
 
-  protected async broadcastProposal(txHex: string, originalTxId: string) {
-    const data = {
-      outputs: await this.wrapData('hex', txHex),
-    };
-    data.outputs = data.outputs.concat(await this.wrapData(this.txIdType, originalTxId));
-    data.outputs.push({
-      address: await this.getMultiSigAddress(),
-      value: 1,
-    });
-    await this.broadcastDataToMultisig(data);
-  }
-
   public async sendMySignaturesToProposal(txHex: string, txId: string): Promise<void> {
     if (!(await this.validateTx(txHex, txId))) {
       throw new HathorException('Invalid tx', 'Invalid tx');

@@ -11,13 +11,14 @@ import { EvmBroker } from './Broker/EvmBroker';
 import { Broker } from './Broker/Broker';
 import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
-import { waitBlocks } from './utils';
+import TransactionSender from './TransactionSender';
 
 export class HathorService {
   public logger: LogWrapper;
   public config: ConfigData;
   public bridgeFactory: BridgeFactory;
   public federationFactory: FederationFactory;
+  public transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
 
   private nonRetriableErrors = [
@@ -31,19 +32,31 @@ export class HathorService {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    transactionSender: TransactionSender,
   ) {
     this.config = config;
     this.logger = logger;
     this.chainConfig = config.sidechain[0];
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
+    this.transactionSender = transactionSender;
   }
 
-  async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
-    if (this.chainConfig.multisigOrder > 1) return;
-
-    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
-    await broker.sendTokensToHathor(receiverAddress, qtd, tokenAddress, txHash);
+  async sendTokensToHathor(
+    senderAddress: string,
+    receiverAddress: string,
+    qtd: string,
+    tokenAddress: string,
+    txHash: string,
+  ) {
+    const broker = new EvmBroker(
+      this.config,
+      this.logger,
+      this.bridgeFactory,
+      this.federationFactory,
+      this.transactionSender,
+    );
+    await broker.sendTokensToHathor(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -65,8 +78,6 @@ export class HathorService {
 
   private async listenToRabbitMQEventQueue() {
     const queue = 'main_queue';
-
-    // const retryHeader = 'x-retry-count';
 
     try {
       const conn = await rabbitmq.connect(process.env.RABBIT_CONFIG);
@@ -285,7 +296,10 @@ export class HathorService {
     const customDataType = tx.getCustomDataType();
     switch (customDataType) {
       case 'hsh':
-        return [new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
+        return [
+          new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory, this.transactionSender),
+          customDataType,
+        ];
       case 'hid':
         return [new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
     }

@@ -270,7 +270,7 @@ export default class FederatorHTR extends Federator {
     // );
     // this.logger.info('get transaction id:', transactionId);
 
-    const transactionId = Date.now().toString(); 
+    const transactionId = Date.now().toString();
 
     await this.processTransaction({
       ...processLogParams,
@@ -293,9 +293,11 @@ export default class FederatorHTR extends Federator {
       this.logger,
       processTransactionParams.bridgeFactory,
       processTransactionParams.federationFactory,
+      processTransactionParams.transactionSender,
     );
 
     await hathorService.sendTokensToHathor(
+      processTransactionParams.senderAddress,
       processTransactionParams.receiver,
       processTransactionParams.amount.toString(),
       processTransactionParams.tokenAddress,

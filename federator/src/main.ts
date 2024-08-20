@@ -19,6 +19,7 @@ import HathorService from './lib/HathorService';
 import { BridgeFactory } from './contracts/BridgeFactory';
 import { FederationFactory } from './contracts/FederationFactory';
 import { HathorWallet } from './lib/HathorWallet';
+import TransactionSender from './lib/TransactionSender';
 
 export class Main {
   logger: LogWrapper;
@@ -60,7 +61,7 @@ export class Main {
 
     if (ready) {
       this.logger.info('No need to wait, the wallets are ready, lets go.');
-      this.listenToHathorTransactions();
+      // this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
       return;
     }
@@ -68,7 +69,7 @@ export class Main {
     this.logger.info('It seems the wallets are not ready, lets wait for the event');
     walletEmmiter.on('wallets-ready', async () => {
       this.logger.info('Event emmited, we can start the wallet');
-      this.listenToHathorTransactions();
+      // this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
     });
 
@@ -114,8 +115,8 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    const service = new HathorService(this.config, this.logger, new BridgeFactory(), new FederationFactory());
-    service.listenToEventQueue();
+    // const service = new HathorService(this.config, this.logger, new BridgeFactory(), new FederationFactory());
+    // service.listenToEventQueue();
   }
 
   async scheduleFederatorProcesses() {

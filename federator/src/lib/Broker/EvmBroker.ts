@@ -7,33 +7,59 @@ import { CreateProposalResponse } from '../../types/HathorResponseTypes';
 import { FederationFactory } from '../../contracts/FederationFactory';
 import { BridgeFactory } from '../../contracts/BridgeFactory';
 import { HathorWallet } from '../HathorWallet';
+import { HathorFederationFactory } from '../../contracts/HathorFederationFactory';
+import { IHathorFederation } from '../../contracts/IHathorFederation';
+import TransactionSender from '../TransactionSender';
+import { TransactionTypes } from '../../types/transactionTypes';
 
 export class EvmBroker extends Broker {
   public txIdType: string;
+  private hathorFederationFactory: HathorFederationFactory;
+  private transactionSender: TransactionSender;
 
   constructor(
     config: ConfigData,
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    transactionSender: TransactionSender,
   ) {
     super(config, logger, bridgeFactory, federationFactory);
     this.txIdType = 'hsh';
+    this.transactionSender = transactionSender;
+    this.hathorFederationFactory = new HathorFederationFactory();
   }
 
-  async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
-    const txs = super.castHistoryToTx(await this.getHistory());
-    const proposals = txs.filter(
-      (tx) => tx.haveCustomData('hsh') && tx.haveCustomData('hex') && tx.getCustomData('hsh') === txHash,
-    );
-
-    if (proposals.length > 0) {
-      this.logger.info('Proposal already sent.');
-      return;
-    }
-
+  async sendTokensToHathor(
+    senderAddress: string,
+    receiverAddress: string,
+    qtd: string,
+    tokenAddress: string,
+    txHash: string,
+  ) {
+    // validations
     const [hathorTokenAddress, originalChainId] = await this.getHathorTokenAddress(tokenAddress);
+    const hathorFederationContract = (await this.hathorFederationFactory.createInstance(
+      this.config.mainchain,
+    )) as IHathorFederation;
+    const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
+    const transactionType = isTokenEvmNative ? TransactionTypes.MINT : TransactionTypes.TRANSFER;
+    const transactionId = await hathorFederationContract.getTransactionId(
+      tokenAddress,
+      txHash,
+      qtd,
+      senderAddress,
+      receiverAddress,
+      transactionType.valueOf(),
+    );
+    // the transaction has been processed before? if so, nothing to do
+    const isProcessed = await hathorFederationContract.isProcessed(transactionId);
+    if (isProcessed) return;
+    // the transaction has been proposed before? if so, nothing to do
+    const isProposed = await hathorFederationContract.isProposed(transactionId);
+    if (isProposed) return;
 
+    // if not, let's propose
     const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
     const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
     if (convertedQuantity <= 0) {
@@ -42,12 +68,30 @@ export class EvmBroker extends Broker {
       );
       return;
     }
-    const txHex =
-      originalChainId == this.config.mainchain.chainId
-        ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
-        : await this.sendTransferProposal(receiverAddress, convertedQuantity, hathorTokenAddress);
+    const txHex = isTokenEvmNative
+      ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
+      : await this.sendTransferProposal(receiverAddress, convertedQuantity, hathorTokenAddress);
 
-    await this.broadcastProposal(txHex, txHash);
+    const dataAbi = hathorFederationContract.getSendTransactionProposalABI(
+      tokenAddress,
+      txHash,
+      convertedQuantity,
+      senderAddress,
+      receiverAddress,
+      transactionType,
+      txHex,
+    );
+
+    const receipt = await this.transactionSender.sendTransaction(
+      '0x83e114b4f071d45be22fb3ef546942ed5ca40cab',
+      dataAbi,
+      0,
+      this.config.privateKey,
+    );
+
+    if (!receipt.status) {
+      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+    }
   }
 
   async validateTx(txHex: string, txHash: string): Promise<boolean> {
