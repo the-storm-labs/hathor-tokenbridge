@@ -44,13 +44,14 @@ export class EvmBroker extends Broker {
     )) as IHathorFederation;
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
     const transactionType = isTokenEvmNative ? TransactionTypes.MINT : TransactionTypes.TRANSFER;
-    const transactionId = await hathorFederationContract.getTransactionId(
+    
+     const transactionId = await hathorFederationContract.getTransactionId(
       tokenAddress,
       txHash,
       qtd,
       senderAddress,
       receiverAddress,
-      transactionType.valueOf(),
+      transactionType,
     );
     // the transaction has been processed before? if so, nothing to do
     const isProcessed = await hathorFederationContract.isProcessed(transactionId);
@@ -72,7 +73,7 @@ export class EvmBroker extends Broker {
       ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
       : await this.sendTransferProposal(receiverAddress, convertedQuantity, hathorTokenAddress);
 
-    const dataAbi = hathorFederationContract.getSendTransactionProposalABI(
+    const args = hathorFederationContract.getSendTransactionProposalArgs(
       tokenAddress,
       txHash,
       convertedQuantity,
@@ -84,7 +85,7 @@ export class EvmBroker extends Broker {
 
     const receipt = await this.transactionSender.sendTransaction(
       '0x83e114b4f071d45be22fb3ef546942ed5ca40cab',
-      dataAbi,
+      args,
       0,
       this.config.privateKey,
     );
