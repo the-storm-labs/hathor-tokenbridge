@@ -4,6 +4,8 @@ import { TransactionTypes } from '../types/transactionTypes';
 export interface IHathorFederation {
   hathorFederationContract: Contract;
 
+  getPastEvents(eventName: string, options: any): Promise<EventData[]>;
+  getSignatureCount(transactionId: string): Promise<any>; 
   isProcessed(transactionId: string): Promise<boolean>;
   isSigned(transactionId: string): Promise<boolean>;
   isProposed(transactionId: string): Promise<boolean>;
@@ -28,6 +30,15 @@ export interface IHathorFederation {
     transactionType,
     signature,
     signed
+  ) : Promise<any>;
+  getUpdateTransactionStateArgs(
+    originalTokenAddress,
+    transactionHash,
+    value,
+    sender,
+    receiver,
+    transactionType,
+    sent
   ) : Promise<any>;
 
 }

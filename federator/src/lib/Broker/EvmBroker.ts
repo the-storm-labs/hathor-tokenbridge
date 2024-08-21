@@ -12,10 +12,12 @@ import { IHathorFederation } from '../../contracts/IHathorFederation';
 import TransactionSender from '../TransactionSender';
 import { TransactionTypes } from '../../types/transactionTypes';
 
+
 export class EvmBroker extends Broker {
   public txIdType: string;
   private hathorFederationFactory: HathorFederationFactory;
   private transactionSender: TransactionSender;
+  
 
   constructor(
     config: ConfigData,
@@ -74,12 +76,47 @@ export class EvmBroker extends Broker {
     if (isSigned) {
       if (!isProcessed) {
         // Send signatures if already signed but not yet processed
-        //GET FROM Array
+
+        const arrayLength = await hathorFederationContract.getSignatureCount(transactionId);
 
 
-        // GET FROM Events
 
-        //broadcast transaction
+        if (arrayLength < this.config.mainchain.multisigRequiredSignatures) return;
+
+        const txHex = await hathorFederationContract.transactionHex(transactionId);
+
+        this.validateTx(txHex, transactionId);
+
+
+        
+        const signatures = await this.getSignaturesFromArray(transactionId);
+
+        await this.signAndPushProposal(txHex, transactionId, signatures)
+
+        
+
+        const args = hathorFederationContract.getUpdateTransactionStateArgs(
+          tokenAddress,
+          txHash,
+          convertedQuantity,
+          senderAddress,
+          receiverAddress,
+          transactionType,
+          true
+        );
+
+        const receipt = await this.transactionSender.sendTransaction(
+          process.env.HATHOR_FEDERATION,
+          args,
+          0,
+          this.config.privateKey,
+        );
+
+        if (!receipt.status) {
+          this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+        }
+
+
 
       }
       return;
@@ -144,7 +181,7 @@ export class EvmBroker extends Broker {
     );
 
     const receipt = await this.transactionSender.sendTransaction(
-      process.env.HATHOR_FEDERATION,,
+      process.env.HATHOR_FEDERATION,
       args,
       0,
       this.config.privateKey,
@@ -266,6 +303,10 @@ export class EvmBroker extends Broker {
   }
   private async getSignaturesFromArray(transactionId: string): Promise<string[]> {
 
+    const hathorFederationContract = (await this.hathorFederationFactory.createInstance(
+      this.config.mainchain,
+    )) as IHathorFederation;
+
     const arrayLength = await hathorFederationContract.getSignatureCount(transactionId);
     const signatures = [];
 
@@ -278,9 +319,14 @@ export class EvmBroker extends Broker {
   }
 
   private async getSignaturesFromEvents(transactionId: string): Promise<string[]> {
+    
+    const hathorFederationContract = (await this.hathorFederationFactory.createInstance(
+      this.config.mainchain,
+    )) as IHathorFederation;
+
     const signatures: string[] = [];
 
-    const events = await hahtorFederationContract.getPastEvents('ProposalSigned', {
+    const events = await hathorFederationContract.getPastEvents('ProposalSigned', {
         filter: { transactionId },
         fromBlock: 0,
         toBlock: 'latest'

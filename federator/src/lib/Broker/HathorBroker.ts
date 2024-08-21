@@ -25,20 +25,25 @@ export class HathorBroker extends Broker {
     this.txIdType = 'hid';
   }
 
-  async validateTx(txHex: string, txId: string): Promise<boolean> {
-    // const hathorTx = await this.decodeTxHex(txHex);
-    // const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+  async validateTx(TxHex: string, tokenData: string): Promise<boolean> {
 
-    // TODO validate if the txHex comes from a tx that was initiated by the multisig? does it make sense? or it has to be?
-    // TODO think what's importante to validate here
+    const hathorTx = await this.decodeTxHex(TxHex);
 
-    // get token from event
-    // const evmTranslatedToken = await bridge.EvmToHathorTokenMap(hathorTx);
+    const txOutput = hathorTx.outputs.find((o) => o.token === tokenData.token);
 
-    // check if token is mapped on bridge
-
-    // check if destination is a valid address
+    if (!txOutput) {
+      this.logger.error(`Invalid tx. Unable to find token on hathor tx outputs. HEX: ${txHex} | HASH: ${txHash}`);
+      return false;
+    }
+   
+    if (txOutput.value != tokenData.value) {
+      this.logger.error(
+        `txHex ${txHex} value ${txOutput.value} is not the same as txHash value ${tokenData.value}.`,
+      );
+      return false;
+    }
     return true;
+        
   }
 
   private async sendMeltProposal(qtd: number, token: string): Promise<string> {

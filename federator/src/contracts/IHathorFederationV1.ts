@@ -140,7 +140,37 @@ export class IHathorFederationV1 implements IHathorFederation {
         bytesSender,
         bytesReceiver,
         transactionType.valueOf(), // Convert transaction type enum to its underlying value
-        signature,signed
+        signature,
+        signed
+      )
+      .encodeABI();
+  }
+
+  async getUpdateTransactionStateArgs(
+    originalTokenAddress,
+    transactionHash,
+    value,
+    sender,
+    receiver,
+    transactionType,
+    sent
+  ) {
+    // Convert strings to bytes32 format
+    const bytesOriginalTokenAddress = this.web3.utils.padLeft(originalTokenAddress, 64);
+    const bytesTransactionHash = this.web3.utils.padLeft(transactionHash, 64);
+    const bytesSender = this.web3.utils.padLeft(sender, 64);
+    const bytesReceiver = this.web3.utils.padLeft(receiver, 64);
+
+    // Prepare the ABI-encoded function call
+    return this.hathorFederationContract.methods
+      .updateTransactionState(
+        bytesOriginalTokenAddress,
+        bytesTransactionHash,
+        value,
+        bytesSender,
+        bytesReceiver,
+        transactionType.valueOf(), // Convert transaction type enum to its underlying value
+        sent
       )
       .encodeABI();
   }
