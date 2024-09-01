@@ -8,7 +8,6 @@ import { HathorException } from '../types/HathorException';
 import { BridgeFactory } from '../contracts/BridgeFactory';
 import { FederationFactory } from '../contracts/FederationFactory';
 import { EvmBroker } from './Broker/EvmBroker';
-import { Broker } from './Broker/Broker';
 import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
 import TransactionSender from './TransactionSender';
@@ -56,7 +55,7 @@ export class HathorService {
       this.federationFactory,
       this.transactionSender,
     );
-    await broker.sendTokensToHathor(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
+    await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, null, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -226,49 +225,16 @@ export class HathorService {
     );
     const tx = new HathorTx(event.data.tx_id, event.data.timestamp, outUtxos, inUtxos);
 
-    const isProposal = tx.haveCustomData('hex');
-
-    if (isProposal) {
-      this.logger.info('Evaluating proposal...');
-      const txHex = tx.getCustomData('hex');
-      const [broker, dataType] = this.getBrokerAndDataType(tx);
-      const confirmed = await broker.isTxConfirmed(tx.tx_id);
-      if (!confirmed) {
-        return false;
-      }
-      await broker.sendMySignaturesToProposal(txHex, tx.getCustomData(dataType));
-      return true;
-    }
-
-    const isSignature = tx.haveCustomData('sig');
-
-    if (isSignature) {
-      this.logger.info('Evaluating signature...');
-      const [broker, dataType] = this.getBrokerAndDataType(tx);
-
-      const confirmed = await broker.isTxConfirmed(tx.tx_id);
-      if (!confirmed) {
-        return false;
-      }
-
-      const txId = tx.getCustomData(dataType);
-      const components = await broker.getSignaturesToPush(txId);
-
-      if (components.signatures.length < this.chainConfig.multisigRequiredSignatures) {
-        this.logger.info(
-          `Number of signatures not reached. Require ${this.chainConfig.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
-        );
-        return false;
-      }
-
-      await broker.signAndPushProposal(components.hex, txId, components.signatures);
-      return true;
-    }
-
-    const isHathorToEvm = tx.haveCustomData('addr');
+    const isHathorToEvm = tx.haveCustomData();
 
     if (isHathorToEvm) {
-      const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+      const broker = new HathorBroker(
+        this.config,
+        this.logger,
+        this.bridgeFactory,
+        this.federationFactory,
+        this.transactionSender,
+      );
 
       const confirmed = await broker.isTxConfirmed(tx.tx_id);
       if (!confirmed) {
@@ -277,31 +243,8 @@ export class HathorService {
 
       const tokenData = tx.getCustomTokenData()[0];
 
-      const result = await broker.sendTokensFromHathor(
-        tx.getCustomData('addr'),
-        tokenData.value,
-        tokenData.token,
-        tx.tx_id,
-        tokenData.sender,
-        tx.timestamp,
-      );
-      if (!result) {
-        throw new HathorException('Invalid tx', 'Invalid tx'); //TODO change exception type
-      }
+      await broker.sendTokens(tokenData.sender, tx.getCustomData(), tokenData.value, tokenData.token, null, tx.tx_id);
       return true;
-    }
-  }
-
-  private getBrokerAndDataType(tx: HathorTx): [Broker, string] {
-    const customDataType = tx.getCustomDataType();
-    switch (customDataType) {
-      case 'hsh':
-        return [
-          new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory, this.transactionSender),
-          customDataType,
-        ];
-      case 'hid':
-        return [new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
     }
   }
 }

@@ -21,6 +21,7 @@ import {
   ProcessToHathorTransactionParams,
   VoteHathorTransactionParams,
 } from '../types/federator';
+import { HathorFederationFactory } from '../contracts/HathorFederationFactory';
 
 export default class FederatorHTR extends Federator {
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
@@ -254,24 +255,6 @@ export default class FederatorHTR extends Federator {
       }
     }
 
-    // TODO we need a new way to generate a transaction ID
-    // const transactionId = await typescriptUtils.retryNTimes(
-    //   processLogParams.sideFedContract.getTransactionId({
-    //     originalTokenAddress: tokenAddress,
-    //     sender: crossFromAddress,
-    //     receiver,
-    //     amount,
-    //     blockHash,
-    //     transactionHash,
-    //     logIndex,
-    //     originChainId,
-    //     destinationChainId,
-    //   }),
-    // );
-    // this.logger.info('get transaction id:', transactionId);
-
-    const transactionId = Date.now().toString();
-
     await this.processTransaction({
       ...processLogParams,
       tokenAddress,
@@ -279,7 +262,6 @@ export default class FederatorHTR extends Federator {
       receiver,
       amount,
       typeId,
-      transactionId,
       originChainId,
       destinationChainId,
     });

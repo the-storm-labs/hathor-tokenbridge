@@ -14,23 +14,13 @@ export class HathorTx {
     this.inputs = inputs;
   }
 
-  getCustomDataType(): string {
-    if (this.haveCustomData('hsh')) return 'hsh';
-    if (this.haveCustomData('hid')) return 'hid';
-  }
-
-  haveCustomData(dataType: string = null): boolean {
-    if (dataType != null)
-      return this.outputs.some((utxo) => utxo.haveCustomData && utxo.customData?.dataType === dataType);
-
+  haveCustomData(): boolean {
     return this.outputs.some((utxo) => utxo.haveCustomData);
   }
 
-  getCustomData(dataType: string): string {
+  getCustomData(): string {
     let customData = '';
-    const dataOutputs = this.outputs
-      .filter((output) => output.haveCustomData && output.customData.dataType === dataType)
-      .sort((a, b) => a.customData.index - b.customData.index);
+    const dataOutputs = this.outputs.filter((output) => output.haveCustomData);
     dataOutputs.forEach((output) => {
       customData += output.customData.data;
     });

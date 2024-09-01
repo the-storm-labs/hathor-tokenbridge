@@ -86,6 +86,42 @@
         "anonymous": false,
         "inputs": [
             {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "originalTokenAddress",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "transactionHash",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "sender",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "receiver",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum HathorFederation.TransactionType",
+                "name": "transactionType",
+                "type": "uint8"
+            },
+            {
                 "indexed": true,
                 "internalType": "bytes32",
                 "name": "transactionId",
@@ -96,6 +132,12 @@
                 "internalType": "bool",
                 "name": "processed",
                 "type": "bool"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "hathorTxId",
+                "type": "bytes32"
             }
         ],
         "name": "ProposalSent",
@@ -104,6 +146,42 @@
     {
         "anonymous": false,
         "inputs": [
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "originalTokenAddress",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "transactionHash",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "sender",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "receiver",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum HathorFederation.TransactionType",
+                "name": "transactionType",
+                "type": "uint8"
+            },
             {
                 "indexed": true,
                 "internalType": "bytes32",
@@ -124,9 +202,9 @@
             },
             {
                 "indexed": false,
-                "internalType": "bytes",
+                "internalType": "string",
                 "name": "signature",
-                "type": "bytes"
+                "type": "string"
             }
         ],
         "name": "ProposalSigned",
@@ -136,15 +214,113 @@
         "anonymous": false,
         "inputs": [
             {
-                "indexed": false,
+                "indexed": true,
                 "internalType": "bytes32",
                 "name": "transactionId",
                 "type": "bytes32"
             },
             {
                 "indexed": false,
+                "internalType": "address",
+                "name": "member",
+                "type": "address"
+            }
+        ],
+        "name": "SignaturaFailed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
                 "internalType": "bytes32",
-                "name": "originalTransactionHash",
+                "name": "originalTokenAddress",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "transactionHash",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "sender",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "receiver",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum HathorFederation.TransactionType",
+                "name": "transactionType",
+                "type": "uint8"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "transactionId",
+                "type": "bytes32"
+            }
+        ],
+        "name": "TransactionFailed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "originalTokenAddress",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "transactionHash",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "sender",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "receiver",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum HathorFederation.TransactionType",
+                "name": "transactionType",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "bytes32",
+                "name": "transactionId",
                 "type": "bytes32"
             },
             {
@@ -200,6 +376,25 @@
         "inputs": [
             {
                 "internalType": "bytes32",
+                "name": "transactionId",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getSignatureCount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
                 "name": "originalTokenAddress",
                 "type": "bytes32"
             },
@@ -214,14 +409,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "sender",
-                "type": "bytes32"
+                "type": "string"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "receiver",
-                "type": "bytes32"
+                "type": "string"
             },
             {
                 "internalType": "enum HathorFederation.TransactionType",
@@ -391,14 +586,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "sender",
-                "type": "bytes32"
+                "type": "string"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "receiver",
-                "type": "bytes32"
+                "type": "string"
             },
             {
                 "internalType": "enum HathorFederation.TransactionType",
@@ -412,6 +607,44 @@
             }
         ],
         "name": "sendTransactionProposal",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "originalTokenAddress",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "transactionHash",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "sender",
+                "type": "string"
+            },
+            {
+                "internalType": "string",
+                "name": "receiver",
+                "type": "string"
+            },
+            {
+                "internalType": "enum HathorFederation.TransactionType",
+                "name": "transactionType",
+                "type": "uint8"
+            }
+        ],
+        "name": "setTransactionFailed",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -451,9 +684,9 @@
         "name": "transactionSignatures",
         "outputs": [
             {
-                "internalType": "bytes",
+                "internalType": "string",
                 "name": "signature",
-                "type": "bytes"
+                "type": "string"
             }
         ],
         "stateMutability": "view",
@@ -490,14 +723,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "sender",
-                "type": "bytes32"
+                "type": "string"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "receiver",
-                "type": "bytes32"
+                "type": "string"
             },
             {
                 "internalType": "enum HathorFederation.TransactionType",
@@ -505,9 +738,9 @@
                 "type": "uint8"
             },
             {
-                "internalType": "bytes",
+                "internalType": "string",
                 "name": "signature",
-                "type": "bytes"
+                "type": "string"
             },
             {
                 "internalType": "bool",
@@ -538,14 +771,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "sender",
-                "type": "bytes32"
+                "type": "string"
             },
             {
-                "internalType": "bytes32",
+                "internalType": "string",
                 "name": "receiver",
-                "type": "bytes32"
+                "type": "string"
             },
             {
                 "internalType": "enum HathorFederation.TransactionType",
@@ -556,6 +789,11 @@
                 "internalType": "bool",
                 "name": "sent",
                 "type": "bool"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "hathorTxId",
+                "type": "bytes32"
             }
         ],
         "name": "updateTransactionState",

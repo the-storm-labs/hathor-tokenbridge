@@ -5,7 +5,6 @@ import { LogWrapper } from './logWrapper';
 import { ConfigChain } from './configChain';
 import { ConfigData } from './config';
 
-
 export type Wallet = {
   ready: boolean;
   lastCheck: Date;
@@ -74,7 +73,7 @@ export class HathorWallet {
   }
 
   private async isReady(multisig: boolean, retry = 1): Promise<boolean> {
-    const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
+    const id = multisig ? 'multi' : 'single';
     if (retry > 5) {
       this.logger.error(`Fail to start ${id} wallet: Maximum number of retries reached.`);
       return false;
@@ -104,7 +103,7 @@ export class HathorWallet {
   }
 
   private async start(multisig: boolean): Promise<boolean> {
-    const id = multisig ? this.chainConfig.multisigWalletId : this.chainConfig.singleWalletId;
+    const id = multisig ? 'multi' : 'single';
     const seedKey = multisig ? this.chainConfig.multisigSeedKey : this.chainConfig.singleSeedKey;
     const data = {
       'wallet-id': id,
@@ -127,11 +126,11 @@ export class HathorWallet {
     data?: any,
     params?: any,
   ): Promise<AxiosResponse<Type>> {
-    const url = `${this.chainConfig.walletUrl}/${path}`;
+    const url = `${process.env.WALLET_URL}/${path}`;
     const config = {
       headers: {
         'Content-type': 'application/json',
-        'x-api-key': this.chainConfig.walletKey,
+        'x-api-key': process.env.HEADLESS_API_KEY,
         'x-wallet-id': id,
       },
       params: params,

@@ -1,22 +1,12 @@
 import { Broker } from './Broker';
 import { LogWrapper } from '../logWrapper';
 import { ConfigData } from '../config';
-import HathorException from '../../types/HathorException';
-import { IBridgeV4 } from '../../contracts/IBridgeV4';
-import { CreateProposalResponse } from '../../types/HathorResponseTypes';
-import { FederationFactory } from '../../contracts/FederationFactory';
-import { BridgeFactory } from '../../contracts/BridgeFactory';
+import { HathorException, CreateProposalResponse, TransactionTypes } from '../../types';
+import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
-import { HathorFederationFactory } from '../../contracts/HathorFederationFactory';
-import { IHathorFederation } from '../../contracts/IHathorFederation';
 import TransactionSender from '../TransactionSender';
-import { TransactionTypes } from '../../types/transactionTypes';
 
 export class EvmBroker extends Broker {
-  public txIdType: string;
-  private hathorFederationFactory: HathorFederationFactory;
-  private transactionSender: TransactionSender;
-
   constructor(
     config: ConfigData,
     logger: LogWrapper,
@@ -24,135 +14,30 @@ export class EvmBroker extends Broker {
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
   ) {
-    super(config, logger, bridgeFactory, federationFactory);
-    this.txIdType = 'hsh';
-    this.transactionSender = transactionSender;
-    this.hathorFederationFactory = new HathorFederationFactory();
+    super(config, logger, bridgeFactory, federationFactory, transactionSender);
   }
 
-  async sendTokensToHathor(
+  async sendTokens(
     senderAddress: string,
     receiverAddress: string,
-    qtd: string,
+    amount: string,
     tokenAddress: string,
+    destinaTionTokenAddress: string,
     txHash: string,
   ) {
-    // validations
-    const [hathorTokenAddress, originalChainId] = await this.getHathorTokenAddress(tokenAddress);
-    const hathorFederationContract = (await this.hathorFederationFactory.createInstance(
-      this.config.mainchain,
-    )) as IHathorFederation;
+    const [destinationChainTokenAddress, originalChainId] = await this.getSideChainTokenAddress(tokenAddress);
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
     const transactionType = isTokenEvmNative ? TransactionTypes.MINT : TransactionTypes.TRANSFER;
-
-    const transactionId = await hathorFederationContract.getTransactionId(
-      tokenAddress,
-      txHash,
-      qtd,
+    await super.sendTokens(
       senderAddress,
       receiverAddress,
-      transactionType,
-    );
-    // the transaction has been processed before? if so, nothing to do
-    const isProcessed = await hathorFederationContract.isProcessed(transactionId);
-    const isSigned = await hathorFederationContract.isSigned(transactionId);
-    const isProposed = await hathorFederationContract.isProposed(transactionId);
-
-    const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
-    const convertedQuantity = this.convertToHathorDecimals(qtd, tokenDecimals);
-
-    if (convertedQuantity <= 0) {
-      this.logger.info(
-        `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${qtd}, Token decimals ${tokenDecimals}.`,
-      );
-      return;
-    }
-
-
-    if (isProcessed) return; // No action needed if already processed
-
-    if (isSigned) {
-      if (!isProcessed) {
-        // Send signatures if already signed but not yet processed
-        //GET FROM Array
-
-
-        // GET FROM Events
-
-        //broadcast transaction
-
-      }
-      return;
-    }
-
-    if (isProposed) {
-      if (!isSigned) {
-        
-        // the transaction if proposed but not signed
-        
-        
-        const txHex = await hathorFederationContract.transactionHex(transactionId);
-
-        this.validateTx(txHex, transactionId);
-
-
-        const signature = await this.getMySignatures(txHex);
-
-        const args = hathorFederationContract.getUpdateSignatureStateArgs(
-          tokenAddress,
-          txHash,
-          convertedQuantity,
-          senderAddress,
-          receiverAddress,
-          transactionType,
-          signature,
-          true
-        );
-
-        const receipt = await this.transactionSender.sendTransaction(
-          process.env.HATHOR_FEDERATION,
-          args,
-          0,
-          this.config.privateKey,
-        );
-
-        if (!receipt.status) {
-          this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
-        }
-
-
-      }
-      return;
-    }
-
-    //validate transaction
-    const txHex = isTokenEvmNative
-      ? await this.sendMintProposal(receiverAddress, convertedQuantity, hathorTokenAddress)
-      : await this.sendTransferProposal(receiverAddress, convertedQuantity, hathorTokenAddress);
-
-    
-    this.validateTx(txHex, transactionId);
-
-    const args = hathorFederationContract.getSendTransactionProposalArgs(
+      amount,
       tokenAddress,
+      destinationChainTokenAddress,
       txHash,
-      convertedQuantity,
-      senderAddress,
-      receiverAddress,
       transactionType,
-      txHex,
+      isTokenEvmNative,
     );
-
-    const receipt = await this.transactionSender.sendTransaction(
-      process.env.HATHOR_FEDERATION,,
-      args,
-      0,
-      this.config.privateKey,
-    );
-
-    if (!receipt.status) {
-      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
-    }
   }
 
   async validateTx(txHex: string, txHash: string): Promise<boolean> {
@@ -191,6 +76,13 @@ export class EvmBroker extends Broker {
     const tokenDecimals = await this.getTokenDecimals(originalToken.tokenAddress, originalToken.originChainId);
     const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
 
+    if (convertedQuantity <= 0) {
+      this.logger.error(
+        `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${convertedQuantity}, Token decimals ${tokenDecimals}.`,
+      );
+      false;
+    }
+
     if (!(txOutput.value === convertedQuantity)) {
       this.logger.error(
         `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${convertedQuantity}.`,
@@ -200,7 +92,12 @@ export class EvmBroker extends Broker {
     return true;
   }
 
-  private async sendMintProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
+  //There is no postProcessing on the EVM side
+  async postProcessing() {
+    return;
+  }
+
+  async sendEvmNativeTokenProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
     const data = {
       address: `${receiverAddress}`,
@@ -210,7 +107,7 @@ export class EvmBroker extends Broker {
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
       true,
-      this.chainConfig.multisigWalletId,
+      'multi',
       'wallet/p2sh/tx-proposal/mint-tokens',
       data,
     );
@@ -223,7 +120,7 @@ export class EvmBroker extends Broker {
     );
   }
 
-  private async sendTransferProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
+  async sendHathorNativeTokenProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
 
     const output = {
@@ -234,12 +131,9 @@ export class EvmBroker extends Broker {
     const outputs = [];
     outputs.push(output);
 
-    const response = await wallet.requestWallet<CreateProposalResponse>(
-      true,
-      this.chainConfig.multisigWalletId,
-      'wallet/tx-proposal',
-      { outputs },
-    );
+    const response = await wallet.requestWallet<CreateProposalResponse>(true, 'multi', 'wallet/tx-proposal', {
+      outputs,
+    });
 
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
@@ -252,46 +146,11 @@ export class EvmBroker extends Broker {
     );
   }
 
-  private async getHathorTokenAddress(evmTokenAddress: string): Promise<[string, number]> {
+  async getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]> {
     const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
-    const hathorTokenAddress = await originBridge.EvmToHathorTokenMap(evmTokenAddress);
+    const hathorTokenAddress = await originBridge.EvmToHathorTokenMap(tokenAddress);
     const originalToken = await originBridge.HathorToEvmTokenMap(hathorTokenAddress);
 
     return [hathorTokenAddress, originalToken.originChainId];
   }
-
-  private convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
-    const hathorPrecision = tokenDecimals - 2;
-    return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
-  }
-  private async getSignaturesFromArray(transactionId: string): Promise<string[]> {
-
-    const arrayLength = await hathorFederationContract.getSignatureCount(transactionId);
-    const signatures = [];
-
-    for (let i = 0; i < arrayLength; ++i) {
-        const signature = await hathorFederationContract.transactionSignatures(transactionId, i);
-        signatures.push(signature);
-    }
-
-    return signatures;
-  }
-
-  private async getSignaturesFromEvents(transactionId: string): Promise<string[]> {
-    const signatures: string[] = [];
-
-    const events = await hahtorFederationContract.getPastEvents('ProposalSigned', {
-        filter: { transactionId },
-        fromBlock: 0,
-        toBlock: 'latest'
-    });
-
-    // Extract signatures from the events
-    for (const event of events) {
-        signatures.push(event.returnValues.signature);
-    }
-
-    return signatures;
-}
-
 }

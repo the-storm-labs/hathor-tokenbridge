@@ -71,6 +71,10 @@ export default abstract class Federator {
     return this.getWeb3(this.config.mainchain.host);
   }
 
+  getChainWeb3(host: string): web3 {
+    return this.getWeb3(host);
+  }
+
   getLastBlock(mainChainId: number, sideChainId: number): number {
     let fromBlock: number;
     const originalFromBlock = this.config.mainchain.fromBlock || 0;
@@ -115,16 +119,9 @@ export default abstract class Federator {
     for (const sideChainConfig of this.config.sidechain) {
       this.logger.trace(`${this.constructor.name} from ${this.config.mainchain.chainId} to ${sideChainConfig.chainId}`);
       this.resetRetries();
-      const sideChainWeb3 = sideChainConfig.isHathor ? null : this.getWeb3(sideChainConfig.host);
+      const sideChainWeb3 = this.getWeb3(process.env.HATHOR_STATE_CONTRACT_HOST_URL);
       const transactionSender = new TransactionSender(sideChainWeb3, this.logger, this.config);
       const federationFactory = new FederationFactory();
-      // const fedContract = await federationFactory.createInstance(sideChainConfig, this.config.privateKey);
-      // const from = await transactionSender.getAddress(this.config.privateKey);
-      // const isMember = await fedContract.isMember(from);
-      // if (!isMember) {
-      //   this.logger.warn(`This Federator addr:${from} is not part of the federation. Skipping to next scheduled poll.`)
-      //   return false;
-      // }
       this.logger.upsertContext('Retrie', this.getCurrentRetrie());
       try {
         while (this.numberOfRetries > 0) {
