@@ -187,7 +187,9 @@ export class IHathorFederationV1 implements IHathorFederation {
       result = `0x${param}`;
     }
 
-    result = this.web3.utils.padLeft(result, 64);
+    if (param.length < 64) {
+      result = this.web3.utils.padLeft(result, 64);
+    }
     return result;
   }
 

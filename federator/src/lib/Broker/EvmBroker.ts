@@ -22,7 +22,6 @@ export class EvmBroker extends Broker {
     receiverAddress: string,
     amount: string,
     tokenAddress: string,
-    destinaTionTokenAddress: string,
     txHash: string,
   ) {
     const [destinationChainTokenAddress, originalChainId] = await this.getSideChainTokenAddress(tokenAddress);
@@ -33,7 +32,6 @@ export class EvmBroker extends Broker {
       receiverAddress,
       amount,
       tokenAddress,
-      destinationChainTokenAddress,
       txHash,
       transactionType,
       isTokenEvmNative,
@@ -92,17 +90,14 @@ export class EvmBroker extends Broker {
     return true;
   }
 
-  //There is no postProcessing on the EVM side
-  async postProcessing() {
-    return;
-  }
-
-  async sendEvmNativeTokenProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
+  async sendEvmNativeTokenProposal(receiverAddress: string, qtd: string, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
+    const tokenDecimals = await this.getTokenDecimals(token, this.config.mainchain.chainId);
+    const destinationToken = await this.getSideChainTokenAddress(token);
     const data = {
       address: `${receiverAddress}`,
-      amount: qtd,
-      token: `${token}`,
+      amount: this.convertToHathorDecimals(qtd, tokenDecimals),
+      token: `${destinationToken}`,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -120,13 +115,15 @@ export class EvmBroker extends Broker {
     );
   }
 
-  async sendHathorNativeTokenProposal(receiverAddress: string, qtd: number, token: string): Promise<string> {
+  async sendHathorNativeTokenProposal(receiverAddress: string, qtd: string, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
+    const tokenDecimals = await this.getTokenDecimals(token, this.config.sidechain[0].chainId);
+    const destinationToken = await this.getSideChainTokenAddress(token);
 
     const output = {
       address: `${receiverAddress}`,
-      value: qtd,
-      token: `${token}`,
+      value: this.convertToHathorDecimals(qtd, tokenDecimals),
+      token: `${destinationToken}`,
     };
     const outputs = [];
     outputs.push(output);

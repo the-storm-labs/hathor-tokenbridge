@@ -45,7 +45,22 @@ export class HathorFederationLogsReader {
         break;
       case 'ProposalSent':
         result = this.handleProposalSent(event);
-        break;
+        if (result.transactionType == TransactionTypes.MELT) {
+          new HathorBroker(
+            this.config,
+            this.logger,
+            this.bridgeFactory,
+            this.federationFactory,
+            this.transactionSender,
+          ).postProcessing(
+            result.sender,
+            result.receiver,
+            result.value,
+            result.originalTokenAddress,
+            result.transactionHash,
+          );
+        }
+        return;
       case 'TransactionFailed':
         result = this.handleTransactionFailed(event);
         break;
@@ -93,7 +108,6 @@ export class HathorFederationLogsReader {
       result.receiver,
       result.value,
       result.originalTokenAddress,
-      null,
       result.transactionHash,
       result.transactionType,
       result.transactionType != TransactionTypes.TRANSFER,
@@ -114,7 +128,9 @@ export class HathorFederationLogsReader {
       receiver,
       transactionType,
     } = event.returnValues;
-    originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    if (transactionType != TransactionTypes.MELT) {
+      originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    }
     console.log('ProposalSigned Event:');
     console.log(`Transaction ID: ${transactionId}`);
     console.log(`Original Token Address: ${originalTokenAddress}`);
@@ -154,7 +170,9 @@ export class HathorFederationLogsReader {
       transactionType,
       hathorTxId,
     } = event.returnValues;
-    originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    if (transactionType != TransactionTypes.MELT) {
+      originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    }
     console.log('ProposalSent Event:');
     console.log(`Transaction ID: ${transactionId}`);
     console.log(`Original Token Address: ${originalTokenAddress}`);
@@ -184,7 +202,9 @@ export class HathorFederationLogsReader {
     let { transactionId, txHex, originalTokenAddress, transactionHash, value, sender, receiver, transactionType } =
       event.returnValues;
 
-    originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    if (transactionType != TransactionTypes.MELT) {
+      originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    }
     txHex = (txHex as string).substring(2);
     console.log('TransactionProposed Event:');
     console.log(`Transaction ID: ${transactionId}`);
@@ -203,7 +223,9 @@ export class HathorFederationLogsReader {
     let { transactionId, originalTokenAddress, transactionHash, value, sender, receiver, transactionType } =
       event.returnValues;
 
-    originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    if (transactionType != TransactionTypes.MELT) {
+      originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
+    }
     console.log('TransactionFailed Event:');
     console.log(`Transaction ID: ${transactionId}`);
     console.log(`Original Token Address: ${originalTokenAddress}`);

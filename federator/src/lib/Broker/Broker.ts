@@ -71,20 +71,12 @@ export abstract class Broker {
   abstract getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]>;
   abstract sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress);
   abstract sendHathorNativeTokenProposal(receiverAddress, amount, tokenAddress);
-  abstract postProcessing(
-    senderAddress: string,
-    receiverAddress: string,
-    amount: string,
-    originalTokenAddress: string,
-    txHash: string,
-  );
 
   public async sendTokens(
     senderAddress: string,
     receiverAddress: string,
     amount: string,
     tokenAddress: string,
-    destinationTokenAddress: string,
     txHash: string,
     transactionType: TransactionTypes,
     isTokenEvmNative: boolean,
@@ -99,13 +91,12 @@ export abstract class Broker {
     );
 
     const isProcessed = await this.hathorFederationContract.isProcessed(transactionId);
-    const isSigned = await this.hathorFederationContract.isSigned(transactionId, process.env.FEDERATOR_ADDRESS);
-    const isProposed = await this.hathorFederationContract.isProposed(transactionId);
 
     if (isProcessed) {
-      this.postProcessing(senderAddress, receiverAddress, amount, tokenAddress, txHash);
       return;
     }
+
+    const isSigned = await this.hathorFederationContract.isSigned(transactionId, process.env.FEDERATOR_ADDRESS);
 
     if (isSigned) {
       const txHex = await this.hathorFederationContract.transactionHex(transactionId);
@@ -122,6 +113,8 @@ export abstract class Broker {
       );
       return;
     }
+
+    const isProposed = await this.hathorFederationContract.isProposed(transactionId);
 
     if (isProposed) {
       // the transaction if proposed but not signed
@@ -140,16 +133,8 @@ export abstract class Broker {
     }
 
     const txHex = isTokenEvmNative
-      ? await this.sendEvmNativeTokenProposal(
-          receiverAddress,
-          this.convertToHathorDecimals(amount, 18),
-          destinationTokenAddress,
-        )
-      : await this.sendHathorNativeTokenProposal(
-          receiverAddress,
-          this.convertToHathorDecimals(amount, 18),
-          destinationTokenAddress,
-        );
+      ? await this.sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress)
+      : await this.sendHathorNativeTokenProposal(receiverAddress, amount, tokenAddress);
 
     this.sendProposal(
       tokenAddress,

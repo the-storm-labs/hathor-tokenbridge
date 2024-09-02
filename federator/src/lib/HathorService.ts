@@ -55,7 +55,7 @@ export class HathorService {
       this.federationFactory,
       this.transactionSender,
     );
-    await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, null, txHash);
+    await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -79,7 +79,7 @@ export class HathorService {
     const queue = 'main_queue';
 
     try {
-      const conn = await rabbitmq.connect(process.env.RABBIT_CONFIG);
+      const conn = await rabbitmq.connect(process.env.RABBITMQ_URL);
 
       if (conn) {
         this.logger.info('Connected to rabbitmq');
@@ -243,7 +243,7 @@ export class HathorService {
 
       const tokenData = tx.getCustomTokenData()[0];
 
-      await broker.sendTokens(tokenData.sender, tx.getCustomData(), tokenData.value, tokenData.token, null, tx.tx_id);
+      await broker.sendTokens(tokenData.sender, tx.getCustomData(), tokenData.value, tokenData.token, tx.tx_id);
       return true;
     }
   }

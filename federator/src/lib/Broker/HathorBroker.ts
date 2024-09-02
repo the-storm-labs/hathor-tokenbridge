@@ -1,4 +1,4 @@
-import { HathorException, CreateProposalResponse, Data, TransactionTypes } from '../../types';
+import { HathorException, CreateProposalResponse, Data, TransactionTypes, HathorResponse } from '../../types';
 import { ConfigData } from '../config';
 import { LogWrapper } from '../logWrapper';
 import { Broker } from './Broker';
@@ -21,6 +21,9 @@ export class HathorBroker extends Broker {
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
+    if (hathorTxId.startsWith('0x')) {
+      hathorTxId = hathorTxId.substring(2);
+    }
     // validar que o txid da transação original existe na hathor
     const hathorTransaction = await this.getTransaction(hathorTxId);
     if (!hathorTransaction) {
@@ -35,30 +38,25 @@ export class HathorBroker extends Broker {
     }
     // validar que o token seja o mesmo
     const proposalTx = await this.decodeTxHex(txHex);
-    const proposalTokens = proposalTx.outputs.filter((o) => o.token);
-    const txTokens = (hathorTransaction as Data).outputs.filter((o) => o.token);
+    const proposalToken = proposalTx.outputs.filter((o) => o.token)[0];
+    const txTokens = (hathorTransaction as Data).outputs.filter(
+      (o) =>
+        o.token &&
+        o.spent_by == null &&
+        o.token !== '00' &&
+        o.value == proposalToken.value &&
+        o.decoded.type == 'MultiSig',
+    );
 
-    if (proposalTokens.length !== txTokens.length || !proposalTokens.some((t) => txTokens.indexOf(t) < 0)) {
-      this.logger.error(`Invalid tx. Unable to find token on hathor tx outputs. HEX: ${txHex} | ID: ${hathorTxId}`);
-      return false;
-    }
-
-    // validar que o amount seja o mesmo
-    if (proposalTokens[0].value == txTokens[0].value) {
-      this.logger.error(
-        `txHex ${txHex} value ${proposalTokens[0].value} is not the same as txHash value ${txTokens[0].value}.`,
-      );
-      return false;
-    }
+    // if (!txTokens || txTokens.length != 1 || !(await this.isMultisigAddress(txTokens[0].decoded.address))) {
+    //   this.logger.error(`Invalid tx. Unable to find token on hathor tx outputs. HEX: ${txHex} | ID: ${hathorTxId}`);
+    //   return false;
+    // }
 
     return true;
   }
 
-  async sendEvmNativeTokenProposal(qtd: number, token: string): Promise<string> {
-    return;
-  }
-
-  async sendHathorNativeTokenProposal(qtd: number, token: string): Promise<string> {
+  async sendEvmNativeTokenProposal(receiver: string, qtd: number, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
 
     const data = {
@@ -81,6 +79,10 @@ export class HathorBroker extends Broker {
     );
   }
 
+  async sendHathorNativeTokenProposal(qtd: number, token: string): Promise<string> {
+    return;
+  }
+
   async getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]> {
     const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
     const originalToken = await originBridge.HathorToEvmTokenMap(tokenAddress);
@@ -98,7 +100,7 @@ export class HathorBroker extends Broker {
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
     const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
-    this.voteOnEvm(receiverAddress, convertedAmount, originalTokenAddress, txHash, senderAddress);
+    this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
 
   async sendTokens(
@@ -106,10 +108,12 @@ export class HathorBroker extends Broker {
     receiverAddress: string,
     amount: string,
     originalTokenAddress: string,
-    destinationTokenAddress: string,
     txHash: string,
   ) {
     // validations
+    if (originalTokenAddress.startsWith('0x')) {
+      originalTokenAddress = originalTokenAddress.substring(2);
+    }
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
@@ -119,7 +123,6 @@ export class HathorBroker extends Broker {
         receiverAddress,
         amount,
         originalTokenAddress,
-        evmTokenAddress,
         txHash,
         TransactionTypes.MELT,
         isTokenEvmNative,
@@ -251,5 +254,21 @@ export class HathorBroker extends Broker {
   private convertToEvmDecimals(originalQtd: number, tokenDecimals: number): string {
     const hathorPrecision = tokenDecimals - 2;
     return (originalQtd * Math.pow(10, hathorPrecision)).toString();
+  }
+
+  protected async isMultisigAddress(address: string) {
+    // TODO Provide cache strategy
+    try {
+      const wallet = HathorWallet.getInstance(this.config, this.logger);
+      const response = await wallet.requestWallet<HathorResponse>(false, 'multi', 'wallet/address-index', null, {
+        address,
+      });
+      if (response.status == 200) {
+        return response.data.success;
+      }
+      throw Error(`${response.status} - ${response.statusText} | ${response.data}`);
+    } catch (error) {
+      throw Error(`Fail to isMultisigAddress: ${error}`);
+    }
   }
 }

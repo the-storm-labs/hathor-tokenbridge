@@ -22,6 +22,7 @@ import { HathorWallet } from './lib/HathorWallet';
 import TransactionSender from './lib/TransactionSender';
 import FederationHTR from './lib/FederationHTR';
 import FederatorHTR from './lib/FederatorHTR';
+import Web3 from 'web3';
 
 export class Main {
   logger: LogWrapper;
@@ -126,8 +127,15 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    // const service = new HathorService(this.config, this.logger, new BridgeFactory(), new FederationFactory(), new TransactionSender(sideChainWeb3, this.logger, this.config));
-    // service.listenToEventQueue();
+    const client = new Web3(this.config.mainchain.host);
+    const service = new HathorService(
+      this.config,
+      this.logger,
+      new BridgeFactory(),
+      new FederationFactory(),
+      new TransactionSender(client, this.logger, this.config),
+    );
+    service.listenToEventQueue();
   }
 
   async scheduleHathorFederationProcess() {
