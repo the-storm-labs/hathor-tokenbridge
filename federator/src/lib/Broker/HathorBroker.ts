@@ -9,6 +9,8 @@ import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 
+type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
+
 export class HathorBroker extends Broker {
   constructor(
     config: ConfigData,
@@ -18,6 +20,34 @@ export class HathorBroker extends Broker {
     transactionSender: TransactionSender,
   ) {
     super(config, logger, bridgeFactory, federationFactory, transactionSender);
+  }
+
+  getCustomTokenData(inputs, outputs): any {
+    const tokenData = outputs.filter(
+      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+    );
+
+    const tokens: Token[] = [];
+
+    tokenData.forEach((data) => {
+      const input = inputs.find((inpt) => inpt.token == data.token);
+
+      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
+        throw Error('Invalid transaction, it has more than one token or destination address.');
+      }
+
+      if (tokens.length == 0) {
+        tokens.push({
+          tokenAddress: data.token,
+          senderAddress: input.decoded.address,
+          receiverAddress: data.decoded.address,
+          amount: 0,
+        });
+      }
+
+      tokens[0].amount += data.value;
+    });
+    return tokens[0];
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
@@ -38,19 +68,48 @@ export class HathorBroker extends Broker {
     }
     // validar que o token seja o mesmo
     const proposalTx = await this.decodeTxHex(txHex);
-    const proposalToken = proposalTx.outputs.filter((o) => o.token)[0];
-    const txTokens = (hathorTransaction as Data).outputs.filter(
-      (o) =>
-        o.token &&
-        o.spent_by == null &&
-        o.token !== '00' &&
-        o.value == proposalToken.value &&
-        o.decoded.type == 'MultiSig',
-    );
+    const originalTx = hathorTransaction as Data;
 
-    // if (!txTokens || txTokens.length != 1 || !(await this.isMultisigAddress(txTokens[0].decoded.address))) {
-    //   this.logger.error(`Invalid tx. Unable to find token on hathor tx outputs. HEX: ${txHex} | ID: ${hathorTxId}`);
-    //   return false;
+    const proposalInfo = await this.getTransactionInfo(proposalTx);
+
+    const originalTxTokenData = this.getCustomTokenData(originalTx.inputs, originalTx.outputs);
+
+    // MELT
+
+    if (!proposalInfo.canMelt[originalTxTokenData.tokenAddress]) {
+      throw Error('Multisig does not have melt authority.');
+    }
+
+    if (proposalInfo.balances[originalTxTokenData.tokenAddress] >= 0) {
+      throw Error('Not a melt operation.');
+    }
+
+    if (Math.abs(proposalInfo.balances[originalTxTokenData.tokenAddress]) != originalTxTokenData.amount) {
+      throw Error('Proposal cannot differ amount from original Tx.');
+    }
+
+    // MINT
+
+    // if (!proposalInfo.canMint[originalTxTokenData.tokenAddress]) {
+    //   throw Error('Multisig does not have mint authority.');
+    // }
+
+    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] <= 0) {
+    //   throw Error('Not a mint operation.');
+    // }
+
+    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] != originalTxTokenData.amount) {
+    //   throw Error('Proposal cannot differ amount from original Tx.');
+    // }
+
+    // TRANSFER
+
+    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] == 0) {
+    //   throw Error('Not a mint operation.');
+    // }
+
+    // if (SUM OUTPUTS for receiver address  != originalTxTokenData.amount) {
+    //   throw Error('Proposal cannot differ amount from original Tx.');
     // }
 
     return true;
@@ -256,7 +315,7 @@ export class HathorBroker extends Broker {
     return (originalQtd * Math.pow(10, hathorPrecision)).toString();
   }
 
-  protected async isMultisigAddress(address: string) {
+  public async isMultisigAddress(address: string) {
     // TODO Provide cache strategy
     try {
       const wallet = HathorWallet.getInstance(this.config, this.logger);

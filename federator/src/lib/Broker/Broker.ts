@@ -24,6 +24,10 @@ import { ConfigChain } from '../configChain';
 import { HathorWallet } from '../HathorWallet';
 import { TransactionSender } from '../TransactionSender';
 
+const TOKEN_MELT_MASK = 0b00000010;
+const TOKEN_MINT_MASK = 0b00000001;
+const TOKEN_AUTHORITY_MASK = 0b10000000;
+
 export abstract class Broker {
   public logger: LogWrapper;
   public config: ConfigData;
@@ -409,5 +413,67 @@ export abstract class Broker {
   protected convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
     const hathorPrecision = tokenDecimals - 2;
     return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
+  }
+
+  /**
+   * @param {IHistoryTx} tx
+   */
+  public getTransactionInfo(tx) {
+    /** @type {Record<string, number>} */
+    const balances = {};
+    /** @type {Record<string, boolean>} */
+    const canMint = {};
+    /** @type {Record<string, boolean>} */
+    const canMelt = {};
+    for (const output of tx.outputs) {
+      if (this.isAuthority(output)) {
+        continue;
+      }
+      balances[output.token] += output.value;
+    }
+
+    for (const input of tx.inputs) {
+      if (this.isAuthority(input)) {
+        if (this.isMint(input.token_data, input.value)) {
+          canMint[input.token] = true;
+        } else if (this.isMelt(input.token_data, input.value)) {
+          canMelt[input.token] = true;
+        }
+        continue;
+      }
+      balances[input.token] -= input.value;
+    }
+
+    return { balances: balances, canMelt: canMelt, canMint: canMint };
+  }
+
+  /**
+   * Check if the output is an authority output
+   *
+   * @param {Pick<HistoryTransactionOutput, 'token_data'>} output An output with the token_data field
+   * @returns {boolean} If the output is an authority output
+   */
+  isAuthority(token_data: number): boolean {
+    return (token_data & TOKEN_AUTHORITY_MASK) > 0;
+  }
+
+  /**
+   * Check if the output is a mint authority output
+   *
+   * @param {Pick<HistoryTransactionOutput, 'token_data'|'value'>} output An output with the token_data and value fields
+   * @returns {boolean} If the output is a mint authority output
+   */
+  isMint(token_data: number, value: number): boolean {
+    return this.isAuthority(token_data) && (value & TOKEN_MINT_MASK) > 0;
+  }
+
+  /**
+   * Check if the output is a melt authority output
+   *
+   * @param {Pick<HistoryTransactionOutput, 'token_data'|'value'>} output An output with the token_data and value fields
+   * @returns {boolean} If the output is a melt authority output
+   */
+  isMelt(token_data: number, value: number): boolean {
+    return this.isAuthority(token_data) && (value & TOKEN_MELT_MASK) > 0;
   }
 }

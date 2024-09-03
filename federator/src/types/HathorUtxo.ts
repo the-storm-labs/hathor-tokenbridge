@@ -6,15 +6,17 @@ export class HathorUtxo {
   token: string;
   value: number;
   decoded: decodeInput;
+  spent_by: string;
 
   customData?: CustomUtxoData;
   haveCustomData: boolean;
 
-  constructor(script: string, token?: string, value?: number, decoded?: decodeInput) {
+  constructor(script: string, token?: string, value?: number, decoded?: decodeInput, spent_by?: string) {
     this.script = script;
     this.token = token;
     this.value = value;
     this.decoded = decoded;
+    this.spent_by = spent_by;
     this.haveCustomData = false;
 
     this.decodeScript();

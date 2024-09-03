@@ -33,7 +33,7 @@ export class HathorFederationLogsReader {
 
     this.hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
     this.counter = 0;
-    console.log(`Counter: ${this.counter}`);
+    this.logger.info(`Counter: ${this.counter}`);
   }
   // Function to handle different event types
   async handleEvent(event) {
@@ -68,8 +68,8 @@ export class HathorFederationLogsReader {
         result = this.handleTransactionProposed(event);
         break;
       default:
-        console.log(`Unhandled event type: ${event.event}`);
-        console.log(event.returnValues);
+        this.logger.info(`Unhandled event type: ${event.event}`);
+        this.logger.info(event.returnValues);
     }
 
     if (!result) {
@@ -78,7 +78,7 @@ export class HathorFederationLogsReader {
 
     let broker: Broker;
 
-    console.log(`Counter: ${this.counter}`);
+    this.logger.info(`Counter: ${this.counter}`);
     this.counter += 1;
 
     switch (Number.parseInt(result.transactionType)) {
@@ -131,17 +131,17 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    console.log('ProposalSigned Event:');
-    console.log(`Transaction ID: ${transactionId}`);
-    console.log(`Original Token Address: ${originalTokenAddress}`);
-    console.log(`Transaction Hash: ${transactionHash}`);
-    console.log(`Value: ${value}`);
-    console.log(`Sender: ${sender}`);
-    console.log(`Receiver: ${receiver}`);
-    console.log(`Transaction Type: ${transactionType}`);
-    console.log(`Member: ${member}`);
-    console.log(`Signed: ${signed}`);
-    console.log(`Signature: ${signature}`);
+    this.logger.info('ProposalSigned Event:');
+    this.logger.info(`Transaction ID: ${transactionId}`);
+    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
+    this.logger.info(`Transaction Hash: ${transactionHash}`);
+    this.logger.info(`Value: ${value}`);
+    this.logger.info(`Sender: ${sender}`);
+    this.logger.info(`Receiver: ${receiver}`);
+    this.logger.info(`Transaction Type: ${transactionType}`);
+    this.logger.info(`Member: ${member}`);
+    this.logger.info(`Signed: ${signed}`);
+    this.logger.info(`Signature: ${signature}`);
 
     return {
       transactionId,
@@ -173,16 +173,16 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    console.log('ProposalSent Event:');
-    console.log(`Transaction ID: ${transactionId}`);
-    console.log(`Original Token Address: ${originalTokenAddress}`);
-    console.log(`Transaction Hash: ${transactionHash}`);
-    console.log(`Value: ${value}`);
-    console.log(`Sender: ${sender}`);
-    console.log(`Receiver: ${receiver}`);
-    console.log(`Transaction Type: ${transactionType}`);
-    console.log(`Processed: ${processed}`);
-    console.log(`Hathor Tx ID: ${hathorTxId}`);
+    this.logger.info('ProposalSent Event:');
+    this.logger.info(`Transaction ID: ${transactionId}`);
+    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
+    this.logger.info(`Transaction Hash: ${transactionHash}`);
+    this.logger.info(`Value: ${value}`);
+    this.logger.info(`Sender: ${sender}`);
+    this.logger.info(`Receiver: ${receiver}`);
+    this.logger.info(`Transaction Type: ${transactionType}`);
+    this.logger.info(`Processed: ${processed}`);
+    this.logger.info(`Hathor Tx ID: ${hathorTxId}`);
 
     return {
       transactionId,
@@ -206,15 +206,15 @@ export class HathorFederationLogsReader {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
     txHex = (txHex as string).substring(2);
-    console.log('TransactionProposed Event:');
-    console.log(`Transaction ID: ${transactionId}`);
-    console.log(`Original Token Address: ${originalTokenAddress}`);
-    console.log(`Transaction Hash: ${transactionHash}`);
-    console.log(`Value: ${value}`);
-    console.log(`Sender: ${sender}`);
-    console.log(`Receiver: ${receiver}`);
-    console.log(`Transaction Type: ${transactionType}`);
-    console.log(`Transaction Hex: ${txHex}`);
+    this.logger.info('TransactionProposed Event:');
+    this.logger.info(`Transaction ID: ${transactionId}`);
+    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
+    this.logger.info(`Transaction Hash: ${transactionHash}`);
+    this.logger.info(`Value: ${value}`);
+    this.logger.info(`Sender: ${sender}`);
+    this.logger.info(`Receiver: ${receiver}`);
+    this.logger.info(`Transaction Type: ${transactionType}`);
+    this.logger.info(`Transaction Hex: ${txHex}`);
 
     return { transactionId, txHex, originalTokenAddress, transactionHash, value, sender, receiver, transactionType };
   }
@@ -226,14 +226,14 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    console.log('TransactionFailed Event:');
-    console.log(`Transaction ID: ${transactionId}`);
-    console.log(`Original Token Address: ${originalTokenAddress}`);
-    console.log(`Transaction Hash: ${transactionHash}`);
-    console.log(`Value: ${value}`);
-    console.log(`Sender: ${sender}`);
-    console.log(`Receiver: ${receiver}`);
-    console.log(`Transaction Type: ${transactionType}`);
+    this.logger.info('TransactionFailed Event:');
+    this.logger.info(`Transaction ID: ${transactionId}`);
+    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
+    this.logger.info(`Transaction Hash: ${transactionHash}`);
+    this.logger.info(`Value: ${value}`);
+    this.logger.info(`Sender: ${sender}`);
+    this.logger.info(`Receiver: ${receiver}`);
+    this.logger.info(`Transaction Type: ${transactionType}`);
 
     return {
       transactionId,
@@ -254,7 +254,7 @@ export class HathorFederationLogsReader {
       const fromBlock = currentBlock;
       const toBlock = Math.min(currentBlock + batchSize - 1, endBlock);
 
-      console.log(`Fetching events from block ${fromBlock} to ${toBlock}`);
+      this.logger.info(`Fetching events from block ${fromBlock} to ${toBlock}`);
 
       try {
         const events = await this.hathorFederationContract.getPastEvents('allEvents', {
@@ -267,7 +267,7 @@ export class HathorFederationLogsReader {
           await this.handleEvent(event);
         }
       } catch (error) {
-        console.error(`Error fetching events from block ${fromBlock} to ${toBlock}:`, error);
+        this.logger.error(`Error fetching events from block ${fromBlock} to ${toBlock}:`, error);
       }
 
       currentBlock += batchSize;

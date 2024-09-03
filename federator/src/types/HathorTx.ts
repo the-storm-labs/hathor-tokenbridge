@@ -1,5 +1,7 @@
 import { HathorUtxo } from './HathorUtxo';
 
+type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
+
 export class HathorTx {
   tx_id: string;
   timestamp: string;
@@ -27,26 +29,32 @@ export class HathorTx {
     return customData;
   }
 
-  getCustomTokenData(): any[] {
-    const tokenData = this.outputs
-      // there is probably a better way to do that filter
-      .filter((output) => output.token !== '00' && output.decoded.type === 'MultiSig');
+  getCustomTokenData(): any {
+    const tokenData = this.outputs.filter(
+      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+    );
 
-    const customData = [];
+    const tokens: Token[] = [];
 
     tokenData.forEach((data) => {
-      /* It is possible to have multiple inputs with multiple addresses. This could be a issue? 
-          At first I think not, buuut....
-      */
       const input = this.inputs.find((inpt) => inpt.token == data.token);
-      customData.push({
-        sender: input.decoded.address,
-        value: data.value,
-        token: data.token,
-      });
-    });
 
-    return customData;
+      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
+        throw Error('Invalid transaction, it has more than one token or destination address.');
+      }
+
+      if (tokens.length == 0) {
+        tokens.push({
+          tokenAddress: data.token,
+          senderAddress: input.decoded.address,
+          receiverAddress: data.decoded.address,
+          amount: 0,
+        });
+      }
+
+      tokens[0].amount += data.value;
+    });
+    return tokens[0];
   }
 }
 

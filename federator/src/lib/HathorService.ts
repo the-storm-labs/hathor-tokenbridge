@@ -208,11 +208,17 @@ export class HathorService {
 
     const outUtxos = event.data.outputs.map(
       (o) =>
-        new HathorUtxo(o.script, o.token, o.value, {
-          type: o.decoded?.type,
-          address: o.decoded?.address,
-          timelock: o.decoded?.timelock,
-        }),
+        new HathorUtxo(
+          o.script,
+          o.token,
+          o.value,
+          {
+            type: o.decoded?.type,
+            address: o.decoded?.address,
+            timelock: o.decoded?.timelock,
+          },
+          o.spent_by,
+        ),
     );
 
     const inUtxos = event.data.inputs.map(
@@ -241,9 +247,15 @@ export class HathorService {
         return false;
       }
 
-      const tokenData = tx.getCustomTokenData()[0];
+      const token = tx.getCustomTokenData();
 
-      await broker.sendTokens(tokenData.sender, tx.getCustomData(), tokenData.value, tokenData.token, tx.tx_id);
+      const isMulsigAddress = await broker.isMultisigAddress(token.receiverAddress);
+
+      if (!isMulsigAddress) {
+        throw Error('Not a multisig address.');
+      }
+
+      await broker.sendTokens(token.senderAddress, tx.getCustomData(), token.amount, token.tokenAddress, tx.tx_id);
       return true;
     }
   }
