@@ -2,80 +2,91 @@
    "type": "wallet:new-tx",
    "walletId": "multi",
    "data": {
-      "tx_id": "0000001c7dda1b102d44c4e1ad177e5cebfbb363169499e835025e04b0517e53",
+      "tx_id": "00000fe08c0b04da24895166c7ebadb249d9138f13cc171074aa8e2a81918922",
       "version": 1,
-      "weight": 21.12473388938574,
-      "timestamp": 1700081894,
+      "weight": 19.13808973179251,
+      "timestamp": 1725399466,
       "is_voided": false,
       "inputs": [
          {
-            "value": 9995,
+            "value": 1724,
             "token_data": 0,
-            "script": "dqkUoKzkYtClWiEraGX7aXYgAak5Ys+IrA==",
+            "script": "dqkUOH3NFnIkunhf5GSVsUHmY2vMYCeIrA==",
             "decoded": {
                "type": "P2PKH",
-               "address": "WdKc7NnyBPE4tyrohdo4V8GA8tww9BSxhL",
+               "address": "WTpjRV7XrnEs1nRReyakSgE9up4CuGoEBH",
                "timelock": null
             },
             "token": "00",
-            "tx_id": "00000448b416622900b24325fa9279ffcadb2805a013eae700ad488ad7cfaa6c",
-            "index": 1
+            "tx_id": "00000000b1cc091f2370c3ccd0901fd209556dfa7718cd0a8fadd2b87f7a9f49",
+            "index": 2
+         },
+         {
+            "value": 49,
+            "token_data": 1,
+            "script": "dqkUOH3NFnIkunhf5GSVsUHmY2vMYCeIrA==",
+            "decoded": {
+               "type": "P2PKH",
+               "address": "WTpjRV7XrnEs1nRReyakSgE9up4CuGoEBH",
+               "timelock": null
+            },
+            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
+            "tx_id": "00000000b1cc091f2370c3ccd0901fd209556dfa7718cd0a8fadd2b87f7a9f49",
+            "index": 3
          }
       ],
       "outputs": [
          {
             "value": 1,
             "token_data": 0,
-            "script": "TFNoZXgyMzE0ODUyMGQzNmFiZTRmYWM2YmEzYjE4NWI4ZWRkYmU1OTVlYWFmMzNiNzg3NDAzMGJhMjQzNjVjOWZmZjY1NTUzMGQ4MDAwMDAwMDAwMKw=",
+            "script": "KjB4RTIzZDU5ZWYwYzFGNjNCNTMyMzRiMDBhMWUxRWFCRWY4MjIzOTdEMqw=",
             "decoded": {},
             "token": "00",
             "spent_by": null
          },
          {
-            "value": 1,
+            "value": 1723,
             "token_data": 0,
-            "script": "TJZoZXgwMzAwMDEwMTAyMDIwMDAwMDFmODEwN2MxOWI1NzM5N2FjYjRkNDRkNjYyMDgwMTViNmMwZWI2Y2JjM2M0NjY1MWM2ZmMxZTQzY2RkMDAwMDA0NDhiNDE2NjIyOTAwYjI0MzI1ZmE5Mjc5ZmZjYWRiMjgwNWEwMTNlYWU3MDBhZDQ4OGFkN2NmYWE2YzAwMDAwMDCs",
-            "decoded": {},
-            "token": "00",
-            "spent_by": null
-         },
-         {
-            "value": 1,
-            "token_data": 0,
-            "script": "TJZoZXgxMzAwMDBmNDgxZjI0MjFhMDRkNTAyMWQzMWNiNTgzNGEyNjc3NjY5MjlkMGI1NTdlMzAwZGQ0M2Y4NWI1Y2MyYjAyMDAwMDAwMDAwMDAxMDEwMDE3YTkxNDg4OTVlMGIxNzhmZmQ3ZTJkZGY0ZDUzNDZkMmQzYzgzYjUwNmJmOWQ4NzAwMDAwMDAxODEwMDE3YTms",
-            "decoded": {},
-            "token": "00",
-            "spent_by": null
-         },
-         {
-            "value": 1,
-            "token_data": 0,
-            "script": "qRSIleCxeP/X4t301TRtLTyDtQa/nYc=",
-            "decoded": {
-               "type": "MultiSig",
-               "address": "wY5dNSAqCsmcimkgHig3CzZPjYRDyBWbjv",
-               "timelock": null
-            },
-            "token": "00",
-            "spent_by": "00001600e921462f9374afd0d0dd30a529e92f41ab509c6dbaaa8fd3a2db8113"
-         },
-         {
-            "value": 9991,
-            "token_data": 0,
-            "script": "dqkU8xIkwiWRwZXS5Qv2Xx3BbbnwHZiIrA==",
+            "script": "dqkUxKfkUkOAqXile1+GmXlU1btOKLmIrA==",
             "decoded": {
                "type": "P2PKH",
-               "address": "WkqGpBTJ5mgKA7FGP2NKb5FBJoKLHJHBgQ",
+               "address": "WgbrSrmHJDzgNmSAB8izStTfLqfMBo8BzS",
                "timelock": null
             },
             "token": "00",
-            "spent_by": "00001b898a5a96672e0d604a6e8fee1a3c14a854dfe39113771dc5701c910d74"
+            "spent_by": null
+         },
+         {
+            "value": 48,
+            "token_data": 1,
+            "script": "dqkUxKfkUkOAqXile1+GmXlU1btOKLmIrA==",
+            "decoded": {
+               "type": "P2PKH",
+               "address": "WgbrSrmHJDzgNmSAB8izStTfLqfMBo8BzS",
+               "timelock": null
+            },
+            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
+            "spent_by": null
+         },
+         {
+            "value": 1,
+            "token_data": 1,
+            "script": "qRTddUyEFtKdLC8i0pafRrAcS4p3A4c=",
+            "decoded": {
+               "type": "MultiSig",
+               "address": "wfpPn8ArZKVw9Qnc6oz3t6xcfS6WZjtk67",
+               "timelock": null
+            },
+            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
+            "spent_by": null
          }
       ],
       "parents": [
-         "000044413ef58254953bc23075f47e14e6acb21a622b746b2d70c1357e233f26",
-         "00000000ceb4e1414c3ed619b2a87ddd30df2648fe80f6800bf526060eec0ef0"
-      ]
+         "00003f123c48aa678eb5f6176ad7126fecc822a3c3a65ccae44e7ad148d8b4c6",
+         "0000167681b42ad3e8c06c7723bf69a0fa647f857ca2d2b533503433efe962ee"
+      ],
+      "first_block": null,
+      "processingStatus": "finished"
    },
    "balance": {
       "00": {

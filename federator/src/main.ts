@@ -19,12 +19,17 @@ import HathorService from './lib/HathorService';
 import { BridgeFactory } from './contracts/BridgeFactory';
 import { FederationFactory } from './contracts/FederationFactory';
 import { HathorWallet } from './lib/HathorWallet';
+import TransactionSender from './lib/TransactionSender';
+import FederationHTR from './lib/FederationHTR';
+import FederatorHTR from './lib/FederatorHTR';
+import Web3 from 'web3';
 
 export class Main {
   logger: LogWrapper;
   endpoint: any;
   metricCollector: MetricCollector;
-  rskFederator: Federator;
+  rskFederator: FederatorHTR;
+  hathorFederation: FederationHTR;
   config: Config;
   heartbeat: Heartbeat;
   heartBeatScheduler: Scheduler;
@@ -52,6 +57,12 @@ export class Main {
       Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
       this.metricCollector,
     );
+
+    this.hathorFederation = new FederationHTR(
+      this.config,
+      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
+      this.metricCollector,
+    );
   }
 
   async start() {
@@ -62,6 +73,7 @@ export class Main {
       this.logger.info('No need to wait, the wallets are ready, lets go.');
       this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
+      this.scheduleHathorFederationProcess();
       return;
     }
 
@@ -70,6 +82,7 @@ export class Main {
       this.logger.info('Event emmited, we can start the wallet');
       this.listenToHathorTransactions();
       this.scheduleFederatorProcesses();
+      this.scheduleHathorFederationProcess();
     });
 
     this.logger.info(`From main.ts, we have ${walletEmmiter.listenerCount('wallets-ready')} listeners`);
@@ -114,8 +127,33 @@ export class Main {
   }
 
   async listenToHathorTransactions() {
-    const service = new HathorService(this.config, this.logger, new BridgeFactory(), new FederationFactory());
+    const client = new Web3(this.config.mainchain.host);
+    const service = new HathorService(
+      this.config,
+      this.logger,
+      new BridgeFactory(),
+      new FederationFactory(),
+      new TransactionSender(client, this.logger, this.config),
+    );
     service.listenToEventQueue();
+  }
+
+  async scheduleHathorFederationProcess() {
+    const federatorPollingInterval = this.config.runEvery * 1000 * 60; // Minutes
+    this.federatorScheduler = new Scheduler(federatorPollingInterval, this.logger, {
+      run: async () => {
+        try {
+          await this.hathorFederation.runAll();
+        } catch (err) {
+          this.logger.error('Unhandled Error on runFederator()', err);
+          process.exit(1);
+        }
+      },
+    });
+
+    this.federatorScheduler.start().catch((err) => {
+      this.logger.error('Unhandled Error on federatorScheduler.start()', err);
+    });
   }
 
   async scheduleFederatorProcesses() {

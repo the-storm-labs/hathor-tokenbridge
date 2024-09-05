@@ -8,16 +8,16 @@ import { HathorException } from '../types/HathorException';
 import { BridgeFactory } from '../contracts/BridgeFactory';
 import { FederationFactory } from '../contracts/FederationFactory';
 import { EvmBroker } from './Broker/EvmBroker';
-import { Broker } from './Broker/Broker';
 import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
-import { waitBlocks } from './utils';
+import TransactionSender from './TransactionSender';
 
 export class HathorService {
   public logger: LogWrapper;
   public config: ConfigData;
   public bridgeFactory: BridgeFactory;
   public federationFactory: FederationFactory;
+  public transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
 
   private nonRetriableErrors = [
@@ -31,19 +31,25 @@ export class HathorService {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    transactionSender: TransactionSender,
   ) {
     this.config = config;
     this.logger = logger;
     this.chainConfig = config.sidechain[0];
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
+    this.transactionSender = transactionSender;
   }
 
-  async sendTokensToHathor(receiverAddress: string, qtd: string, tokenAddress: string, txHash: string) {
-    if (this.chainConfig.multisigOrder > 1) return;
-
+  async sendTokensToHathor(
+    senderAddress: string,
+    receiverAddress: string,
+    qtd: string,
+    tokenAddress: string,
+    txHash: string,
+  ) {
     const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
-    await broker.sendTokensToHathor(receiverAddress, qtd, tokenAddress, txHash);
+    await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
   }
 
   async listenToEventQueue(): Promise<void> {
@@ -65,8 +71,6 @@ export class HathorService {
 
   private async listenToRabbitMQEventQueue() {
     const queue = 'main_queue';
-
-    // const retryHeader = 'x-retry-count';
 
     try {
       const conn = await rabbitmq.connect(process.env.RABBITMQ_URL);
@@ -198,11 +202,17 @@ export class HathorService {
 
     const outUtxos = event.data.outputs.map(
       (o) =>
-        new HathorUtxo(o.script, o.token, o.value, {
-          type: o.decoded?.type,
-          address: o.decoded?.address,
-          timelock: o.decoded?.timelock,
-        }),
+        new HathorUtxo(
+          o.script,
+          o.token,
+          o.value,
+          {
+            type: o.decoded?.type,
+            address: o.decoded?.address,
+            timelock: o.decoded?.timelock,
+          },
+          o.spent_by,
+        ),
     );
 
     const inUtxos = event.data.inputs.map(
@@ -215,46 +225,7 @@ export class HathorService {
     );
     const tx = new HathorTx(event.data.tx_id, event.data.timestamp, outUtxos, inUtxos);
 
-    const isProposal = tx.haveCustomData('hex');
-
-    if (isProposal) {
-      this.logger.info('Evaluating proposal...');
-      const txHex = tx.getCustomData('hex');
-      const [broker, dataType] = this.getBrokerAndDataType(tx);
-      const confirmed = await broker.isTxConfirmed(tx.tx_id);
-      if (!confirmed) {
-        return false;
-      }
-      await broker.sendMySignaturesToProposal(txHex, tx.getCustomData(dataType));
-      return true;
-    }
-
-    const isSignature = tx.haveCustomData('sig');
-
-    if (isSignature) {
-      this.logger.info('Evaluating signature...');
-      const [broker, dataType] = this.getBrokerAndDataType(tx);
-
-      const confirmed = await broker.isTxConfirmed(tx.tx_id);
-      if (!confirmed) {
-        return false;
-      }
-
-      const txId = tx.getCustomData(dataType);
-      const components = await broker.getSignaturesToPush(txId);
-
-      if (components.signatures.length < this.chainConfig.multisigRequiredSignatures) {
-        this.logger.info(
-          `Number of signatures not reached. Require ${this.chainConfig.multisigRequiredSignatures} signatures, have ${components.signatures.length}`,
-        );
-        return false;
-      }
-
-      await broker.signAndPushProposal(components.hex, txId, components.signatures);
-      return true;
-    }
-
-    const isHathorToEvm = tx.haveCustomData('addr');
+    const isHathorToEvm = tx.haveCustomData();
 
     if (isHathorToEvm) {
       const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
@@ -264,30 +235,16 @@ export class HathorService {
         return false;
       }
 
-      const tokenData = tx.getCustomTokenData()[0];
+      const token = tx.getCustomTokenData();
 
-      const result = await broker.sendTokensFromHathor(
-        tx.getCustomData('addr'),
-        tokenData.value,
-        tokenData.token,
-        tx.tx_id,
-        tokenData.sender,
-        tx.timestamp,
-      );
-      if (!result) {
-        throw new HathorException('Invalid tx', 'Invalid tx'); //TODO change exception type
+      const isMulsigAddress = await broker.isMultisigAddress(token.receiverAddress);
+
+      if (!isMulsigAddress) {
+        throw Error('Not a multisig address.');
       }
-      return true;
-    }
-  }
 
-  private getBrokerAndDataType(tx: HathorTx): [Broker, string] {
-    const customDataType = tx.getCustomDataType();
-    switch (customDataType) {
-      case 'hsh':
-        return [new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
-      case 'hid':
-        return [new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory), customDataType];
+      await broker.sendTokens(token.senderAddress, tx.getCustomData(), token.amount, token.tokenAddress, tx.tx_id);
+      return true;
     }
   }
 }

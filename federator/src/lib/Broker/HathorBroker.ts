@@ -1,20 +1,15 @@
-import axios from 'axios';
-import HathorException from '../../types/HathorException';
+import { HathorException, CreateProposalResponse, Data, TransactionTypes, HathorResponse } from '../../types';
 import { ConfigData } from '../config';
 import { LogWrapper } from '../logWrapper';
 import { Broker } from './Broker';
-import { CreateProposalResponse } from '../../types/HathorResponseTypes';
-import { IBridgeV4 } from '../../contracts/IBridgeV4';
 import FederatorHTR from '../FederatorHTR';
 import Web3 from 'web3';
 import { BN } from 'ethereumjs-util';
 import TransactionSender from '../TransactionSender';
-import { BridgeFactory } from '../../contracts/BridgeFactory';
-import { FederationFactory } from '../../contracts/FederationFactory';
+import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 
 export class HathorBroker extends Broker {
-  public txIdType: string;
   constructor(
     config: ConfigData,
     logger: LogWrapper,
@@ -22,26 +17,50 @@ export class HathorBroker extends Broker {
     federationFactory: FederationFactory,
   ) {
     super(config, logger, bridgeFactory, federationFactory);
-    this.txIdType = 'hid';
   }
 
-  async validateTx(txHex: string, txId: string): Promise<boolean> {
-    // const hathorTx = await this.decodeTxHex(txHex);
-    // const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+  async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
+    if (hathorTxId.startsWith('0x')) {
+      hathorTxId = hathorTxId.substring(2);
+    }
+    // validar que o txid da transação original existe na hathor
+    const hathorTransaction = await this.getTransaction(hathorTxId);
+    if (!hathorTransaction) {
+      this.logger.error(`txHex ${txHex} txID ${hathorTxId} unable to validate tx exists.`);
+      return false;
+    }
+    // validar que o txid não foi enviado anteriormente para o hathor federation contract
+    const isProcessed = await this.hathorFederationContract.isProcessed(contractTxId);
+    if (isProcessed) {
+      this.logger.error(`txHex ${txHex} txID ${hathorTxId} was processed before.`);
+      return false;
+    }
+    // validar que o token seja o mesmo
+    const proposalTx = await this.decodeTxHex(txHex);
+    const originalTx = hathorTransaction as Data;
 
-    // TODO validate if the txHex comes from a tx that was initiated by the multisig? does it make sense? or it has to be?
-    // TODO think what's importante to validate here
+    const proposalInfo = await this.getTransactionInfo(proposalTx);
 
-    // get token from event
-    // const evmTranslatedToken = await bridge.EvmToHathorTokenMap(hathorTx);
+    const originalTxTokenData = this.getCustomTokenData(originalTx.inputs, originalTx.outputs);
 
-    // check if token is mapped on bridge
+    // MELT
 
-    // check if destination is a valid address
+    if (!proposalInfo.canMelt[originalTxTokenData.tokenAddress]) {
+      throw Error('Multisig does not have melt authority.');
+    }
+
+    if (proposalInfo.balances[originalTxTokenData.tokenAddress] >= 0) {
+      throw Error('Not a melt operation.');
+    }
+
+    if (Math.abs(proposalInfo.balances[originalTxTokenData.tokenAddress]) != originalTxTokenData.amount) {
+      throw Error('Proposal cannot differ amount from original Tx.');
+    }
+
     return true;
   }
 
-  private async sendMeltProposal(qtd: number, token: string): Promise<string> {
+  async sendEvmNativeTokenProposal(receiver: string, qtd: number, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
 
     const data = {
@@ -51,7 +70,7 @@ export class HathorBroker extends Broker {
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
       true,
-      this.chainConfig.multisigWalletId,
+      'multi',
       'wallet/p2sh/tx-proposal/melt-tokens',
       data,
     );
@@ -64,36 +83,78 @@ export class HathorBroker extends Broker {
     );
   }
 
-  private async getEvmTokenAddress(tokenAddress: string): Promise<[string, number]> {
+  async sendHathorNativeTokenProposal(qtd: number, token: string): Promise<string> {
+    return;
+  }
+
+  async getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]> {
     const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
     const originalToken = await originBridge.HathorToEvmTokenMap(tokenAddress);
 
     return [originalToken.tokenAddress, originalToken.originChainId];
   }
 
-  async sendTokensFromHathor(
+  async postProcessing(
+    senderAddress: string,
     receiverAddress: string,
-    qtd: number,
-    hathorTokenAddress: string,
-    txId: string,
-    ogSenderAddress: string,
-    timestamp: string,
-  ): Promise<boolean> {
-    const [evmTokenAddress, originalChainId] = await this.getEvmTokenAddress(hathorTokenAddress);
-
-    if (originalChainId == this.config.mainchain.chainId && this.chainConfig.multisigOrder == 1) {
-      const txHex = await this.sendMeltProposal(qtd, hathorTokenAddress);
-      await this.broadcastProposal(txHex, txId);
+    amount: string,
+    originalTokenAddress: string,
+    txHash: string,
+  ) {
+    if (originalTokenAddress.startsWith('0x')) {
+      originalTokenAddress = originalTokenAddress.substring(2);
     }
-    const federator = new FederatorHTR(this.config, this.logger, null);
+    const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
+    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
+    const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
+    this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
+  }
+
+  async sendTokens(
+    senderAddress: string,
+    receiverAddress: string,
+    amount: string,
+    originalTokenAddress: string,
+    txHash: string,
+  ) {
+    // validations
+    if (originalTokenAddress.startsWith('0x')) {
+      originalTokenAddress = originalTokenAddress.substring(2);
+    }
+    const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
+    const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
+
+    if (isTokenEvmNative) {
+      await super.sendTokens(
+        senderAddress,
+        receiverAddress,
+        amount,
+        originalTokenAddress,
+        txHash,
+        TransactionTypes.MELT,
+        isTokenEvmNative,
+      );
+      return;
+    }
 
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
+    const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
+
+    this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
+  }
+
+  async voteOnEvm(
+    receiverAddress: string,
+    amount: BN,
+    tokenAddress: string,
+    txId: string,
+    ogSenderAddress: string,
+  ): Promise<boolean> {
+    const federator = new FederatorHTR(this.config, this.logger, null);
 
     const sender = Web3.utils.keccak256(ogSenderAddress);
     const thirdTwoBytesSender = Web3.utils.toChecksumAddress(sender.substring(0, 42));
     const idHash = Web3.utils.keccak256(txId);
-    const convertedAmount = new BN(this.convertToEvmDecimals(qtd, evmTokenDecimals));
-    const timestampHash = Web3.utils.soliditySha3(timestamp);
     const logIndex = 129;
 
     const transactionSender = new TransactionSender(this.getWeb3(this.config.mainchain.host), this.logger, this.config);
@@ -104,11 +165,11 @@ export class HathorBroker extends Broker {
     );
 
     const transactionId = await federatorContract.getTransactionId({
-      originalTokenAddress: evmTokenAddress,
+      originalTokenAddress: tokenAddress,
       sender: thirdTwoBytesSender,
       receiver: receiverAddress,
-      amount: convertedAmount,
-      blockHash: timestampHash,
+      amount: amount,
+      blockHash: idHash,
       transactionHash: idHash,
       logIndex: logIndex,
       originChainId: this.config.sidechain[0].chainId,
@@ -117,13 +178,13 @@ export class HathorBroker extends Broker {
 
     const isTransactionVotedOrProcessed = await this.isTransactionVotedOrProcessed(
       receiverAddress,
-      convertedAmount,
-      timestampHash,
+      amount,
+      idHash,
       idHash,
       logIndex,
       this.config.sidechain[0].chainId,
       this.config.mainchain.chainId,
-      evmTokenAddress,
+      tokenAddress,
       transactionId,
       federatorAddress,
     );
@@ -137,14 +198,14 @@ export class HathorBroker extends Broker {
       sideChainConfig: this.config.mainchain,
       sideFedContract: federatorContract,
       federatorAddress: federatorAddress,
-      tokenAddress: evmTokenAddress,
+      tokenAddress: tokenAddress,
       senderAddress: thirdTwoBytesSender,
       receiver: receiverAddress,
-      amount: convertedAmount,
+      amount: amount,
       transactionId: transactionId,
       originChainId: this.config.sidechain[0].chainId,
       destinationChainId: this.config.mainchain.chainId,
-      blockHash: timestampHash,
+      blockHash: idHash,
       transactionHash: idHash,
       logIndex: logIndex,
     };
@@ -200,5 +261,21 @@ export class HathorBroker extends Broker {
   private convertToEvmDecimals(originalQtd: number, tokenDecimals: number): string {
     const hathorPrecision = tokenDecimals - 2;
     return (originalQtd * Math.pow(10, hathorPrecision)).toString();
+  }
+
+  public async isMultisigAddress(address: string) {
+    // TODO Provide cache strategy
+    try {
+      const wallet = HathorWallet.getInstance(this.config, this.logger);
+      const response = await wallet.requestWallet<HathorResponse>(false, 'multi', 'wallet/address-index', null, {
+        address,
+      });
+      if (response.status == 200) {
+        return response.data.success;
+      }
+      throw Error(`${response.status} - ${response.statusText} | ${response.data}`);
+    } catch (error) {
+      throw Error(`Fail to isMultisigAddress: ${error}`);
+    }
   }
 }

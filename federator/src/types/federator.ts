@@ -60,7 +60,6 @@ export interface ProcessToHathorTransactionParams extends ProcessToHathorLogPara
   receiver: string;
   amount: BN;
   typeId: string;
-  transactionId: string;
   originChainId: number;
   destinationChainId: number;
 }

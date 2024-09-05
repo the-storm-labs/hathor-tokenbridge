@@ -6,15 +6,17 @@ export class HathorUtxo {
   token: string;
   value: number;
   decoded: decodeInput;
+  spent_by: string;
 
   customData?: CustomUtxoData;
   haveCustomData: boolean;
 
-  constructor(script: string, token?: string, value?: number, decoded?: decodeInput) {
+  constructor(script: string, token?: string, value?: number, decoded?: decodeInput, spent_by?: string) {
     this.script = script;
     this.token = token;
     this.value = value;
     this.decoded = decoded;
+    this.spent_by = spent_by;
     this.haveCustomData = false;
 
     this.decodeScript();
@@ -25,7 +27,7 @@ export class HathorUtxo {
     try {
       const decodedData = script.parseScriptData(buffer).data;
       this.customData = new CustomUtxoData(decodedData);
-      this.haveCustomData = true;
+      this.haveCustomData = this.customData.hasData;
     } catch (error) {
       // If false, we don't have custom data. If true, an unexpected error ocurred, so we log it
       if (error.toString().indexOf('Invalid output script.') == -1) {
@@ -38,22 +40,14 @@ export class HathorUtxo {
 }
 
 class CustomUtxoData {
-  index: number;
-  length: number;
   data: string;
-  dataType: string;
+  hasData = false;
 
   constructor(decodedData: string) {
     if (web3.utils.isAddress(decodedData)) {
-      this.dataType = 'addr';
       this.data = decodedData;
-      return;
+      this.hasData = true;
     }
-
-    this.dataType = decodedData.substring(0, 3);
-    this.index = parseInt(decodedData.substring(3, 4));
-    this.length = parseInt(decodedData.substring(4, 5));
-    this.data = decodedData.substring(5);
   }
 }
 
