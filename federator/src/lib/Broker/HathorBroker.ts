@@ -205,7 +205,7 @@ export class HathorBroker extends Broker {
     const federator = new FederatorHTR(this.config, this.logger, null);
 
     const sender = Web3.utils.keccak256(ogSenderAddress);
-    const thirdTwoBytesSender = sender.substring(0, 42);
+    const thirdTwoBytesSender = Web3.utils.toChecksumAddress(sender.substring(0, 42));
     const idHash = Web3.utils.keccak256(txId);
     const logIndex = 129;
 

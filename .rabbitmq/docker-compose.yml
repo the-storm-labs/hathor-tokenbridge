@@ -2,7 +2,10 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: hathor_rabbitmq_${HATHOR_MULTISIG_ORDER}
+    container_name: hathor_rabbitmq_${HATHOR_MULTISIG_ORDER}
     ports:
+      - "56${HATHOR_MULTISIG_ORDER}2:5672"
+      - "156${HATHOR_MULTISIG_ORDER}2:15672"
       - "56${HATHOR_MULTISIG_ORDER}2:5672"
       - "156${HATHOR_MULTISIG_ORDER}2:15672"
     environment:
@@ -14,6 +17,7 @@ services:
   
   init-rabbitmq:
     image: alpine:3.12
+    container_name: init_rabbitmq_container_${HATHOR_MULTISIG_ORDER}
     container_name: init_rabbitmq_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       - rabbitmq
@@ -38,13 +42,23 @@ services:
       - ./init-rabbitmq.sh:/init-rabbitmq.sh
 
   hathor-wallet:
+    env_file:
+      - .env
     image: toggera/hathor-wallet-rabbitmq:latest
     container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       init-rabbitmq:
         condition: service_healthy
     ports:
-      - "800${HATHOR_MULTISIG_ORDER}:8000"
+      - "8000:8000"
+
+  hathor-federator:
+    image: toggera/hathor-tokenbridge:latest
+    container_name: hathor_tokenbridge
+    depends_on:
+      - hathor-wallet
+    ports:
+      - "5000:5000"
     environment:
       - HEADLESS_SEED_DEFAULT=${HEADLESS_SEED_DEFAULT}
       - HEADLESS_API_KEY=${HEADLESS_API_KEY}
