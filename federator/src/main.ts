@@ -96,10 +96,7 @@ export class Main {
       // TODO uncoment this after tests
       // await this.heartbeat.readLogs();
       await this.runErcRskFederator();
-
-      // for (const sideChainConfig of this.config.sidechain) {
-      //   await this.runErcOtherChainFederator(sideChainConfig);
-      // }
+     
     } catch (err) {
       this.logger.error('Unhandled Error on main.run()', err);
       process.exit(1);
