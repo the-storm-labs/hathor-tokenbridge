@@ -9,45 +9,14 @@ import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 
-type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
-
 export class HathorBroker extends Broker {
   constructor(
     config: ConfigData,
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    transactionSender: TransactionSender,
   ) {
-    super(config, logger, bridgeFactory, federationFactory, transactionSender);
-  }
-
-  getCustomTokenData(inputs, outputs): any {
-    const tokenData = outputs.filter(
-      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
-    );
-
-    const tokens: Token[] = [];
-
-    tokenData.forEach((data) => {
-      const input = inputs.find((inpt) => inpt.token == data.token);
-
-      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
-        throw Error('Invalid transaction, it has more than one token or destination address.');
-      }
-
-      if (tokens.length == 0) {
-        tokens.push({
-          tokenAddress: data.token,
-          senderAddress: input.decoded.address,
-          receiverAddress: data.decoded.address,
-          amount: 0,
-        });
-      }
-
-      tokens[0].amount += data.value;
-    });
-    return tokens[0];
+    super(config, logger, bridgeFactory, federationFactory);
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
@@ -87,30 +56,6 @@ export class HathorBroker extends Broker {
     if (Math.abs(proposalInfo.balances[originalTxTokenData.tokenAddress]) != originalTxTokenData.amount) {
       throw Error('Proposal cannot differ amount from original Tx.');
     }
-
-    // MINT
-
-    // if (!proposalInfo.canMint[originalTxTokenData.tokenAddress]) {
-    //   throw Error('Multisig does not have mint authority.');
-    // }
-
-    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] <= 0) {
-    //   throw Error('Not a mint operation.');
-    // }
-
-    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] != originalTxTokenData.amount) {
-    //   throw Error('Proposal cannot differ amount from original Tx.');
-    // }
-
-    // TRANSFER
-
-    // if (proposalInfo.balances[originalTxTokenData.tokenAddress] == 0) {
-    //   throw Error('Not a mint operation.');
-    // }
-
-    // if (SUM OUTPUTS for receiver address  != originalTxTokenData.amount) {
-    //   throw Error('Proposal cannot differ amount from original Tx.');
-    // }
 
     return true;
   }
@@ -156,6 +101,9 @@ export class HathorBroker extends Broker {
     originalTokenAddress: string,
     txHash: string,
   ) {
+    if (originalTokenAddress.startsWith('0x')) {
+      originalTokenAddress = originalTokenAddress.substring(2);
+    }
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
     const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));

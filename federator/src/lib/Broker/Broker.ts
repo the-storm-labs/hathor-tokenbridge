@@ -7,7 +7,6 @@ import {
   DecodeResponse,
   GetConfirmationResponse,
   GetMySignatureResponse,
-  HathorResponse,
   TransactionTypes,
   SignAndPushResponse,
 } from '../../types';
@@ -28,6 +27,8 @@ const TOKEN_MELT_MASK = 0b00000010;
 const TOKEN_MINT_MASK = 0b00000001;
 const TOKEN_AUTHORITY_MASK = 0b10000000;
 
+type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
+
 export abstract class Broker {
   public logger: LogWrapper;
   public config: ConfigData;
@@ -44,7 +45,6 @@ export abstract class Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    transactionSender: TransactionSender,
   ) {
     this.config = config;
     this.logger = logger;
@@ -53,7 +53,11 @@ export abstract class Broker {
     this.chainConfig = config.sidechain[0];
 
     this.web3ByHost = new Map<string, Web3>();
-    this.transactionSender = transactionSender;
+    this.transactionSender = new TransactionSender(
+      this.getWeb3(process.env.HATHOR_STATE_CONTRACT_HOST_URL),
+      this.logger,
+      this.config,
+    );
 
     this.wallet = HathorWallet.getInstance(this.config, this.logger);
     this.hathorFederationFactory = new HathorFederationFactory();
@@ -415,6 +419,83 @@ export abstract class Broker {
     return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
   }
 
+  protected sumByAddressAndToken(transactions) {
+    const result = {};
+    transactions.forEach((txn) => {
+      const address = txn.decoded.address;
+      const token = txn.token;
+      const key = `${address}:${token}`;
+      if (!result[key]) {
+        result[key] = 0;
+      }
+      result[key] += txn.value;
+    });
+    return result;
+  }
+
+  protected checkOutputs(tx: Data, multiSigAddress: string, receiverAddress: string): boolean {
+    return tx.outputs.every((output) => {
+      const address = output.decoded.address;
+      return address === multiSigAddress || address === receiverAddress;
+    });
+  }
+
+  getCustomTokenData(inputs, outputs): any {
+    const tokenData = outputs.filter(
+      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+    );
+
+    const tokens: Token[] = [];
+
+    tokenData.forEach((data) => {
+      const input = inputs.find((inpt) => inpt.token == data.token);
+
+      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
+        throw Error('Invalid transaction, it has more than one token or destination address.');
+      }
+
+      if (tokens.length == 0) {
+        tokens.push({
+          tokenAddress: data.token,
+          senderAddress: input.decoded.address,
+          receiverAddress: data.decoded.address,
+          amount: 0,
+        });
+      }
+
+      tokens[0].amount += data.value;
+    });
+    return tokens[0];
+  }
+
+  validateTokensOutput(outputs) {
+    const tokenData = outputs.filter(
+      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+    );
+
+    const tokens: Token[] = [];
+
+    tokenData.forEach((data) => {
+      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
+        throw Error('Invalid transaction, it has more than one token or destination address.');
+      }
+    });
+  }
+
+  validateOutputReceiver(outputs) {
+    const tokenData = outputs.filter(
+      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type != 'MultiSig',
+    );
+
+    const tokens: Token[] = [];
+
+    tokenData.forEach((data) => {
+      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
+        throw Error('Invalid transaction, it has more than one token or destination address.');
+      }
+    });
+  }
+
   /**
    * @param {IHistoryTx} tx
    */
@@ -426,14 +507,14 @@ export abstract class Broker {
     /** @type {Record<string, boolean>} */
     const canMelt = {};
     for (const output of tx.outputs) {
-      if (this.isAuthority(output)) {
+      if (this.isAuthority(output.token_data)) {
         continue;
       }
-      balances[output.token] += output.value;
+      balances[output.token] = (balances[output.token] ?? 0) + output.value;
     }
 
     for (const input of tx.inputs) {
-      if (this.isAuthority(input)) {
+      if (this.isAuthority(input.token_data)) {
         if (this.isMint(input.token_data, input.value)) {
           canMint[input.token] = true;
         } else if (this.isMelt(input.token_data, input.value)) {
@@ -441,7 +522,7 @@ export abstract class Broker {
         }
         continue;
       }
-      balances[input.token] -= input.value;
+      balances[input.token] = (balances[input.token] ?? 0) - input.value;
     }
 
     return { balances: balances, canMelt: canMelt, canMint: canMint };

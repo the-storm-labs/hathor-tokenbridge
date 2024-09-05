@@ -15,7 +15,6 @@ export class HathorFederationLogsReader {
   public transactionSender: TransactionSender;
   protected hathorFederationContract: IHathorFederationV1;
   protected chainConfig: ConfigChain;
-  counter: number;
 
   constructor(
     config: ConfigData,
@@ -32,8 +31,6 @@ export class HathorFederationLogsReader {
     this.transactionSender = transactionSender;
 
     this.hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
-    this.counter = 0;
-    this.logger.info(`Counter: ${this.counter}`);
   }
   // Function to handle different event types
   async handleEvent(event) {
@@ -46,13 +43,7 @@ export class HathorFederationLogsReader {
       case 'ProposalSent':
         result = this.handleProposalSent(event);
         if (result.transactionType == TransactionTypes.MELT) {
-          new HathorBroker(
-            this.config,
-            this.logger,
-            this.bridgeFactory,
-            this.federationFactory,
-            this.transactionSender,
-          ).postProcessing(
+          new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory).postProcessing(
             result.sender,
             result.receiver,
             result.value,
@@ -78,28 +69,13 @@ export class HathorFederationLogsReader {
 
     let broker: Broker;
 
-    this.logger.info(`Counter: ${this.counter}`);
-    this.counter += 1;
-
     switch (Number.parseInt(result.transactionType)) {
       case TransactionTypes.MINT:
       case TransactionTypes.TRANSFER:
-        broker = new EvmBroker(
-          this.config,
-          this.logger,
-          this.bridgeFactory,
-          this.federationFactory,
-          this.transactionSender,
-        );
+        broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
         break;
       case TransactionTypes.MELT:
-        broker = new HathorBroker(
-          this.config,
-          this.logger,
-          this.bridgeFactory,
-          this.federationFactory,
-          this.transactionSender,
-        );
+        broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
         break;
     }
 

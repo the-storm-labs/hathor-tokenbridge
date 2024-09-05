@@ -8,6 +8,7 @@ import Federator from './Federator';
 import { ConfigChain } from './configChain';
 import { LogWrapper } from './logWrapper';
 import { HathorFederationLogsReader } from './HathorFederationLogsReader';
+import fs from 'fs';
 
 export default class FederationHTR extends Federator {
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
@@ -28,7 +29,7 @@ export default class FederationHTR extends Federator {
     federationFactory: FederationFactory;
   }): Promise<boolean> {
     const currentBlock = await this.getChainWeb3(process.env.HATHOR_STATE_CONTRACT_HOST_URL).eth.getBlockNumber();
-    const mainChainId = process.env.FEDERATION_CHAINID;
+    const mainChainId = Number.parseInt(process.env.FEDERATION_CHAIN_ID);
     this.logger.upsertContext('Main Chain ID', mainChainId);
 
     this.logger.trace(`Federator Run started currentBlock: ${currentBlock}, currentChainId: ${mainChainId}`);
@@ -52,7 +53,7 @@ export default class FederationHTR extends Federator {
       return false;
     }
 
-    let fromBlock = this.getLastBlock(Number.parseInt(process.env.FEDERATION_CHAIN), 1234);
+    let fromBlock = this.getLastBlockFromEnv(Number.parseInt(process.env.FEDERATION_CHAIN_ID), 31);
     if (fromBlock >= toBlock) {
       this.logger.warn(
         `Current chain ${mainChainId} Height ${toBlock} is the same or lesser than the last block processed ${fromBlock}`,
@@ -62,6 +63,8 @@ export default class FederationHTR extends Federator {
     fromBlock = fromBlock + 1;
     this.logger.debug('Running from Block', fromBlock);
     await this.getLogsAndProcess(currentBlock, fromBlock, toBlock, bridgeFactory, federationFactory, transactionSender);
+
+    this._saveProgress(this.getLastBlockPath(mainChainId, 31), toBlock);
 
     return true;
   }

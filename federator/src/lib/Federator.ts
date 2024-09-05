@@ -89,6 +89,21 @@ export default abstract class Federator {
     return fromBlock;
   }
 
+  getLastBlockFromEnv(mainChainId: number, sideChainId: number): number {
+    let fromBlock: number;
+    const originalFromBlock = Number.parseInt(process.env.FEDERATION_FROM_BLOCK) || 0;
+    try {
+      fromBlock = parseInt(fs.readFileSync(this.getLastBlockPath(mainChainId, sideChainId), 'utf8'));
+    } catch (err) {
+      fromBlock = originalFromBlock;
+    }
+    if (fromBlock < originalFromBlock) {
+      fromBlock = originalFromBlock;
+    }
+    return fromBlock;
+  }
+
+
   private checkStoragePath() {
     if (!fs.existsSync(this.config.storagePath)) {
       fs.mkdirSync(this.config.storagePath, {

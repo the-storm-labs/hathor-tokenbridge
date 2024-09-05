@@ -48,13 +48,7 @@ export class HathorService {
     tokenAddress: string,
     txHash: string,
   ) {
-    const broker = new EvmBroker(
-      this.config,
-      this.logger,
-      this.bridgeFactory,
-      this.federationFactory,
-      this.transactionSender,
-    );
+    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
     await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
   }
 
@@ -234,13 +228,7 @@ export class HathorService {
     const isHathorToEvm = tx.haveCustomData();
 
     if (isHathorToEvm) {
-      const broker = new HathorBroker(
-        this.config,
-        this.logger,
-        this.bridgeFactory,
-        this.federationFactory,
-        this.transactionSender,
-      );
+      const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
 
       const confirmed = await broker.isTxConfirmed(tx.tx_id);
       if (!confirmed) {
