@@ -4,7 +4,6 @@ import { ConfigData } from '../config';
 import { HathorException, CreateProposalResponse, TransactionTypes } from '../../types';
 import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
-import TransactionSender from '../TransactionSender';
 
 export class EvmBroker extends Broker {
   constructor(
@@ -12,9 +11,8 @@ export class EvmBroker extends Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    transactionSender: TransactionSender,
   ) {
-    super(config, logger, bridgeFactory, federationFactory, transactionSender);
+    super(config, logger, bridgeFactory, federationFactory);
   }
 
   async sendTokens(
@@ -39,7 +37,7 @@ export class EvmBroker extends Broker {
   }
 
   async validateTx(txHex: string, txHash: string): Promise<boolean> {
-    const hathorTx = await this.decodeTxHex(txHex);
+    const proposalTx = await this.decodeTxHex(txHex);
     const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
     const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
     const events = await bridge.getPastEvents('Cross', this.config.sidechain[0].chainId, {
@@ -53,47 +51,52 @@ export class EvmBroker extends Broker {
       return false;
     }
 
-    const evmTranslatedToken = await bridge.EvmToHathorTokenMap(event.returnValues['_tokenAddress']);
+    const tokenAddress = event.returnValues['_tokenAddress'];
 
-    const txOutput = hathorTx.outputs.find((o) => o.token === evmTranslatedToken);
+    const [destinationChainTokenAddress, originalChainId] = await this.getSideChainTokenAddress(tokenAddress);
 
-    if (!txOutput) {
-      this.logger.error(`Invalid tx. Unable to find token on hathor tx outputs. HEX: ${txHex} | HASH: ${txHash}`);
-      return false;
-    }
+    const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
 
-    if (!(txOutput.decoded.address === event.returnValues['_to'])) {
-      this.logger.error(
-        `txHex ${txHex} address ${txOutput.decoded.address} is not the same as txHash ${txHash} address ${event.returnValues['_to']}.`,
-      );
-      return false;
-    }
-
-    const originalToken = await bridge.HathorToEvmTokenMap(evmTranslatedToken);
-
-    const tokenDecimals = await this.getTokenDecimals(originalToken.tokenAddress, originalToken.originChainId);
     const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
 
-    if (convertedQuantity <= 0) {
-      this.logger.error(
-        `The amount transfered can't be less than 0.01 HTR. OG Qtd: ${convertedQuantity}, Token decimals ${tokenDecimals}.`,
-      );
-      false;
+    const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
+
+    const proposalInfo = await this.getTransactionInfo(proposalTx);
+
+    this.validateTokensOutput(proposalTx.outputs);
+    this.validateOutputReceiver(proposalTx.outputs);
+
+    if (isTokenEvmNative) {
+      // MINT
+      if (!proposalInfo.canMint[destinationChainTokenAddress]) {
+        throw Error('Multisig does not have mint authority.');
+      }
+      if (proposalInfo.balances[destinationChainTokenAddress] <= 0) {
+        throw Error('Not a mint operation.');
+      }
+      if (proposalInfo.balances[destinationChainTokenAddress] != convertedQuantity) {
+        throw Error('Proposal cannot differ amount from original Tx.');
+      }
+    } else {
+      // TRANSFER
+      if (proposalInfo.balances[destinationChainTokenAddress] != 0) {
+        throw Error('Not a transfer operation.');
+      }
+
+      const sumOutputs = this.sumByAddressAndToken(proposalTx.outputs);
+
+      if (sumOutputs[`${event.returnValues['_to']}:${destinationChainTokenAddress}`] != convertedQuantity) {
+        throw Error('Proposal cannot differ amount from original Tx.');
+      }
     }
 
-    if (!(txOutput.value === convertedQuantity)) {
-      this.logger.error(
-        `txHex ${txHex} value ${txOutput.value} is not the same as txHash ${txHash} value ${convertedQuantity}.`,
-      );
-      return false;
-    }
     return true;
   }
 
   async sendEvmNativeTokenProposal(receiverAddress: string, qtd: string, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
     const tokenDecimals = await this.getTokenDecimals(token, this.config.mainchain.chainId);
-    const destinationToken = await this.getSideChainTokenAddress(token);
+    const [destinationToken] = await this.getSideChainTokenAddress(token);
     const data = {
       address: `${receiverAddress}`,
       amount: this.convertToHathorDecimals(qtd, tokenDecimals),
