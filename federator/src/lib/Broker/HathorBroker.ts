@@ -39,7 +39,7 @@ export class HathorBroker extends Broker {
     const proposalTx = await this.decodeTxHex(txHex);
     const originalTx = hathorTransaction as Data;
 
-    const proposalInfo = await this.getTransactionInfo(proposalTx);
+    const proposalInfo = this.getTransactionInfo(proposalTx);
 
     const originalTxTokenData = this.getCustomTokenData(originalTx.inputs, originalTx.outputs);
 

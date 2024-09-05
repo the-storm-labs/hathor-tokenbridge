@@ -61,7 +61,7 @@ export class EvmBroker extends Broker {
 
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
-    const proposalInfo = await this.getTransactionInfo(proposalTx);
+    const proposalInfo = this.getTransactionInfo(proposalTx);
 
     this.validateTokensOutput(proposalTx.outputs);
     this.validateOutputReceiver(proposalTx.outputs);
