@@ -20,7 +20,7 @@ import { BridgeFactory } from './contracts/BridgeFactory';
 import { FederationFactory } from './contracts/FederationFactory';
 import { HathorWallet } from './lib/HathorWallet';
 import TransactionSender from './lib/TransactionSender';
-import FederationHTR from './lib/FederationHTR';
+import HathorMultisigManager from './lib/HathorMultisigManager';
 import FederatorHTR from './lib/FederatorHTR';
 import Web3 from 'web3';
 
@@ -29,7 +29,7 @@ export class Main {
   endpoint: any;
   metricCollector: MetricCollector;
   rskFederator: FederatorHTR;
-  hathorFederation: FederationHTR;
+  hathorFederation: HathorMultisigManager;
   config: Config;
   heartbeat: Heartbeat;
   heartBeatScheduler: Scheduler;
@@ -58,7 +58,7 @@ export class Main {
       this.metricCollector,
     );
 
-    this.hathorFederation = new FederationHTR(
+    this.hathorFederation = new HathorMultisigManager(
       this.config,
       Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
       this.metricCollector,

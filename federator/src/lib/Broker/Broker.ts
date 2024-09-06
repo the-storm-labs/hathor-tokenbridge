@@ -480,6 +480,12 @@ export abstract class Broker {
         throw Error('Invalid transaction, it has more than one token or destination address.');
       }
     });
+
+    const htrData = outputs.filter((output) => output.token && output.spent_by == null && output.token == '00');
+
+    if (htrData.length > 0) {
+      throw Error('Invalid transaction, HTR transfer forbidden');
+    }
   }
 
   validateOutputReceiver(outputs) {
