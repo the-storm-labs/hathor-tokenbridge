@@ -21,7 +21,6 @@ import {
   ProcessToHathorTransactionParams,
   VoteHathorTransactionParams,
 } from '../types/federator';
-import { HathorFederationFactory } from '../contracts/HathorFederationFactory';
 
 export default class FederatorHTR extends Federator {
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {

@@ -61,7 +61,7 @@ export class EvmBroker extends Broker {
 
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
-    const proposalInfo = await this.getTransactionInfo(proposalTx);
+    const proposalInfo = this.getTransactionInfo(proposalTx);
 
     this.validateTokensOutput(proposalTx.outputs);
     this.validateOutputReceiver(proposalTx.outputs);
@@ -121,7 +121,7 @@ export class EvmBroker extends Broker {
   async sendHathorNativeTokenProposal(receiverAddress: string, qtd: string, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
     const tokenDecimals = await this.getTokenDecimals(token, this.config.sidechain[0].chainId);
-    const destinationToken = await this.getSideChainTokenAddress(token);
+    const [destinationToken] = await this.getSideChainTokenAddress(token);
 
     const output = {
       address: `${receiverAddress}`,

@@ -8,9 +8,8 @@ import Federator from './Federator';
 import { ConfigChain } from './configChain';
 import { LogWrapper } from './logWrapper';
 import { HathorFederationLogsReader } from './HathorFederationLogsReader';
-import fs from 'fs';
 
-export default class FederationHTR extends Federator {
+export default class HathorMultisigManager extends Federator {
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
     super(config, logger, metricCollector);
   }
