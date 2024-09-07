@@ -233,6 +233,9 @@ export class TransactionSender {
 
       if (receipt.status) {
         this.logger.info(`Transaction Successful txHash:${receipt.transactionHash} blockNumber:${receipt.blockNumber}`);
+        setTimeout(() => {
+          this.logger.info(`Waiting for transaction to be mined.`);
+        }, 10000);
       } else {
         this.logger.error('Transaction Receipt Status Failed', receipt);
         this.logger.error('RawTx that failed Status', rawTx);
