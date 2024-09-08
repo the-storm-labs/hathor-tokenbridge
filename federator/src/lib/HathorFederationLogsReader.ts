@@ -107,17 +107,19 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    this.logger.info('ProposalSigned Event:');
-    this.logger.info(`Transaction ID: ${transactionId}`);
-    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
-    this.logger.info(`Transaction Hash: ${transactionHash}`);
-    this.logger.info(`Value: ${value}`);
-    this.logger.info(`Sender: ${sender}`);
-    this.logger.info(`Receiver: ${receiver}`);
-    this.logger.info(`Transaction Type: ${transactionType}`);
-    this.logger.info(`Member: ${member}`);
-    this.logger.info(`Signed: ${signed}`);
-    this.logger.info(`Signature: ${signature}`);
+    this.logger.info(
+      `ProposalSigned Event:
+       Transaction ID: ${transactionId}
+       Original Token Address: ${originalTokenAddress}
+       Transaction Hash: ${transactionHash}
+       Value: ${value}
+       Sender: ${sender}
+       Receiver: ${receiver}
+       Transaction Type: ${transactionType}
+       Member: ${member}
+       Signed: ${signed}
+       Signature: ${signature}`,
+    );
 
     return {
       transactionId,
@@ -149,16 +151,18 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    this.logger.info('ProposalSent Event:');
-    this.logger.info(`Transaction ID: ${transactionId}`);
-    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
-    this.logger.info(`Transaction Hash: ${transactionHash}`);
-    this.logger.info(`Value: ${value}`);
-    this.logger.info(`Sender: ${sender}`);
-    this.logger.info(`Receiver: ${receiver}`);
-    this.logger.info(`Transaction Type: ${transactionType}`);
-    this.logger.info(`Processed: ${processed}`);
-    this.logger.info(`Hathor Tx ID: ${hathorTxId}`);
+    this.logger.info(
+      `ProposalSent Event:
+       Transaction ID: ${transactionId}
+       Original Token Address: ${originalTokenAddress}
+       Transaction Hah: ${transactionHash}
+       Value: ${value}
+       Sender: ${sender}
+       Receiver: ${receiver}
+       Transaction Type: ${transactionType}
+       Processed: ${processed}
+       Hathor Tx ID: ${hathorTxId}`,
+    );
 
     return {
       transactionId,
@@ -182,15 +186,17 @@ export class HathorFederationLogsReader {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
     txHex = (txHex as string).substring(2);
-    this.logger.info('TransactionProposed Event:');
-    this.logger.info(`Transaction ID: ${transactionId}`);
-    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
-    this.logger.info(`Transaction Hash: ${transactionHash}`);
-    this.logger.info(`Value: ${value}`);
-    this.logger.info(`Sender: ${sender}`);
-    this.logger.info(`Receiver: ${receiver}`);
-    this.logger.info(`Transaction Type: ${transactionType}`);
-    this.logger.info(`Transaction Hex: ${txHex}`);
+    this.logger.info(
+      `TransactionProposed Event:
+       Transaction ID: ${transactionId}
+       Original Token Address: ${originalTokenAddress}
+       Transaction Hash: ${transactionHash}
+       Value: ${value}
+       Sender: ${sender}
+       Receiver: ${receiver}
+       Transaction Type: ${transactionType}
+       Transaction Hex: ${txHex}`,
+    );
 
     return { transactionId, txHex, originalTokenAddress, transactionHash, value, sender, receiver, transactionType };
   }
@@ -202,14 +208,16 @@ export class HathorFederationLogsReader {
     if (transactionType != TransactionTypes.MELT) {
       originalTokenAddress = this.hathorFederationContract.getAddress(originalTokenAddress);
     }
-    this.logger.info('TransactionFailed Event:');
-    this.logger.info(`Transaction ID: ${transactionId}`);
-    this.logger.info(`Original Token Address: ${originalTokenAddress}`);
-    this.logger.info(`Transaction Hash: ${transactionHash}`);
-    this.logger.info(`Value: ${value}`);
-    this.logger.info(`Sender: ${sender}`);
-    this.logger.info(`Receiver: ${receiver}`);
-    this.logger.info(`Transaction Type: ${transactionType}`);
+    this.logger.info(
+      `TransactionFailed Event: \n
+       Transaction ID: ${transactionId} \n
+       Original Token Address: ${originalTokenAddress} \n
+       Transaction Hash: ${transactionHash} \n
+       Value: ${value} \n
+       Sender: ${sender} \n
+       Receiver: ${receiver} \n
+       Transaction Type: ${transactionType}`,
+    );
 
     return {
       transactionId,
