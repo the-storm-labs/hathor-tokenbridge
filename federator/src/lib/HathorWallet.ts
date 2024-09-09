@@ -31,7 +31,6 @@ export class HathorWallet {
     this.chainConfig = config.sidechain[0];
     this.wallets = new Map<string, Wallet>();
     this.wallets.set('multisig', { ready: false, lastCheck: new Date(0) });
-    this.wallets.set('single', { ready: false, lastCheck: new Date(0) });
   }
 
   public static getInstance(config: ConfigData, logger: LogWrapper): HathorWallet {
@@ -43,19 +42,17 @@ export class HathorWallet {
 
   public async areWalletsReady(): Promise<[boolean, EventEmmiter]> {
     const multisig = this.wallets.get('multisig');
-    const single = this.wallets.get('single');
     const currentTime = new Date();
     const oneHourAgo = currentTime.getTime() - 10 * 60 * 1000;
 
     // The ideia is to do this asyncronously, but for some reason,
     // it is not working on the google cloud, so it stays syncronous for the time being
-    if (multisig.lastCheck.getTime() < oneHourAgo || single.lastCheck.getTime() < oneHourAgo) {
+    if (multisig.lastCheck.getTime() < oneHourAgo) {
       const multisigReady = await this.isReady(true);
-      const singleReady = await this.isReady(false);
-      return [multisigReady && singleReady, this.walletEmmiter];
+      return [multisigReady, this.walletEmmiter];
     }
 
-    if (multisig.ready && single.ready) {
+    if (multisig.ready) {
       return [true, null];
     }
 
@@ -65,7 +62,7 @@ export class HathorWallet {
   private setWalletReady(wallet: string) {
     this.wallets.set(wallet, { ready: true, lastCheck: new Date() });
     this.logger.info(`Setting ${wallet} wallet as ready`);
-    if (this.wallets.get('multisig').ready && this.wallets.get('single').ready) {
+    if (this.wallets.get('multisig').ready) {
       this.logger.info('All wallets are ready');
       this.logger.info(`From HathorWallet.ts, we have ${this.walletEmmiter.listenerCount('wallets-ready')} listeners`);
       this.walletEmmiter.emit('wallets-ready');

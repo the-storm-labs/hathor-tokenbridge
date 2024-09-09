@@ -1,6 +1,6 @@
 import { LogWrapper } from './logWrapper';
 import { ConfigData } from './config';
-import { PubSub, Subscription } from '@google-cloud/pubsub';
+import { Message, PubSub, Subscription } from '@google-cloud/pubsub';
 import * as rabbitmq from 'amqplib';
 import { HathorTx } from '../types/HathorTx';
 import { HathorUtxo } from '../types/HathorUtxo';
@@ -75,93 +75,86 @@ export class HathorService {
     try {
       const conn = await rabbitmq.connect(process.env.RABBITMQ_URL);
 
-      if (conn) {
-        this.logger.info('Connected to rabbitmq');
+      if (!conn) {
+        this.logger.info('Failed to connected to rabbitmq');
+        return;
       }
 
+      this.logger.info('Connected to rabbitmq');
       const channel = await conn.createChannel();
       await channel.assertQueue(queue, { deadLetterExchange: 'dlx_exchange', deadLetterRoutingKey: 'dlq_queue' });
-
-      channel.consume(queue, async (message) => {
-        if (message !== null) {
-          try {
-            const response = await this.parseHathorLogs(JSON.parse(message.content.toString()));
-            if (response) {
-              channel.ack(message);
-              return;
-            }
-            channel.reject(message, false);
-          } catch (error) {
-            this.logger.error(`Fail to processing hathor event: ${error}`);
-            let isNonRetriable = false;
-            if (error instanceof HathorException) {
-              const originalError = (error as HathorException).getOriginalMessage();
-
-              for (let index = 0; index < this.nonRetriableErrors.length; index++) {
-                const rgxError = this.nonRetriableErrors[index];
-                if (originalError.match(rgxError)) {
-                  isNonRetriable = true;
-                  break;
-                }
-              }
-
-              if (isNonRetriable) {
-                channel.ack(message);
-                return;
-              }
-            }
-            channel.reject(message, false);
-          }
-        } else {
-          this.logger.error('Consumer cancelled by server');
-        }
-      });
+      this.rabbitConsume(channel, queue);
     } catch (error) {
       this.logger.error(error);
     }
   }
 
-  private async listenToPubSubEventQueue() {
-    const subscription = await this.getOrCreateSubscrition();
+  private rabbitConsume(channel: rabbitmq.Channel, queue: string) {
+    channel.consume(queue, async (message) => {
+      if (!message || message == null) {
+        this.logger.error('Consumer cancelled by server');
+        return;
+      }
 
-    subscription.on('message', async (message) => {
       try {
-        const response = await this.parseHathorLogs(JSON.parse(message.data.toString()));
+        const response = await this.parseHathorLogs(JSON.parse(message.content.toString()));
         if (response) {
-          message.ack();
+          channel.ack(message);
           return;
         }
-        message.nack();
-        return;
       } catch (error) {
-        // TODO retry policy if fails to parse and resolve
         this.logger.error(`Fail to processing hathor event: ${error}`);
-        let isNonRetriable = false;
         if (error instanceof HathorException) {
-          const originalError = (error as HathorException).getOriginalMessage();
-
-          for (let index = 0; index < this.nonRetriableErrors.length; index++) {
-            const rgxError = this.nonRetriableErrors[index];
-            if (originalError.match(rgxError)) {
-              isNonRetriable = true;
-              break;
-            }
-          }
-
-          if (isNonRetriable) {
-            message.ack();
+          if (this.isNonRetriableError((error as HathorException).getOriginalMessage())) {
+            channel.ack(message);
             return;
           }
         }
-
-        message.nack();
       }
+
+      channel.reject(message, false);
     });
+  }
+
+  private async listenToPubSubEventQueue() {
+    const subscription = await this.getOrCreateSubscrition();
+    subscription.on('message', this.pubSubConsume);
     subscription.on('error', (error) => {
       this.logger.error(
         `Unable to subscribe to topic hathor-federator-${this.chainConfig.multisigOrder}. Make sure it exists. Error: ${error}`,
       );
     });
+  }
+
+  private async pubSubConsume(message: Message) {
+    try {
+      const response = await this.parseHathorLogs(JSON.parse(message.data.toString()));
+      if (response) {
+        message.ack();
+        return;
+      }
+    } catch (error) {
+      this.logger.error(`Fail to processing hathor event: ${error}`);
+      if (error instanceof HathorException) {
+        if (this.isNonRetriableError((error as HathorException).getOriginalMessage())) {
+          message.ack();
+          return;
+        }
+      }
+    }
+    message.nack();
+  }
+
+  private isNonRetriableError(errorMessage) {
+    let isNonRetriable = false;
+    for (let index = 0; index < this.nonRetriableErrors.length; index++) {
+      const rgxError = this.nonRetriableErrors[index];
+      if (errorMessage.match(rgxError)) {
+        isNonRetriable = true;
+        break;
+      }
+    }
+    return isNonRetriable;
   }
 
   private async getOrCreateSubscrition(): Promise<Subscription> {

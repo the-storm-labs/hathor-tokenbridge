@@ -1,12 +1,12 @@
-// How to run the script: npx hardhat run ./hardhat/script/addHathorToken.js --network mumbai
+// How to run the script: npx hardhat run ./hardhat/script/addHathorToken.js --network sepolia
 const hre = require("hardhat");
 
 async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
   const transactionEtherValue = 0;
-  const mainToken = "0x0280f915ce595ec0d3457f89a0eba554999ec273";
-  const hathorToken = "000001f8107c19b57397acb4d44d66208015b6c0eb6cbc3c46651c6fc1e43cdd";
+  //const mainToken = "0x5C2b6fd29BA6CfC27858fAE03aAc5eac14e5081D";
+  const hathorToken = "000001ffde91ce936aec3cb7421214599b771225095c7bba6d4a93b7f4d33f47";
 
   const Bridge = await deployments.get('Bridge');
   const BridgeProxy = await deployments.get('BridgeProxy');
@@ -14,6 +14,8 @@ async function main() {
 
   const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
+
+  const mainToken = await bridge.methods.uidToAddress(hathorToken).call({ from: deployer });
 
   const methodCallAddHathorToken = await bridge.methods.addHathorToken(31, mainToken, hathorToken);
   const result = await methodCallAddHathorToken.call({ from: MultiSigWallet.address });
@@ -29,9 +31,6 @@ async function main() {
   });
 
   console.log("Transaction worked, member added, txHash:", receipt.transactionHash);
-
-  // const tx = await bridge.methods.uidToAddress(hathorToken).call({ from: deployer });
-  // console.log(`uid mapped to ${tx}`);
 
   const evmTokenAddress = await bridge.methods.HathorToEvmTokenMap(hathorToken).call({ from: deployer });
   console.log(`EVM Token Address ${evmTokenAddress.tokenAddress} ${evmTokenAddress.originChainId}`);

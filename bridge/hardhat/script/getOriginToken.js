@@ -1,10 +1,9 @@
-// How to run the script: npx hardhat run ./hardhat/script/createHathorToken.js --network sepolia
+// How to run the script: npx hardhat run ./hardhat/script/getOriginToken.js --network sepolia
 const hre = require("hardhat");
 
 async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
-
 
   const Bridge = await deployments.get('Bridge');
   const BridgeProxy = await deployments.get('BridgeProxy');
@@ -13,14 +12,14 @@ async function main() {
   const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
 
-  const hathorAddr = '000001ffde91ce936aec3cb7421214599b771225095c7bba6d4a93b7f4d33f47';
+  const hathorAddr = '000001f8107c19b57397acb4d44d66208015b6c0eb6cbc3c46651c6fc1e43cdd';
 
   const addrFromToken = await bridge.methods.uidToAddress(hathorAddr).call({ from: deployer });
 
   const tokens = [
     {
-      name: 'Hathor Native Token (hNT)',
-      symbol: 'hNT',
+      name: 'BogusC Coin (hBCC)',
+      symbol: 'hBCC',
       typeId: 1,
       originalHathorAddress: hathorAddr,
       originalTokenAddress: addrFromToken,
@@ -35,26 +34,12 @@ async function main() {
     console.log("\nBridgeProxy", BridgeProxy.address);
     console.log("\nMultiSigWallet", MultiSigWallet.address);
 
-    const methodCallCreateSideToken = bridge.methods.createSideToken(
-      token.typeId,
-      token.originalTokenAddress,
-      6,
-      token.symbol,
-      token.name,
-      token.chainId
-    );
-    const result = await methodCallCreateSideToken.call({ from: MultiSigWallet.address});
-    console.log("Method call result", result);
 
-    const receipt = await multiSigContract.methods.submitTransaction(
-      BridgeProxy.address,
-      0,
-      methodCallCreateSideToken.encodeABI()
-    ).send({
-      from: deployer,
-      gasLimit: 3000000
-    });
-    console.log("Transaction worked", receipt.transactionHash);
+    const mappedTokenAddress = await bridge.methods.sideTokenByOriginalToken(31, "0x0280f915ce595ec0d3457f89a0eba554999ec273").call({from: MultiSigWallet.address});
+    console.log("Mapped Token address for", token.name, ":", mappedTokenAddress);
+
+
+
   }
 
   console.log("finish");
