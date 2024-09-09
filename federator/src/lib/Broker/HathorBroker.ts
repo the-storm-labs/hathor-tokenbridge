@@ -264,7 +264,6 @@ export class HathorBroker extends Broker {
   }
 
   public async isMultisigAddress(address: string) {
-    // TODO Provide cache strategy
     try {
       const wallet = HathorWallet.getInstance(this.config, this.logger);
       const response = await wallet.requestWallet<HathorResponse>(false, 'multi', 'wallet/address-index', null, {
