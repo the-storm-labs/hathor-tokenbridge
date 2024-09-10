@@ -2,40 +2,52 @@
    "type": "wallet:new-tx",
    "walletId": "multi",
    "data": {
-      "tx_id": "00000fe08c0b04da24895166c7ebadb249d9138f13cc171074aa8e2a81918922",
+      "tx_id": "00000a661a2c11ce3a809fccc47995cffc68005805d49168b905ce59728ddad9",
       "version": 1,
-      "weight": 19.13808973179251,
-      "timestamp": 1725399466,
+      "weight": 19.38732763575656,
+      "timestamp": 1725995141,
       "is_voided": false,
       "inputs": [
          {
-            "value": 1724,
+            "value": 1705,
             "token_data": 0,
-            "script": "dqkUOH3NFnIkunhf5GSVsUHmY2vMYCeIrA==",
+            "script": "dqkU7dTTEBOB6l5x3N0pvmmIYxCXgm+IrA==",
             "decoded": {
                "type": "P2PKH",
-               "address": "WTpjRV7XrnEs1nRReyakSgE9up4CuGoEBH",
+               "address": "WkMZyhEaoaeQACE5tYjydvFaoLRBxAK8G4",
                "timelock": null
             },
             "token": "00",
-            "tx_id": "00000000b1cc091f2370c3ccd0901fd209556dfa7718cd0a8fadd2b87f7a9f49",
-            "index": 2
+            "tx_id": "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
+            "index": 0
          },
          {
-            "value": 49,
+            "value": 1000,
             "token_data": 1,
-            "script": "dqkUOH3NFnIkunhf5GSVsUHmY2vMYCeIrA==",
+            "script": "dqkU7dTTEBOB6l5x3N0pvmmIYxCXgm+IrA==",
             "decoded": {
                "type": "P2PKH",
-               "address": "WTpjRV7XrnEs1nRReyakSgE9up4CuGoEBH",
+               "address": "WkMZyhEaoaeQACE5tYjydvFaoLRBxAK8G4",
                "timelock": null
             },
-            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
-            "tx_id": "00000000b1cc091f2370c3ccd0901fd209556dfa7718cd0a8fadd2b87f7a9f49",
-            "index": 3
+            "token": "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
+            "tx_id": "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
+            "index": 1
          }
       ],
       "outputs": [
+         {
+            "value": 970,
+            "token_data": 1,
+            "script": "dqkUqoGMo8Wxr6utc+CoJoxFTnHVGXCIrA==",
+            "decoded": {
+               "type": "P2PKH",
+               "address": "WeDawncK73U6B4NvDCPzwjeiD1DGUVmYX1",
+               "timelock": null
+            },
+            "token": "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
+            "spent_by": null
+         },
          {
             "value": 1,
             "token_data": 0,
@@ -45,31 +57,19 @@
             "spent_by": null
          },
          {
-            "value": 1723,
+            "value": 1704,
             "token_data": 0,
-            "script": "dqkUxKfkUkOAqXile1+GmXlU1btOKLmIrA==",
+            "script": "dqkUqoGMo8Wxr6utc+CoJoxFTnHVGXCIrA==",
             "decoded": {
                "type": "P2PKH",
-               "address": "WgbrSrmHJDzgNmSAB8izStTfLqfMBo8BzS",
+               "address": "WeDawncK73U6B4NvDCPzwjeiD1DGUVmYX1",
                "timelock": null
             },
             "token": "00",
             "spent_by": null
          },
          {
-            "value": 48,
-            "token_data": 1,
-            "script": "dqkUxKfkUkOAqXile1+GmXlU1btOKLmIrA==",
-            "decoded": {
-               "type": "P2PKH",
-               "address": "WgbrSrmHJDzgNmSAB8izStTfLqfMBo8BzS",
-               "timelock": null
-            },
-            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
-            "spent_by": null
-         },
-         {
-            "value": 1,
+            "value": 30,
             "token_data": 1,
             "script": "qRTddUyEFtKdLC8i0pafRrAcS4p3A4c=",
             "decoded": {
@@ -77,13 +77,13 @@
                "address": "wfpPn8ArZKVw9Qnc6oz3t6xcfS6WZjtk67",
                "timelock": null
             },
-            "token": "00000d22ea79269e96b4797dc9fa8ac0d261fce7c3b55a23866a74d74eb828d2",
+            "token": "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
             "spent_by": null
          }
       ],
       "parents": [
-         "00003f123c48aa678eb5f6176ad7126fecc822a3c3a65ccae44e7ad148d8b4c6",
-         "0000167681b42ad3e8c06c7723bf69a0fa647f857ca2d2b533503433efe962ee"
+         "00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175",
+         "00004fa97b2ac34149070d0be55d18658a841b288139f5c8875af98e82d8aeb5"
       ],
       "first_block": null,
       "processingStatus": "finished"
