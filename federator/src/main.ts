@@ -60,7 +60,7 @@ export class Main {
 
     this.hathorFederation = new HathorMultisigManager(
       this.config,
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
+      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_SIDE),
       this.metricCollector,
     );
   }

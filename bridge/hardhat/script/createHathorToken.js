@@ -13,14 +13,14 @@ async function main() {
   const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
 
-  const hathorAddr = '000001ffde91ce936aec3cb7421214599b771225095c7bba6d4a93b7f4d33f47';
+  const hathorAddr = '00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175';
 
   const addrFromToken = await bridge.methods.uidToAddress(hathorAddr).call({ from: deployer });
 
   const tokens = [
     {
-      name: 'Hathor Native Token (hNT)',
-      symbol: 'hNT',
+      name: 'Hathor Native Token 2 (hNT2)',
+      symbol: 'hNT2',
       typeId: 1,
       originalHathorAddress: hathorAddr,
       originalTokenAddress: addrFromToken,
@@ -38,7 +38,7 @@ async function main() {
     const methodCallCreateSideToken = bridge.methods.createSideToken(
       token.typeId,
       token.originalTokenAddress,
-      6,
+      18,
       token.symbol,
       token.name,
       token.chainId
@@ -55,6 +55,19 @@ async function main() {
       gasLimit: 3000000
     });
     console.log("Transaction worked", receipt.transactionHash);
+
+    const methodCallAddHathorToken = await bridge.methods.addHathorToken(31, addrFromToken, hathorAddr);
+
+    const receipt1 = await multiSigContract.methods.submitTransaction(
+      BridgeProxy.address,
+      0,
+      methodCallAddHathorToken.encodeABI()
+    ).send({
+      from: deployer,
+      gasLimit: 3000000
+    });
+
+    console.log("Transaction worked", receipt1.transactionHash);
   }
 
   console.log("finish");

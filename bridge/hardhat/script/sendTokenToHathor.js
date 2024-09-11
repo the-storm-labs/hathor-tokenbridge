@@ -1,4 +1,4 @@
-// How to run the script: npx hardhat run ./hardhat/script/sendTokenToHathor.js --network sepolia
+// How to run the script: npx hardhat run ./hardhat/script/sendTokenToHathor.js --network arbitrum
 const hre = require('hardhat');
 
 async function main() {
