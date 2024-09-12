@@ -11,11 +11,13 @@ async function main() {
     const BridgeProxy = await deployments.get('BridgeProxy');
     const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address)
 
+    const hash = '0x68B0FBDEC63E7C39ACD15C2214062E56E62AB19EA0CE9BECEF9260988BA98510';
+
     const claim = {
         to: '0xCC3CF44397Daa4572CDb20f72dee5700507454E4',
-		amount: '9700000000000000000',
-		blockHash: '0xa68c6190f03abf7a641654c74b47ad9de32a214208d25bd604054b2729b0531a',
-		transactionHash: '0xa68c6190f03abf7a641654c74b47ad9de32a214208d25bd604054b2729b0531a',
+		amount: '10000000000000000',
+		blockHash: hash,
+		transactionHash: hash,
 		logIndex: 129,
 		originChainId: 31,
     }

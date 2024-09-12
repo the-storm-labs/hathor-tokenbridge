@@ -201,8 +201,10 @@ export class HathorService {
     const isHathorToEvm = tx.haveCustomData();
 
     if (isHathorToEvm) {
-      this.sendTokensToEvm(tx);
+      return await this.sendTokensToEvm(tx);
     }
+
+    return true;
   }
 
   castDataToTx(data): HathorTx {

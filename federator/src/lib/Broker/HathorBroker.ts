@@ -177,13 +177,8 @@ export class HathorBroker extends Broker {
     });
 
     const isTransactionVotedOrProcessed = await this.isTransactionVotedOrProcessed(
-      receiverAddress,
-      amount,
       idHash,
       idHash,
-      logIndex,
-      this.config.sidechain[0].chainId,
-      this.config.mainchain.chainId,
       tokenAddress,
       transactionId,
       federatorAddress,
@@ -214,30 +209,14 @@ export class HathorBroker extends Broker {
   }
 
   async isTransactionVotedOrProcessed(
-    receiver: string,
-    amount: BN,
     blockHash: string,
     transactionHash: string,
-    logIndex: number,
-    originChainId: number,
-    destinationChainId: number,
     tokenAddress: string,
     txId: string,
     federatorAddress: string,
   ): Promise<boolean> {
-    const dataToHash = {
-      to: receiver,
-      amount: amount,
-      blockHash: blockHash,
-      transactionHash: transactionHash,
-      logIndex: logIndex,
-      originChainId: originChainId,
-      destinationChainId: destinationChainId,
-    };
-    this.logger.info('===dataToHash===', dataToHash);
-    const bridge = await this.bridgeFactory.createInstance(this.config.mainchain);
-    const transactionDataHash = await bridge.getTransactionDataHash(dataToHash);
-    const wasProcessed = await bridge.getProcessed(transactionDataHash);
+    const federation = await this.federationFactory.createInstance(this.config.mainchain, this.chainConfig.federation);
+    const wasProcessed = await federation.transactionWasProcessed(txId);
     if (wasProcessed) {
       this.logger.info(
         `Already processed Block: ${blockHash} Tx: ${transactionHash}
@@ -245,7 +224,6 @@ export class HathorBroker extends Broker {
       );
       return true;
     }
-    const federation = await this.federationFactory.createInstance(this.config.mainchain, this.chainConfig.federation);
     const hasVoted = await federation.hasVoted(txId, federatorAddress);
     if (hasVoted) {
       this.logger.debug(
