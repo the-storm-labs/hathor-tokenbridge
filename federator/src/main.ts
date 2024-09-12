@@ -23,6 +23,7 @@ import TransactionSender from './lib/TransactionSender';
 import HathorMultisigManager from './lib/HathorMultisigManager';
 import FederatorHTR from './lib/FederatorHTR';
 import Web3 from 'web3';
+import { HathorHistorySinc } from './lib/HathorHistorySync';
 
 export class Main {
   logger: LogWrapper;
@@ -96,7 +97,6 @@ export class Main {
       // TODO uncoment this after tests
       // await this.heartbeat.readLogs();
       await this.runErcRskFederator();
-     
     } catch (err) {
       this.logger.error('Unhandled Error on main.run()', err);
       process.exit(1);
@@ -132,6 +132,8 @@ export class Main {
       new FederationFactory(),
       new TransactionSender(client, this.logger, this.config),
     );
+    const sync = new HathorHistorySinc(this.config, this.logger, service);
+    await sync.processHistory();
     service.listenToEventQueue();
   }
 

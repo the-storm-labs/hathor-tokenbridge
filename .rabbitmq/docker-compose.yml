@@ -80,3 +80,4 @@ services:
       RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
       WALLET_URL: ${HATHOR_WALLET_URL}
       HEADLESS_API_KEY: ${HEADLESS_API_KEY}
+      HATHOR_LAST_TIMESTAMP: ${HATHOR_LAST_TIMESTAMP}

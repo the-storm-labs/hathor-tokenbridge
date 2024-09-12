@@ -11,6 +11,7 @@ import { EvmBroker } from './Broker/EvmBroker';
 import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
 import TransactionSender from './TransactionSender';
+import { FileManagement } from '../utils/fileManagement';
 
 export class HathorService {
   public logger: LogWrapper;
@@ -19,6 +20,7 @@ export class HathorService {
   public federationFactory: FederationFactory;
   public transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
+  private fileManagement: FileManagement;
 
   private nonRetriableErrors = [
     /Invalid transaction. At least one of your inputs has already been spent./,
@@ -39,6 +41,7 @@ export class HathorService {
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
     this.transactionSender = transactionSender;
+    this.fileManagement = new FileManagement(config);
   }
 
   async sendTokensToHathor(
@@ -193,7 +196,17 @@ export class HathorService {
   private async parseHathorLogs(event: any): Promise<boolean> {
     if (event.type !== 'wallet:new-tx') return true;
 
-    const outUtxos = event.data.outputs.map(
+    const tx = this.castDataToTx(event.data);
+
+    const isHathorToEvm = tx.haveCustomData();
+
+    if (isHathorToEvm) {
+      this.sendTokensToEvm(tx);
+    }
+  }
+
+  castDataToTx(data): HathorTx {
+    const outUtxos = data.outputs.map(
       (o) =>
         new HathorUtxo(
           o.script,
@@ -208,7 +221,7 @@ export class HathorService {
         ),
     );
 
-    const inUtxos = event.data.inputs.map(
+    const inUtxos = data.inputs.map(
       (o) =>
         new HathorUtxo(o.script, o.token, o.value, {
           type: o.decoded?.type,
@@ -216,29 +229,29 @@ export class HathorService {
           timelock: o.decoded?.timelock,
         }),
     );
-    const tx = new HathorTx(event.data.tx_id, event.data.timestamp, outUtxos, inUtxos);
 
-    const isHathorToEvm = tx.haveCustomData();
+    return new HathorTx(data.tx_id, data.timestamp, outUtxos, inUtxos);
+  }
 
-    if (isHathorToEvm) {
-      const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+  async sendTokensToEvm(tx: HathorTx): Promise<boolean> {
+    const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
 
-      const confirmed = await broker.isTxConfirmed(tx.tx_id);
-      if (!confirmed) {
-        return false;
-      }
-
-      const token = tx.getCustomTokenData();
-
-      const isMulsigAddress = await broker.isMultisigAddress(token.receiverAddress);
-
-      if (!isMulsigAddress) {
-        throw Error('Not a multisig address.');
-      }
-
-      await broker.sendTokens(token.senderAddress, tx.getCustomData(), token.amount, token.tokenAddress, tx.tx_id);
-      return true;
+    const confirmed = await broker.isTxConfirmed(tx.tx_id);
+    if (!confirmed) {
+      return false;
     }
+
+    const token = tx.getCustomTokenData();
+
+    const isMulsigAddress = await broker.isMultisigAddress(token.receiverAddress);
+
+    if (!isMulsigAddress) {
+      throw Error('Not a multisig address.');
+    }
+
+    await broker.sendTokens(token.senderAddress, tx.getCustomData(), token.amount, token.tokenAddress, tx.tx_id);
+    this.fileManagement._saveProgress(tx.timestamp);
+    return true;
   }
 }
 
