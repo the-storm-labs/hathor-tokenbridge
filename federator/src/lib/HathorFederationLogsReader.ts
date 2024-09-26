@@ -90,6 +90,20 @@ export class HathorFederationLogsReader {
     );
   }
 
+  async handleLockEvent(event) {
+    let { txHex } = event.returnValues;
+
+    txHex = (txHex as string).substring(2);
+    this.logger.info(
+      `LockTransactionHex Event:
+       Transaction Hex: ${txHex}`,
+    );
+
+    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+
+    await broker.hathorLockProposalInputs(txHex);
+  }
+
   // Example handler for 'ProposalSigned' event
   handleProposalSigned(event) {
     let {
@@ -252,6 +266,33 @@ export class HathorFederationLogsReader {
         }
       } catch (error) {
         this.logger.error(`Error fetching events from block ${fromBlock} to ${toBlock}:`, error);
+      }
+
+      currentBlock += batchSize;
+    }
+  }
+
+  async fetchLockEventsInBatches(this: HathorFederationLogsReader, startBlock, endBlock, batchSize) {
+    let currentBlock = startBlock;
+
+    while (currentBlock <= endBlock) {
+      const fromBlock = currentBlock;
+      const toBlock = Math.min(currentBlock + batchSize - 1, endBlock);
+
+      this.logger.info(`Fetching lock events from block ${fromBlock} to ${toBlock}`);
+
+      try {
+        const events = await this.hathorFederationContract.getPastEvents('LockTransactionHex', {
+          fromBlock: fromBlock,
+          toBlock: toBlock,
+        });
+
+        // Process each event using the handleEvent function
+        for (const event of events) {
+          await this.handleLockEvent(event);
+        }
+      } catch (error) {
+        this.logger.error(`Error fetching lock events from block ${fromBlock} to ${toBlock}:`, error);
       }
 
       currentBlock += batchSize;

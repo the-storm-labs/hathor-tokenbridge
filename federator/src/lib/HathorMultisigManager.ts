@@ -90,27 +90,70 @@ export default class HathorMultisigManager extends Federator {
     this.logger.debug(`Total pages ${numberOfPages}, blocks per page ${recordsPerPage}`);
 
     let fromPageBlock = fromBlock;
+
+    const logsReader = new HathorFederationLogsReader(
+      this.config,
+      this.logger,
+      bridgeFactory,
+      federationFactory,
+      transactionSender,
+    );
+
+    /// First we process all the lock input events, so the proposals previously created are synced locally
+    for (let currentPage = 1; currentPage <= numberOfPages; currentPage++) {
+      let toPagedBlock = fromPageBlock + recordsPerPage - 1;
+      if (currentPage === numberOfPages) {
+        toPagedBlock = currentBlock;
+      }
+
+      fromPageBlock = await this.runFetchEvents(
+        currentPage,
+        fromPageBlock,
+        toPagedBlock,
+        recordsPerPage,
+        logsReader.fetchLockEventsInBatches,
+        logsReader,
+      );
+    }
+
+    // Reseting fromPageBlock
+    fromPageBlock = fromBlock;
+
+    // Now for the regular events
     for (let currentPage = 1; currentPage <= numberOfPages; currentPage++) {
       let toPagedBlock = fromPageBlock + recordsPerPage - 1;
       if (currentPage === numberOfPages) {
         toPagedBlock = toBlock;
       }
-      this.logger.debug(`Page ${currentPage} getting events from block ${fromPageBlock} to ${toPagedBlock}`);
-      this.logger.upsertContext('fromBlock', fromPageBlock);
-      this.logger.upsertContext('toBlock', toPagedBlock);
-      ///////
-      const logsReader = new HathorFederationLogsReader(
-        this.config,
-        this.logger,
-        bridgeFactory,
-        federationFactory,
-        transactionSender,
-      );
-      await logsReader.fetchEventsInBatches(fromPageBlock, toPagedBlock, recordsPerPage);
 
-      ///////
-      fromPageBlock = toPagedBlock + 1;
+      fromPageBlock = await this.runFetchEvents(
+        currentPage,
+        fromPageBlock,
+        toPagedBlock,
+        recordsPerPage,
+        logsReader.fetchEventsInBatches,
+        logsReader,
+      );
     }
+
+    return fromPageBlock;
+  }
+
+  async runFetchEvents(
+    currentPage,
+    fromPageBlock,
+    toPagedBlock,
+    recordsPerPage,
+    fetchEventsFunction,
+    reader: HathorFederationLogsReader,
+  ) {
+    this.logger.debug(`Page ${currentPage} getting events from block ${fromPageBlock} to ${toPagedBlock}`);
+    this.logger.upsertContext('fromBlock', fromPageBlock);
+    this.logger.upsertContext('toBlock', toPagedBlock);
+    ///////
+    await fetchEventsFunction.call(reader, fromPageBlock, toPagedBlock, recordsPerPage);
+    ///////
+    fromPageBlock = toPagedBlock + 1;
     return fromPageBlock;
   }
 

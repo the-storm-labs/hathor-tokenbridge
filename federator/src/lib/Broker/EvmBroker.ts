@@ -21,11 +21,11 @@ export class EvmBroker extends Broker {
     amount: string,
     tokenAddress: string,
     txHash: string,
-  ) {
+  ): Promise<boolean> {
     const [destinationChainTokenAddress, originalChainId] = await this.getSideChainTokenAddress(tokenAddress);
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
     const transactionType = isTokenEvmNative ? TransactionTypes.MINT : TransactionTypes.TRANSFER;
-    await super.sendTokens(
+    return await super.sendTokens(
       senderAddress,
       receiverAddress,
       amount,
@@ -101,6 +101,8 @@ export class EvmBroker extends Broker {
       address: `${receiverAddress}`,
       amount: this.convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
+      mark_inputs_as_used: true,
+      ttl: 1000 * 60 * 30,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -127,6 +129,8 @@ export class EvmBroker extends Broker {
       address: `${receiverAddress}`,
       value: this.convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
+      mark_inputs_as_used: true,
+      ttl: 1000 * 60 * 30,
     };
     const outputs = [];
     outputs.push(output);

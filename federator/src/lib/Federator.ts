@@ -103,7 +103,6 @@ export default abstract class Federator {
     return fromBlock;
   }
 
-
   private checkStoragePath() {
     if (!fs.existsSync(this.config.storagePath)) {
       fs.mkdirSync(this.config.storagePath, {

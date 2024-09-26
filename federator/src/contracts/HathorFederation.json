@@ -41,6 +41,19 @@
         "anonymous": false,
         "inputs": [
             {
+                "indexed": false,
+                "internalType": "bytes",
+                "name": "txHex",
+                "type": "bytes"
+            }
+        ],
+        "name": "LockTransactionHex",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
                 "indexed": true,
                 "internalType": "address",
                 "name": "member",

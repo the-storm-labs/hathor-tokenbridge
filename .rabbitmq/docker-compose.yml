@@ -38,7 +38,7 @@ services:
       - ./init-rabbitmq.sh:/init-rabbitmq.sh
 
   hathor-wallet:
-    image: toggera/hathor-wallet-rabbitmq:latest
+    image: toggera/hathor-wallet-rabbitmq:preview.0.0.1
     container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       init-rabbitmq:

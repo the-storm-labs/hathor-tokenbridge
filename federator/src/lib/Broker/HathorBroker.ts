@@ -66,6 +66,8 @@ export class HathorBroker extends Broker {
     const data = {
       amount: qtd,
       token: `${token}`,
+      mark_inputs_as_used: true,
+      ttl: 1000 * 60 * 30,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -116,7 +118,7 @@ export class HathorBroker extends Broker {
     amount: string,
     originalTokenAddress: string,
     txHash: string,
-  ) {
+  ): Promise<boolean> {
     // validations
     if (originalTokenAddress.startsWith('0x')) {
       originalTokenAddress = originalTokenAddress.substring(2);
@@ -125,7 +127,7 @@ export class HathorBroker extends Broker {
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
     if (isTokenEvmNative) {
-      await super.sendTokens(
+      return await super.sendTokens(
         senderAddress,
         receiverAddress,
         amount,
@@ -134,13 +136,12 @@ export class HathorBroker extends Broker {
         TransactionTypes.MELT,
         isTokenEvmNative,
       );
-      return;
     }
 
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
     const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
 
-    this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
+    return await this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
 
   async voteOnEvm(

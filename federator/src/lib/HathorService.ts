@@ -251,9 +251,17 @@ export class HathorService {
       throw Error('Not a multisig address.');
     }
 
-    await broker.sendTokens(token.senderAddress, tx.getCustomData(), token.amount, token.tokenAddress, tx.tx_id);
-    this.fileManagement._saveProgress(tx.timestamp);
-    return true;
+    const result = await broker.sendTokens(
+      token.senderAddress,
+      tx.getCustomData(),
+      token.amount,
+      token.tokenAddress,
+      tx.tx_id,
+    );
+    if (result) {
+      this.fileManagement._saveProgress(tx.timestamp);
+    }
+    return result;
   }
 }
 

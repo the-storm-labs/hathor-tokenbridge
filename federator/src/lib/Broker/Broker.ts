@@ -9,6 +9,7 @@ import {
   GetMySignatureResponse,
   TransactionTypes,
   SignAndPushResponse,
+  HathorResponse,
 } from '../../types';
 import {
   BridgeFactory,
@@ -88,7 +89,7 @@ export abstract class Broker {
     txHash: string,
     transactionType: TransactionTypes,
     isTokenEvmNative: boolean,
-  ) {
+  ): Promise<boolean> {
     const transactionId = await this.hathorFederationContract.getTransactionId(
       tokenAddress,
       txHash,
@@ -101,7 +102,7 @@ export abstract class Broker {
     const isProcessed = await this.hathorFederationContract.isProcessed(transactionId);
 
     if (isProcessed) {
-      return;
+      return true;
     }
 
     const isSigned = await this.hathorFederationContract.isSigned(transactionId, process.env.FEDERATOR_ADDRESS);
@@ -119,7 +120,7 @@ export abstract class Broker {
         transactionType,
         transactionId,
       );
-      return;
+      return true;
     }
 
     const isProposed = await this.hathorFederationContract.isProposed(transactionId);
@@ -137,8 +138,10 @@ export abstract class Broker {
         txHex,
         transactionId,
       );
-      return;
+      return true;
     }
+
+    // check headless state
 
     const txHex = isTokenEvmNative
       ? await this.sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress)
@@ -154,6 +157,8 @@ export abstract class Broker {
       txHex,
       transactionId,
     );
+
+    return true;
   }
 
   private async sendProposal(
@@ -307,6 +312,25 @@ export abstract class Broker {
     this.logger.info(`Sign and Push result: ${JSON.stringify(result)}`);
 
     return result.hash;
+  }
+
+  public async hathorLockProposalInputs(txHex: string): Promise<boolean> {
+    const data = {
+      txHex: `${txHex}`,
+      ttl: 1000 * 60 * 30,
+    };
+    const response = await this.wallet.putRequestWallet<HathorResponse>(
+      'multi',
+      'wallet/utxos-selected-as-input',
+      data,
+    );
+
+    if (response.status != 200 || !response.data.success) {
+      const fullMessage = `${response.status} - ${response.statusText} - ${JSON.stringify(response.data)}`;
+      throw new HathorException(fullMessage, response.data.error);
+    }
+
+    return response.data.success;
   }
 
   async isTxConfirmed(transactionId: string): Promise<boolean> {

@@ -116,6 +116,29 @@ export class HathorWallet {
     }
   }
 
+  public async putRequestWallet<Type>(
+    id: string,
+    path: string,
+    data?: any,
+    params?: any,
+  ): Promise<AxiosResponse<Type>> {
+    const url = `${process.env.WALLET_URL}/${path}`;
+    const config = {
+      headers: {
+        'Content-type': 'application/json',
+        'x-api-key': process.env.HEADLESS_API_KEY,
+        'x-wallet-id': id,
+      },
+      params: params,
+    };
+
+    try {
+      return await axios.put<Type>(url, data, config);
+    } catch (error) {
+      throw Error(`Fail to PUT request to hathor wallet endpoint: ${error}`);
+    }
+  }
+
   public async requestWallet<Type>(
     post: boolean,
     id: string,
