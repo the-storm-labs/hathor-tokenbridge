@@ -21,7 +21,12 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
     - name: Build Docker image
-      run: docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
+      run: |
+        docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
+        docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest
 
-    - name: Push Docker image to Docker Hub
+    - name: Push Docker image to Docker Hub with commit SHA tag
       run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
+
+    - name: Push Docker image to Docker Hub with "latest" tag
+      run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest

@@ -59,7 +59,7 @@ services:
       HEADLESS_PLUGIN_RABBITMQ_URL: amqp://rabbitmq
 
   hathor-federator:
-    image: toggera/hathor-tokenbridge:preview-24100701
+    image: toggera/hathor-tokenbridge:latest
     container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
     depends_on:
       - hathor-wallet
