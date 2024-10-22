@@ -1,1 +1,5 @@
-{}
+{
+  "dependencies": {
+    "axios-curlirize": "^2.0.0"
+  }
+}

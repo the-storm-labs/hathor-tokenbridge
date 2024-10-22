@@ -40,6 +40,7 @@ export class IAllowTokensV1 implements IAllowTokens {
   }
 
   private multiplyByFederatorInstance(confirmation: number): number {
+    console.log(`confirmation ${confirmation} x by fed order ${this.federatorInstance}`);
     return confirmation * this.federatorInstance;
   }
 

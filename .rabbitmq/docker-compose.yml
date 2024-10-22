@@ -38,7 +38,7 @@ services:
       - ./init-rabbitmq.sh:/init-rabbitmq.sh
 
   hathor-wallet:
-    image: toggera/hathor-wallet-rabbitmq:preview.0.0.1
+    image: toggera/hathor-wallet-rabbitmq:preview.0.0.2
     container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
     depends_on:
       init-rabbitmq:
@@ -53,13 +53,13 @@ services:
       HEADLESS_MULTISIG_SEED_DEFAULT_MAX_SIGNATURES: ${HEADLESS_MULTISIG_SEED_DEFAULT_MAX_SIGNATURES}
       HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES: ${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}
       HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS: ${HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS}
-      HEADLESS_ENABLED_PLUGINS: rabbitmq
+      HEADLESS_ENABLED_PLUGINS: rabbitmq debug
       HEADLESS_PLUGIN_DEBUG_LONG: all
       HEADLESS_PLUGIN_RABBITMQ_QUEUE: main_queue
       HEADLESS_PLUGIN_RABBITMQ_URL: amqp://rabbitmq
 
   hathor-federator:
-    image: toggera/hathor-tokenbridge:latest
+    image: toggera/hathor-tokenbridge:preview-24100701
     container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
     depends_on:
       - hathor-wallet
@@ -67,7 +67,7 @@ services:
       - "500${HATHOR_MULTISIG_ORDER}:5000"
     environment:
       HTR_CONFIG: '{"name":"${HATHOR_NAME}","chainId":${HATHOR_CHAIN_ID},"fromBlock":${HATHOR_FROM_BLOCK},"walletUrl":"${HATHOR_WALLET_URL}","walletKey":"${HEADLESS_API_KEY}","singleWalletId":"${HATHOR_SINGLE_WALLET_ID}","singleSeedKey":"${HATHOR_SINGLE_SEED_KEY}","multisigWalletId":"${HATHOR_MULTISIG_WALLET_ID}","multisigSeedKey":"${HATHOR_MULTISIG_SEED_KEY}","multisigRequiredSignatures":${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES},"multisigOrder":${HATHOR_MULTISIG_ORDER},"minimumConfirmations":${HATHOR_MINIMUM_CONFIRMATIONS},"eventQueueType":"rabbitmq"}'
-      EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK}}'
+      EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK},"multisigOrder":${HATHOR_MULTISIG_ORDER}}'
       ETHERSCAN_KEY: '${ETHERSCAN_KEY}'
       HATHOR_STATE_CONTRACT_HOST_URL: ${HATHOR_STATE_CONTRACT_HOST_URL}
       HATHOR_STATE_CONTRACT_ADDR: ${HATHOR_STATE_CONTRACT_ADDR}

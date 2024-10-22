@@ -31,7 +31,7 @@ export class AllowTokensFactory extends ContractFactory {
     const version = await this.getVersion(allowTokensContract);
     switch (version) {
       case VERSIONS.V1:
-        return new IAllowTokensV1(allowTokensContract, chainId);
+        return new IAllowTokensV1(allowTokensContract, chainId, configChain.multisigOrder);
       case VERSIONS.V0:
         allowTokensContract = this.getContractByAbiAndChainId(
           abiAllowTokensV0 as AbiItem[],

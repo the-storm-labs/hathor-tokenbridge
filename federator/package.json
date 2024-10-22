@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@google-cloud/pubsub": "^4.0.7",
-    "@hathor/wallet-lib": "1.0.3",
     "@types/amqplib": "^0.10.5",
     "abi-decoder": "^2.4.0",
     "amqplib": "^0.10.4",
@@ -48,7 +47,7 @@
     "@typescript-eslint/eslint-plugin": "^4.29.2",
     "@typescript-eslint/parser": "^4.29.2",
     "axios": "^0.21.2",
-    "axios-curlirize": "~1.3.7",
+    "axios-curlirize": "^1.3.7",
     "babel-jest": "^27.0.6",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.3.0",
@@ -59,7 +58,7 @@
     "prettier": "2.3.2",
     "tar": ">=4.4.18",
     "tmpl": "^1.0.5",
-    "ts-node": "^10.2.1",
+    "ts-node": "^10.9.2",
     "typescript": "^4.3.5",
     "web3-core-promievent": "^1.2.11"
   },

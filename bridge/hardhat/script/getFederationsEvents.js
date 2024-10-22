@@ -1,13 +1,17 @@
 // How to run the script: npx hardhat run ./hardhat/script/getFederatorMembers.js --network sepolia
 const hre = require("hardhat");
-const abi = require('../../../federator/src/contracts/HathorFederation.json')
 
 async function main() {
   const {deployments} = hre;
 
-  const federation = new web3.eth.Contract(abi, '0x88AdFfb959aE92cAEC42D7a9F4bFBD13318c73Db');
+  const Federation = await deployments.get('Federation');
+  const FederationProxy = await deployments.get('FederationProxy');
+  const MultiSigWallet = await deployments.get('MultiSigWallet');
 
-  const result = await federation.get.call({ from: MultiSigWallet.address});
+  const federator = new web3.eth.Contract(Federation.abi, FederationProxy.address);
+
+  const methodCallGetMembers = federator.methods.getMembers();
+  const result = await methodCallGetMembers.call({ from: MultiSigWallet.address});
   console.log("Method call result", result);
 }
 

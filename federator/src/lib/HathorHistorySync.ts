@@ -9,21 +9,31 @@ export class HathorHistorySinc {
   private wallet: HathorWallet;
   private service: HathorService;
   private fileManagement: FileManagement;
+  private logger: LogWrapper;
 
   constructor(config: ConfigData, logger: LogWrapper, service: HathorService) {
     this.wallet = HathorWallet.getInstance(config, logger);
     this.service = service;
     this.fileManagement = new FileManagement(config);
+    this.logger = logger;
   }
 
   async processHistory() {
-    const history = await this.getHistory();
-    const recentHistory = history.filter((h) => h.timestamp >= this.fileManagement.getLastTimestampFromEnv());
-    const orderedHistory = recentHistory.sort((a, b) => a.timestamp - b.timestamp);
-    const hathorTxs = orderedHistory.map((data) => this.service.castDataToTx(data));
-    const dataTxs = hathorTxs.filter((tx) => tx.haveCustomData());
-    for (const tx of dataTxs) {
-      await this.service.sendTokensToEvm(tx);
+    try {
+      const history = await this.getHistory();
+      const recentHistory = history.filter((h) => h.timestamp >= this.fileManagement.getLastTimestampFromEnv());
+      const orderedHistory = recentHistory.sort((a, b) => a.timestamp - b.timestamp);
+      const hathorTxs = orderedHistory.map((data) => this.service.castDataToTx(data));
+      const dataTxs = hathorTxs.filter((tx) => tx.haveCustomData());
+      for (const tx of dataTxs) {
+        try {
+          await this.service.sendTokensToEvm(tx);
+        } catch (error) {
+          this.logger.error('Error processing hathor history tx: ${tx_id}', tx.tx_id, error);
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error processing hathor history:', error);
     }
   }
 

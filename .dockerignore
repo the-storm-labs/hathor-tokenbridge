@@ -3,3 +3,4 @@
 ./federator/test
 ./federator/integrationTest
 ./federator/node_modules
+./federator/db

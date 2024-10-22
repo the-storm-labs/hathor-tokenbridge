@@ -125,19 +125,19 @@ export class EvmBroker extends Broker {
     const tokenDecimals = await this.getTokenDecimals(token, this.config.sidechain[0].chainId);
     const [destinationToken] = await this.getSideChainTokenAddress(token);
 
+    const data = {
+      mark_inputs_as_used: true,
+      ttl: 1000 * 60 * 30,
+      outputs: [],
+    };
     const output = {
       address: `${receiverAddress}`,
       value: this.convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
-      mark_inputs_as_used: true,
-      ttl: 1000 * 60 * 30,
     };
-    const outputs = [];
-    outputs.push(output);
+    data.outputs.push(output);
 
-    const response = await wallet.requestWallet<CreateProposalResponse>(true, 'multi', 'wallet/tx-proposal', {
-      outputs,
-    });
+    const response = await wallet.requestWallet<CreateProposalResponse>(true, 'multi', 'wallet/tx-proposal', data);
 
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
