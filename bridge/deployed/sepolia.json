@@ -1,0 +1,6 @@
+{
+    "network": "sepolia",
+    "smallAmountConfirmations": "12",
+    "mediumAmountConfirmations": "24",
+    "largeAmountConfirmations": "36"
+}

@@ -11,9 +11,9 @@ module.exports = async function (hre) { // HardhatRuntimeEnvironment
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, multiSigAddress);
   const federationContract = new web3.eth.Contract(Federation.abi, federationAddress);
 
-    const methodCallAddMember = federationContract.methods.addMember("0xCC3CF44397Daa4572CDb20f72dee5700507454E4");
-    await methodCallAddMember.call({ from: multiSigAddress })
-    await multiSigContract.methods.submitTransaction(federationAddress, 0, methodCallAddMember.encodeABI()).send({ from: deployer });
+  const methodCallAddMember = federationContract.methods.addMember("0xCC3CF44397Daa4572CDb20f72dee5700507454E4");
+  await methodCallAddMember.call({ from: multiSigAddress })
+  await multiSigContract.methods.submitTransaction(federationAddress, 0, methodCallAddMember.encodeABI()).send({ from: deployer });
 }
 
 module.exports.id = 'set_federation_member'; // id required to prevent reexecution

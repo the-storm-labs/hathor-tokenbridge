@@ -1,4 +1,4 @@
-// How to run the script: npx hardhat run ./hardhat/script/addFederatorMember.js --network mumbai
+// How to run the script: npx hardhat run ./hardhat/script/addFederatorMember.js --network sepolia
 const hre = require("hardhat");
 
 async function main() {
@@ -9,7 +9,7 @@ async function main() {
   const {deployer} = await getNamedAccounts();
 
   const transactionEtherValue = 0;
-  const memberFederatorAddress = "0x1aA9D0b1063d8b0D2a51F805b86462dBB95a2902";
+  const memberFederatorAddress = "0x6279096C4988bDa648Ab3c419204bf41aBf45f09";
 
   const Federation = await deployments.get('Federation');
   const FederationProxy = await deployments.get('FederationProxy');

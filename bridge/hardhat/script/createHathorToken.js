@@ -13,14 +13,14 @@ async function main() {
   const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
 
-  const hathorAddr = '00000a17c11f022dd0b31c5059c7c2341e64cbd3c2e8f0508360b574c2bb6175';
+  const hathorAddr = '00';
 
   const addrFromToken = await bridge.methods.uidToAddress(hathorAddr).call({ from: deployer });
 
   const tokens = [
     {
-      name: 'Hathor Native Token 2 (hNT2)',
-      symbol: 'hNT2',
+      name: 'Hathor Token (eHTR)',
+      symbol: 'eHTR',
       typeId: 1,
       originalHathorAddress: hathorAddr,
       originalTokenAddress: addrFromToken,

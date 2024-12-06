@@ -31,7 +31,8 @@ export class HathorTx {
 
   getCustomTokenData(): any {
     const tokenData = this.outputs.filter(
-      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+      //(output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+      (output) => output.token && output.spent_by == null && output.decoded.type == 'MultiSig',
     );
 
     const tokens: Token[] = [];
