@@ -66,7 +66,7 @@ export class HathorBroker extends Broker {
     const data = {
       amount: qtd,
       token: `${token}`,
-      mark_inputs_as_used: false,
+      mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
     };
 

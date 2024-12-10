@@ -100,7 +100,7 @@ export class EvmBroker extends Broker {
       address: `${receiverAddress}`,
       amount: this.convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
-      mark_inputs_as_used: false,
+      mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
     };
 
@@ -125,7 +125,7 @@ export class EvmBroker extends Broker {
     const [destinationToken] = await this.getSideChainTokenAddress(token);
 
     const data = {
-      mark_inputs_as_used: false,
+      mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
       outputs: [],
     };
