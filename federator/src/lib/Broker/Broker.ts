@@ -10,6 +10,7 @@ import {
   TransactionTypes,
   SignAndPushResponse,
   HathorResponse,
+  AddressIndexResponse,
 } from '../../types';
 import {
   BridgeFactory,
@@ -317,7 +318,7 @@ export abstract class Broker {
   public async hathorLockProposalInputs(txHex: string): Promise<boolean> {
     const data = {
       txHex: `${txHex}`,
-      ttl: 1000 * 60 * 30,
+      ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
     };
     const response = await this.wallet.putRequestWallet<HathorResponse>(
       'multi',
@@ -438,6 +439,22 @@ export abstract class Broker {
     return signatures;
   }
 
+  private async isMyAddress(address: string) {
+    try {
+      const response = await this.wallet.requestWallet<AddressIndexResponse>(
+        false,
+        'multi',
+        'wallet/address-index',
+        null,
+        { address: address },
+      );
+
+      response.status == 200 && response.data.success;
+    } catch (error) {
+      throw Error(`Fail to isMyAddress: ${error}`);
+    }
+  }
+
   protected convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
     const hathorPrecision = tokenDecimals - 2;
     return Math.floor(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
@@ -492,38 +509,16 @@ export abstract class Broker {
     return tokens[0];
   }
 
-  validateTokensOutput(outputs) {
+  validateTokensOutput(outputs, destinationToken) {
     const tokenData = outputs.filter(
-      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type == 'MultiSig',
+      (output) => output.token != destinationToken && output.spent_by == null && output.mine == false,
     );
 
-    const tokens: Token[] = [];
-
-    tokenData.forEach((data) => {
-      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
-        throw Error('Invalid transaction, it has more than one token or destination address.');
-      }
-    });
-
-    const htrData = outputs.filter((output) => output.token && output.spent_by == null && output.token == '00');
-
-    if (htrData.length > 0) {
-      throw Error('Invalid transaction, HTR transfer forbidden');
+    if (tokenData.length == 0) {
+      return;
     }
-  }
 
-  validateOutputReceiver(outputs) {
-    const tokenData = outputs.filter(
-      (output) => output.token && output.spent_by == null && output.token !== '00' && output.decoded.type != 'MultiSig',
-    );
-
-    const tokens: Token[] = [];
-
-    tokenData.forEach((data) => {
-      if (tokens.find((t) => t.tokenAddress != data.token || t.receiverAddress != data.decoded.address) != undefined) {
-        throw Error('Invalid transaction, it has more than one token or destination address.');
-      }
-    });
+    throw Error('Invalid transaction, it has more than one token or destination address.');
   }
 
   /**

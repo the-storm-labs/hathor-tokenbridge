@@ -66,8 +66,8 @@ export class HathorBroker extends Broker {
     const data = {
       amount: qtd,
       token: `${token}`,
-      mark_inputs_as_used: true,
-      ttl: 1000 * 60 * 30,
+      mark_inputs_as_used: false,
+      ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(

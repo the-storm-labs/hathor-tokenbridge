@@ -13,3 +13,4 @@ export type GetMySignatureResponse = HathorResponse & { signatures: string };
 export type SignAndPushResponse = HathorResponse & { hash: string };
 export type StatusResponse = HathorResponse & { statusCode: number; statusMessage: string; message: string };
 export type DecodeResponse = HathorResponse & { tx: Data };
+export type AddressIndexResponse = HathorResponse & { index: number };

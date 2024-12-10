@@ -63,8 +63,7 @@ export class EvmBroker extends Broker {
 
     const proposalInfo = this.getTransactionInfo(proposalTx);
 
-    this.validateTokensOutput(proposalTx.outputs);
-    this.validateOutputReceiver(proposalTx.outputs);
+    this.validateTokensOutput(proposalTx.outputs, destinationChainTokenAddress);
 
     if (isTokenEvmNative) {
       // MINT
@@ -101,8 +100,8 @@ export class EvmBroker extends Broker {
       address: `${receiverAddress}`,
       amount: this.convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
-      mark_inputs_as_used: true,
-      ttl: 1000 * 60 * 30,
+      mark_inputs_as_used: false,
+      ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -126,8 +125,8 @@ export class EvmBroker extends Broker {
     const [destinationToken] = await this.getSideChainTokenAddress(token);
 
     const data = {
-      mark_inputs_as_used: true,
-      ttl: 1000 * 60 * 30,
+      mark_inputs_as_used: false,
+      ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
       outputs: [],
     };
     const output = {
