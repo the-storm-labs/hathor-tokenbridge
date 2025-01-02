@@ -2,31 +2,31 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
+    paths:
+      - "federator/"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-    - name: Build Docker image
-      run: |
-        docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
-        docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest
+      - name: Build Docker image
+        run: |
+          docker build . --file Dockerfile --tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest
 
-    - name: Push Docker image to Docker Hub with commit SHA tag
-      run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
+      - name: Push Docker image to Docker Hub with commit SHA tag
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ github.sha }}
 
-    - name: Push Docker image to Docker Hub with "latest" tag
-      run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest
+      - name: Push Docker image to Docker Hub with "latest" tag
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:latest
