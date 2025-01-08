@@ -6,10 +6,15 @@ pragma abicoder v2;
 // Upgradables
 import "../zeppelin/upgradable/Initializable.sol";
 import "../zeppelin/upgradable/ownership/UpgradableOwnable.sol";
+import "../zeppelin/utils/Address.sol";
+import "../zeppelin/upgradable/utils/ReentrancyGuard.sol";
 
 import "../interface/IBridge.sol";
 import "../interface/IFederation.sol";
-contract Federation is Initializable, UpgradableOwnable, IFederation {
+contract Federation is Initializable, UpgradableOwnable, IFederation, ReentrancyGuard {
+
+	using Address for address;
+
 	uint constant public MAX_MEMBER_COUNT = 50;
 	address constant private NULL_ADDRESS = address(0);
 
@@ -95,12 +100,13 @@ contract Federation is Initializable, UpgradableOwnable, IFederation {
 		@dev Emits BridgeChanged event
 		@param _bridge the new bridge contract address that should implement the IBridge interface
 		*/
-	function setBridge(address _bridge) external onlyOwner override {
+	function setBridge(address _bridge) external onlyOwner override {		
 		_setBridge(_bridge);
 	}
 
 	function _setBridge(address _bridge) internal {
 		require(_bridge != NULL_ADDRESS, "Federation: Empty bridge");
+		require (_bridge.isContract(), "Federation: Bridge is not a contract");
 		bridge = IBridge(_bridge);
 		emit BridgeChanged(_bridge);
 	}
@@ -162,7 +168,7 @@ contract Federation is Initializable, UpgradableOwnable, IFederation {
 		uint32 logIndex,
 		uint256 originChainId,
 		uint256	destinationChainId
-	) external onlyMember override {
+	) external onlyMember nonReentrant override {
 		shouldBeCurrentChainId(destinationChainId);
 		bytes32 transactionId = keccak256(
 			abi.encodePacked(

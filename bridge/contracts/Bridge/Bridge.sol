@@ -75,6 +75,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	mapping (uint256 => mapping(address => bool)) public knownTokenByChain; // chainId => OriginalToken Address => Know
 	mapping (address => string) public EvmToHathorTokenMap;
 	mapping (string => OriginalToken) public HathorToEvmTokenMap;	
+	bool public initiated;
 
 	event AllowTokensChanged(address _newAllowTokens);
 	event FederationChanged(address _newFederation);
@@ -109,12 +110,14 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	}
 
 	function initDomainSeparator() public {
+		require( !initiated, "Brigde: already initiated");
 		domainSeparator = LibEIP712.hashEIP712Domain(
 			"RSK Token Bridge",
 			"1",
 			block.chainid,
 			address(this)
 		);
+		initiated == true;
 	}
 
 	modifier whenNotUpgrading() {
@@ -498,6 +501,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		uint256 _fee
 	) internal returns (uint256 receivedAmount) {
 		uint256 decimals = LibUtils.getDecimals(_originalTokenAddress);
+		require(decimals > 0 || decimals <= 18, "Bridge: decimals above 18 or below 0");
 		//As side tokens are ERC777 they will always have 18 decimals
 		uint256 formattedAmount = _amount.div(uint256(10) ** (18 - decimals));
 		require(_fee <= formattedAmount, "Bridge: fee too high");
@@ -664,6 +668,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 
 	function changeFederation(address newFederation) external onlyOwner {
 		require(newFederation != NULL_ADDRESS, "Bridge: Federation is empty");
+		require(newFederation.isContract(), "Bridge: Federation not a contract");
 		federation = newFederation;
 		emit FederationChanged(federation);
 	}
@@ -680,6 +685,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 
 	function changeSideTokenFactory(address newSideTokenFactory) external onlyOwner {
 		require(newSideTokenFactory != NULL_ADDRESS, "Bridge: SideTokenFactory is empty");
+		require(newSideTokenFactory.isContract(), "Bridge: SideTokenFactory not a contract");
 		sideTokenFactory = ISideTokenFactory(newSideTokenFactory);
 		emit SideTokenFactoryChanged(newSideTokenFactory);
 	}
