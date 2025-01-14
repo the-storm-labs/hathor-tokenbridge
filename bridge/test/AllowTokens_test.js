@@ -24,6 +24,7 @@ contract('AllowTokens', async function (accounts) {
     });
 
     describe('AllowTokens creation', async () => {
+        this.timeout(90000);
         it('should initialize correctly', async () => {
             const smallConfirmations = '100';
             const mediumConfirmations = '200';
@@ -81,7 +82,7 @@ contract('AllowTokens', async function (accounts) {
         });
     });
 
-    describe('After AllowTokens initialization', () => {
+    describe('After AllowTokens initialization', async () => {
         beforeEach(async function () {
                 this.token = await MainToken.new("MAIN", "MAIN", 18, 10000, { from: tokenDeployer });
                 this.allowTokens = await AllowTokens.new();
@@ -476,9 +477,9 @@ contract('AllowTokens', async function (accounts) {
                 assert.equal(newMediumAmountConfirmations, (await this.allowTokens.mediumAmountConfirmations()).toString());
                 assert.equal(newLargeAmountConfirmations, (await this.allowTokens.largeAmountConfirmations()).toString());
 
-                newSmallAmountConfirmations = '0';
-                newMediumAmountConfirmations = '0';
-                newLargeAmountConfirmations = '0';
+                newSmallAmountConfirmations = '1';
+                newMediumAmountConfirmations = '1';
+                newLargeAmountConfirmations = '1';
                 await this.allowTokens.setConfirmations(newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations, { from: manager });
                 assert.equal(newSmallAmountConfirmations, (await this.allowTokens.smallAmountConfirmations()).toString());
                 assert.equal(newMediumAmountConfirmations, (await this.allowTokens.mediumAmountConfirmations()).toString());
@@ -535,6 +536,44 @@ contract('AllowTokens', async function (accounts) {
                 );
             });
 
+            it('should fail to set small amount confirmations lower than 1', async function() {
+                const newSmallAmountConfirmations = '0';
+                const newMediumAmountConfirmations = '10';
+                const newLargeAmountConfirmations = '50';
+                await truffleAssertions.fails(
+                    this.allowTokens.setConfirmations(
+                        newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations,
+                        { from: manager }
+                    ),
+                    truffleAssertions.ErrorType.REVERT
+                );
+            });
+
+            it('should fail to set medium amount confirmations lower than 1', async function() {
+                const newSmallAmountConfirmations = '10';
+                const newMediumAmountConfirmations = '0';
+                const newLargeAmountConfirmations = '50';
+                await truffleAssertions.fails(
+                    this.allowTokens.setConfirmations(
+                        newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations,
+                        { from: manager }
+                    ),
+                    truffleAssertions.ErrorType.REVERT
+                );
+            });
+
+            it('should fail to set large amount confirmations lower than 1', async function() {
+                const newSmallAmountConfirmations = '10';
+                const newMediumAmountConfirmations = '50';
+                const newLargeAmountConfirmations = '0';
+                await truffleAssertions.fails(
+                    this.allowTokens.setConfirmations(
+                        newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations,
+                        { from: manager }
+                    ),
+                    truffleAssertions.ErrorType.REVERT
+                );
+            });
         });
 
         describe('Ownable methods', async function() {
@@ -608,9 +647,9 @@ contract('AllowTokens', async function (accounts) {
                 await this.allowTokens.methods['initialize(address,address,uint256,uint256,uint256,(string,(uint256,uint256,uint256,uint256,uint256))[])'](
                     this.multiSig.address,
                     tokenDeployer,
-                    '0',
-                    '0' ,
-                    '0',
+                    '1',
+                    '1' ,
+                    '1',
                     []
                 );
                 let data = this.allowTokens.contract.methods.addTokenType('RIF', {max:toWei('10000'), min:toWei('1'), daily:toWei('100000'), mediumAmount:toWei('2'), largeAmount:toWei('3')}).encodeABI();

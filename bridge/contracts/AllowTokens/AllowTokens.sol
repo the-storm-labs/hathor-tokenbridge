@@ -203,6 +203,12 @@ contract AllowTokens is Initializable, UpgradableOwnable, UpgradableSecondary, I
 		uint256 _largeAmountConfirmations) private {
 		require(_smallAmountConfirmations <= _mediumAmountConfirmations, "AllowTokens: small bigger than medium confirmations");
 		require(_mediumAmountConfirmations <= _largeAmountConfirmations, "AllowTokens: medium bigger than large confirmations");
+		require(_smallAmountConfirmations > 0, "AllowTokens: small confirmations lower than 1");
+		require(_mediumAmountConfirmations > 0, "AllowTokens: medium confirmations lower than 1");
+		require(_largeAmountConfirmations > 0, "AllowTokens: large confirmations lower than 1");
+		require(_smallAmountConfirmations <= 500, "AllowTokens: small confirmations bigger than 500");
+		require(_mediumAmountConfirmations <= 750, "AllowTokens: medium confirmations bigger than 750");
+		require(_largeAmountConfirmations <= 1000, "AllowTokens: large confirmations bigger than 1000");
 		smallAmountConfirmations = _smallAmountConfirmations;
 		mediumAmountConfirmations = _mediumAmountConfirmations;
 		largeAmountConfirmations = _largeAmountConfirmations;
