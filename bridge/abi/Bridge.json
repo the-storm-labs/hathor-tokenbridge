@@ -376,7 +376,7 @@
         "type": "address"
       }
     ],
-    "name": "SideTokenSetted",
+    "name": "SideTokenMapped",
     "type": "event"
   },
   {
