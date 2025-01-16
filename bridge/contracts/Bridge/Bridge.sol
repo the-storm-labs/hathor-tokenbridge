@@ -35,6 +35,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	using Address for address;
 
 	address constant internal NULL_ADDRESS = address(0);
+	address constant internal DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 	bytes32 constant internal NULL_HASH = bytes32(0);
 	IERC1820Registry constant internal ERC1820 = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
 
@@ -110,9 +111,9 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	}
 
 	function initDomainSeparator() public {
-		require( !initiated, "Brigde: already initiated");
+		require( !initiated, "Bridge: already initiated");
 		domainSeparator = LibEIP712.hashEIP712Domain(
-			"RSK Token Bridge",
+			"Hathor Token Bridge",
 			"1",
 			block.chainid,
 			address(this)
@@ -130,6 +131,8 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	}
 
 	function sideTokenByOriginalToken(uint256 chainId, address originalToken) public view returns(address) {
+		require(originalToken != NULL_ADDRESS, "Bridge: Null token");
+		require(originalToken != DEAD_ADDRESS, "Bridge: Dead token");
 		address sideTokenAddr = sideTokenByOriginalTokenByChain[chainId][originalToken];
 
 		if (sideTokenAddr != NULL_ADDRESS) {
@@ -141,10 +144,14 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	}
 
 	function setSideTokenByOriginalAddressByChain(uint256 chainId, address originalToken, address sideToken) public onlyOwner {
+		require(originalToken != NULL_ADDRESS, "Bridge: Null token");
+		require(originalToken != DEAD_ADDRESS, "Bridge: Dead token");
 		sideTokenByOriginalTokenByChain[chainId][originalToken] = sideToken;
 	}
 
 	function getOriginalTokenBySideToken(address sideToken) public view returns(OriginalToken memory originalToken) {
+		require(sideToken != NULL_ADDRESS, "Bridge: Null token");
+		require(sideToken != DEAD_ADDRESS, "Bridge: Dead token");
 		originalToken = originalTokenBySideToken[sideToken];
 		if (originalToken.tokenAddress != NULL_ADDRESS) {
 			return originalToken;
@@ -157,6 +164,8 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	}
 
 	function setOriginalTokenBySideTokenByChain(address sideToken, OriginalToken memory originalToken) public onlyOwner {
+		require(sideToken != NULL_ADDRESS, "Bridge: Null token");
+		require(sideToken != DEAD_ADDRESS, "Bridge: Dead token");
 		originalTokenBySideToken[sideToken] = originalToken;
 	}
 
@@ -558,8 +567,8 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		address from,
 		address to,
 		uint amount,
-		bytes calldata userData, // [address,uint256] user addrest receiver, destinationChainId || [uint256] same as from, destinationChainId
-		bytes calldata
+		bytes calldata userData, // [address,uint256] user address receiver, destinationChainId || [uint256] same as from, destinationChainId
+		bytes calldata operatorData
 	) external override(IBridge, IERC777Recipient) {
 		//Hook from ERC777address
 		if(operator == address(this)) return; // Avoid loop from bridge calling to ERC77transferFrom
