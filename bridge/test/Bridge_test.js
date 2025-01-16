@@ -183,7 +183,6 @@ contract('Bridge', async function (accounts) {
                 );
             });
 
-
             it('check federation', async function () {
                 const federationAddress = await this.bridge.getFederation();
                 assert.equal(federationAddress, federation);
@@ -479,7 +478,6 @@ contract('Bridge', async function (accounts) {
                 const isKnownToken = await this.bridge.knownToken(chains.ETHEREUM_MAIN_NET_CHAIN_ID, token.address);
                 assert.equal(isKnownToken, true);
             });
-
 
             it('receiveTokens approve and transferFrom for ERC20 Min allowed tokens 8 decimals', async function () {
                 let limit = await this.allowTokens.typeLimits(this.typeId);
@@ -969,7 +967,6 @@ contract('Bridge', async function (accounts) {
                 );
             });
 
-
             it('send money to contract should fail', async function () {
                 const payment = new BN('1000');
                 await truffleAssertions.fails(
@@ -1183,9 +1180,7 @@ contract('Bridge', async function (accounts) {
                 const receipt = await this.bridge.receiveTokensTo(chains.ETHEREUM_MAIN_NET_CHAIN_ID, this.token.address, tokenOwner, amount, { from: tokenOwner});
                 utils.checkRcpt(receipt);
             });
-
         });
-
     });
 
     describe('Mirror Side', async function () {

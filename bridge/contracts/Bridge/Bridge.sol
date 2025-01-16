@@ -84,6 +84,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 	event Upgrading(bool _isUpgrading);
 	event WrappedCurrencyChanged(address _wrappedCurrency);
 	event HathorTokenMapped(address token, string uid);
+	event SideTokenMapped(uint256 chainId, address originalToken, address sideToken);
 
 	function initialize(
 		address _manager,
@@ -147,6 +148,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		require(originalToken != NULL_ADDRESS, "Bridge: Null token");
 		require(originalToken != DEAD_ADDRESS, "Bridge: Dead token");
 		sideTokenByOriginalTokenByChain[chainId][originalToken] = sideToken;
+		emit SideTokenMapped(chainId, originalToken, sideToken);
 	}
 
 	function getOriginalTokenBySideToken(address sideToken) public view returns(OriginalToken memory originalToken) {
@@ -167,6 +169,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		require(sideToken != NULL_ADDRESS, "Bridge: Null token");
 		require(sideToken != DEAD_ADDRESS, "Bridge: Dead token");
 		originalTokenBySideToken[sideToken] = originalToken;
+		emit SideTokenMapped(originalToken.originChainId, originalToken.tokenAddress, sideToken);
 	}
 
 	function knownToken(uint256 chainId, address originalToken) public view returns(bool) {
