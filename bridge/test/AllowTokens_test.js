@@ -89,7 +89,7 @@ contract('AllowTokens', async function (accounts) {
                 await this.allowTokens.methods['initialize(address,address,uint256,uint256,uint256,(string,(uint256,uint256,uint256,uint256,uint256))[])'](
                     manager,
                     tokenDeployer,
-                    '10',
+                    '12',
                     '20',
                     '30',
                     []
@@ -477,23 +477,23 @@ contract('AllowTokens', async function (accounts) {
                 assert.equal(newMediumAmountConfirmations, (await this.allowTokens.mediumAmountConfirmations()).toString());
                 assert.equal(newLargeAmountConfirmations, (await this.allowTokens.largeAmountConfirmations()).toString());
 
-                newSmallAmountConfirmations = '1';
-                newMediumAmountConfirmations = '1';
-                newLargeAmountConfirmations = '1';
+                newSmallAmountConfirmations = '12';
+                newMediumAmountConfirmations = '12';
+                newLargeAmountConfirmations = '12';
                 await this.allowTokens.setConfirmations(newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations, { from: manager });
                 assert.equal(newSmallAmountConfirmations, (await this.allowTokens.smallAmountConfirmations()).toString());
                 assert.equal(newMediumAmountConfirmations, (await this.allowTokens.mediumAmountConfirmations()).toString());
                 assert.equal(newLargeAmountConfirmations, (await this.allowTokens.largeAmountConfirmations()).toString());
 
-                newSmallAmountConfirmations = '10';
-                newMediumAmountConfirmations = '10';
+                newSmallAmountConfirmations = '12';
+                newMediumAmountConfirmations = '12';
                 newLargeAmountConfirmations = '100';
                 await this.allowTokens.setConfirmations(newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations, { from: manager });
                 assert.equal(newSmallAmountConfirmations, (await this.allowTokens.smallAmountConfirmations()).toString());
                 assert.equal(newMediumAmountConfirmations, (await this.allowTokens.mediumAmountConfirmations()).toString());
                 assert.equal(newLargeAmountConfirmations, (await this.allowTokens.largeAmountConfirmations()).toString());
 
-                newSmallAmountConfirmations = '10';
+                newSmallAmountConfirmations = '12';
                 newMediumAmountConfirmations = '100';
                 newLargeAmountConfirmations = '100';
                 await this.allowTokens.setConfirmations(newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations, { from: manager });
@@ -536,8 +536,8 @@ contract('AllowTokens', async function (accounts) {
                 );
             });
 
-            it('should fail to set small amount confirmations lower than 1', async function() {
-                const newSmallAmountConfirmations = '0';
+            it('should fail to set small amount confirmations lower than 12', async function() {
+                const newSmallAmountConfirmations = '11';
                 const newMediumAmountConfirmations = '10';
                 const newLargeAmountConfirmations = '50';
                 await truffleAssertions.fails(
@@ -549,9 +549,9 @@ contract('AllowTokens', async function (accounts) {
                 );
             });
 
-            it('should fail to set medium amount confirmations lower than 1', async function() {
+            it('should fail to set medium amount confirmations lower than 11', async function() {
                 const newSmallAmountConfirmations = '10';
-                const newMediumAmountConfirmations = '0';
+                const newMediumAmountConfirmations = '11';
                 const newLargeAmountConfirmations = '50';
                 await truffleAssertions.fails(
                     this.allowTokens.setConfirmations(
@@ -562,10 +562,10 @@ contract('AllowTokens', async function (accounts) {
                 );
             });
 
-            it('should fail to set large amount confirmations lower than 1', async function() {
+            it('should fail to set large amount confirmations lower than 11', async function() {
                 const newSmallAmountConfirmations = '10';
                 const newMediumAmountConfirmations = '50';
-                const newLargeAmountConfirmations = '0';
+                const newLargeAmountConfirmations = '11';
                 await truffleAssertions.fails(
                     this.allowTokens.setConfirmations(
                         newSmallAmountConfirmations, newMediumAmountConfirmations, newLargeAmountConfirmations,
@@ -647,9 +647,9 @@ contract('AllowTokens', async function (accounts) {
                 await this.allowTokens.methods['initialize(address,address,uint256,uint256,uint256,(string,(uint256,uint256,uint256,uint256,uint256))[])'](
                     this.multiSig.address,
                     tokenDeployer,
-                    '1',
-                    '1' ,
-                    '1',
+                    '12',
+                    '12' ,
+                    '12',
                     []
                 );
                 let data = this.allowTokens.contract.methods.addTokenType('RIF', {max:toWei('10000'), min:toWei('1'), daily:toWei('100000'), mediumAmount:toWei('2'), largeAmount:toWei('3')}).encodeABI();
