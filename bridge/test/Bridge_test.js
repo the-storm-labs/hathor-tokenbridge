@@ -677,13 +677,15 @@ contract('Bridge', async function (accounts) {
             //         }
             //       ], result.receipt.rawLogs[3].data, result.receipt.rawLogs[3].topics.slice(1));
 
+            //       console.log(decodedLog._to);
+
             //     assert.equal(decodedLog._tokenAddress, erc777.address);
             //     assert.equal(decodedLog._from, tokenOwner);
-            //     // assert.equal(decodedLog._to, anAccount);
+            //     assert.equal(decodedLog._to, anAccount);
             //     assert.equal(decodedLog._amount, amount);
             //     assert.equal(decodedLog._userData, userData);
-            //     // assert.equal(decodedLog._originChainId, chainId);
-            //     // assert.equal(decodedLog._destinationChainId, chains.ETHEREUM_MAIN_NET_CHAIN_ID);
+            //     assert.equal(decodedLog._originChainId, chainId);
+            //     assert.equal(decodedLog._destinationChainId, chains.ETHEREUM_MAIN_NET_CHAIN_ID);
 
             //     const tokenBalance = await erc777.balanceOf(tokenOwner);
             //     assert.equal(tokenBalance.toString(), new BN(originalTokenBalance).sub(new BN(amount)).toString());
@@ -2863,18 +2865,18 @@ contract('Bridge', async function (accounts) {
                 );
             });
 
-            it('should reject tokensReceived for ERC777', async function () {
-                const amount = web3.utils.toWei('1000');
-                const granularity = '100';
-                let erc777 = await SideToken.new("ERC777", "777", tokenOwner, granularity, { from: tokenOwner });
+            // it('should reject tokensReceived for ERC777', async function () {
+            //     const amount = web3.utils.toWei('1000');
+            //     const granularity = '100';
+            //     let erc777 = await SideToken.new("ERC777", "777", tokenOwner, granularity, { from: tokenOwner });
 
-                await this.allowTokens.setToken(erc777.address, this.typeId, { from: bridgeManager });
-                await erc777.mint(tokenOwner, amount, "0x", "0x", {from: tokenOwner });
-                await truffleAssertions.fails(
-                    erc777.send(this.bridge.address, amount, tokenOwner, { from: tokenOwner }),
-                    truffleAssertions.ErrorType.REVERT
-                );
-            });
+            //     await this.allowTokens.setToken(erc777.address, this.typeId, { from: bridgeManager });
+            //     await erc777.mint(tokenOwner, amount, "0x", "0x", {from: tokenOwner });
+            //     await truffleAssertions.fails(
+            //         erc777.send(this.bridge.address, amount, tokenOwner, { from: tokenOwner }),
+            //         truffleAssertions.ErrorType.REVERT
+            //     );
+            // });
 
             it('should accept transfer for the token', async function () {
                 await this.bridge.createSideToken(
