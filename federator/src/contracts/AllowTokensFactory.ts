@@ -1,4 +1,3 @@
-import abiAllowTokensV0 from '../../../bridge/abi/AllowTokensV0.json';
 import abiAllowTokensV1 from '../../../bridge/abi/AllowTokens.json';
 import { IAllowTokensV1 } from './IAllowTokensV1';
 import { IAllowTokensV0 } from './IAllowTokensV0';
@@ -21,27 +20,13 @@ export class AllowTokensFactory extends ContractFactory {
   async createInstance(configChain: ConfigChain): Promise<IAllowTokens> {
     const web3 = this.getWeb3(configChain.host);
     const chainId = configChain.chainId;
-    let allowTokensContract = this.getContractByAbiAndChainId(
+    const allowTokensContract = this.getContractByAbiAndChainId(
       abiAllowTokensV1 as AbiItem[],
       configChain.allowTokens,
       web3,
       chainId,
     );
 
-    const version = await this.getVersion(allowTokensContract);
-    switch (version) {
-      case VERSIONS.V1:
-        return new IAllowTokensV1(allowTokensContract, chainId, configChain.multisigOrder);
-      case VERSIONS.V0:
-        allowTokensContract = this.getContractByAbiAndChainId(
-          abiAllowTokensV0 as AbiItem[],
-          configChain.allowTokens,
-          web3,
-          chainId,
-        );
-        return new IAllowTokensV0(allowTokensContract, chainId);
-      default:
-        throw Error('Unknown AllowTokens contract version');
-    }
+    return new IAllowTokensV1(allowTokensContract, chainId, configChain.multisigOrder);
   }
 }

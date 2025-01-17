@@ -60,11 +60,13 @@ services:
 
   hathor-federator:
     image: toggera/hathor-tokenbridge:latest
-    container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
+    container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}    
     depends_on:
       - hathor-wallet
     ports:
       - "500${HATHOR_MULTISIG_ORDER}:5000"
+    volumes:
+      - federator_db:/app/db
     environment:
       HTR_CONFIG: '{"name":"${HATHOR_NAME}","chainId":${HATHOR_CHAIN_ID},"fromBlock":${HATHOR_FROM_BLOCK},"walletUrl":"${HATHOR_WALLET_URL}","walletKey":"${HEADLESS_API_KEY}","singleWalletId":"${HATHOR_SINGLE_WALLET_ID}","singleSeedKey":"${HATHOR_SINGLE_SEED_KEY}","multisigWalletId":"${HATHOR_MULTISIG_WALLET_ID}","multisigSeedKey":"${HATHOR_MULTISIG_SEED_KEY}","multisigRequiredSignatures":${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES},"multisigOrder":${HATHOR_MULTISIG_ORDER},"minimumConfirmations":${HATHOR_MINIMUM_CONFIRMATIONS},"eventQueueType":"rabbitmq"}'
       EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK},"multisigOrder":${HATHOR_MULTISIG_ORDER}}'
@@ -82,3 +84,8 @@ services:
       HEADLESS_API_KEY: ${HEADLESS_API_KEY}
       HATHOR_LAST_TIMESTAMP: ${HATHOR_LAST_TIMESTAMP}
       HATHOR_INPUT_BLOCK_TTL: ${HATHOR_INPUT_BLOCK_TTL}
+
+volumes:
+  federator_db:
+    name: hathor_federator_db_${HATHOR_MULTISIG_ORDER}
+    driver: local

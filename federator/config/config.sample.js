@@ -10,7 +10,7 @@ module.exports = {
   ],
   runEvery: 1, // In minutes,
   privateKey: process.env.FEDERATOR_KEY,
-  storagePath: "./db",
+  storagePath: "/app/db",
   etherscanApiKey: process.env.ETHERSCAN_KEY,
   runHeartbeatEvery: 1, // In hours
   endpointsPort: 5000, // Server port

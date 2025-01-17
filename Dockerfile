@@ -5,6 +5,10 @@ RUN apk add --no-cache build-base git python3
 WORKDIR /home/node
 USER node
 
+WORKDIR /app
+RUN mkdir -p /app/db && chown -R node:node /app/db
+USER node
+
 COPY --chown=node:node ./federator/package*.json ./federator/
 WORKDIR ./federator
 RUN (npm install) && (npm ci)
