@@ -256,10 +256,14 @@ export abstract class Broker {
 
     let txId;
 
+    let txSent = false;
+
     try {
       txId = await this.hathorPushProposal(txHex, signatures);
+      txSent = true;
     } catch (error) {
       if (error instanceof HathorException) {
+        this.logger.error(`Push proposal failed: ${error}`);
         const exception = error as HathorException;
         if (
           exception.getOriginalMessage() === 'Invalid transaction. At least one of your inputs has already been spent.'
@@ -276,7 +280,7 @@ export abstract class Broker {
       senderAddress,
       receiverAddress,
       transactionType,
-      true,
+      txSent,
       txId,
     );
 
