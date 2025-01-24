@@ -127,11 +127,12 @@ contract('Bridge', async function (accounts) {
 
             it('change allowTokens', async function () {
                 let allowTokens = await this.bridge.allowTokens();
+                this.newAllowtokens = await AllowTokens.new();
                 assert.equal(allowTokens, this.allowTokens.address);
-                const receipt = await this.bridge.changeAllowTokens(anAccount, { from: bridgeManager });
+                const receipt = await this.bridge.changeAllowTokens(this.newAllowtokens.address, { from: bridgeManager });
                 utils.checkRcpt(receipt);
                 allowTokens = await this.bridge.allowTokens();
-                assert.equal(allowTokens, anAccount);
+                assert.equal(allowTokens, this.newAllowtokens.address);
             });
 
             it('only manager can change allowTokens', async function () {

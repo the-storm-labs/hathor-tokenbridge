@@ -686,6 +686,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 
 	function changeAllowTokens(address newAllowTokens) external onlyOwner {
 		require(newAllowTokens != NULL_ADDRESS, "Bridge: AllowTokens is empty");
+		require(newAllowTokens.isContract(), "Bridge: Allow Tokens not a contract");
 		allowTokens = IAllowTokens(newAllowTokens);
 		emit AllowTokensChanged(newAllowTokens);
 	}
