@@ -2,6 +2,7 @@ const Federation = artifacts.require('Federation');
 const AllowTokens = artifacts.require('./AllowTokens');
 const Bridge = artifacts.require('./Bridge');
 const SideTokenFactory = artifacts.require('./SideTokenFactory');
+const MainToken = artifacts.require('./MainToken');
 
 const truffleAssertions = require('truffle-assertions');
 const utils = require('./utils');
@@ -15,7 +16,12 @@ contract('Federation', async function (accounts) {
     const federator1 = accounts[2];
     const federator2 = accounts[3];
     const federator3 = accounts[4];
-    const bridge = utils.getRandomAddress();
+    const tokenName = 'MAIN';
+    const tokenSymbol = 'MAIN';
+    const tokenOwner = accounts[6];
+    const bridgeManager = accounts[5];
+    const bridgeOwner =  accounts[7];
+    const federation = accounts[8];
 
     before(async function () {
         await utils.saveState();
@@ -26,31 +32,62 @@ contract('Federation', async function (accounts) {
     });
 
     beforeEach(async function () {
+
         this.federators = await Federation.new();
+        
+        // await newFederation.methods['initialize(address[],uint,address,address)']([bridgeManager], 1, this.bridge.address, bridgeManager);
+        this.token = await MainToken.new(tokenName, tokenSymbol, 18, web3.utils.toWei('1000000000'), { from: tokenOwner });
+        this.allowTokens = await AllowTokens.new();
+        await this.allowTokens.methods['initialize(address,address,uint256,uint256,uint256,(string,(uint256,uint256,uint256,uint256,uint256))[])'](
+            bridgeManager,
+            bridgeOwner,
+            '13',
+            '13',
+            '13',
+            [{
+                description:'MAIN',
+                limits: {
+                    max:toWei('10000'),
+                    min:toWei('1'),
+                    daily:toWei('100000'),
+                    mediumAmount:toWei('2'),
+                    largeAmount:toWei('3')
+                }
+            }]
+        );
+        this.typeId = 0;
+        await this.allowTokens.setToken(this.token.address, this.typeId, { from: bridgeManager });
+        this.sideTokenFactory = await SideTokenFactory.new();
+        this.bridge = await Bridge.new();
+        await this.bridge.methods['initialize(address,address,address,address)'](bridgeManager,
+            federation, this.allowTokens.address, this.sideTokenFactory.address);
+        await this.sideTokenFactory.transferPrimary(this.bridge.address);
+        await this.allowTokens.transferPrimary(this.bridge.address, { from: bridgeOwner });
+        
     });
 
     describe('Initialization', async function() {
         it('should use initialize', async function () {
-            await this.federators.initialize([federator1, federator2], 1, bridge, deployer);
+            await this.federators.initialize([federator1, federator2], 1, this.bridge.address, deployer);
         });
 
         it('should fail if required is not the same as memebers length', async function () {
             await truffleAssertions.fails(
-                this.federators.initialize([federator1, federator2], 3, bridge, deployer),
+                this.federators.initialize([federator1, federator2], 3, this.bridge.address, deployer),
                 truffleAssertions.ErrorType.REVERT
             );
         });
 
         it('should fail if repeated memebers', async function () {
             await truffleAssertions.fails(
-                this.federators.initialize([federator1, federator1], 2, bridge, deployer),
+                this.federators.initialize([federator1, federator1], 2, this.bridge.address, deployer),
                 truffleAssertions.ErrorType.REVERT
             );
         });
 
         it('should fail if null memeber', async function () {
             await truffleAssertions.fails(
-                this.federators.initialize([federator1, utils.NULL_ADDRESS], 2, bridge, deployer),
+                this.federators.initialize([federator1, utils.NULL_ADDRESS], 2, this.bridge.address, deployer),
                 truffleAssertions.ErrorType.REVERT
             );
         });
@@ -62,13 +99,13 @@ contract('Federation', async function (accounts) {
             );
         });
 
-        it('should fail if bigger max memeber length', async function () {
+        it('should fail if bigger max member length', async function () {
             const members = [];
             for(let i = 0; i <= 50; i++) {
                 members[i]=utils.getRandomAddress();
             }
             await truffleAssertions.fails(
-                this.federators.initialize(members, 2, bridge, deployer),
+                this.federators.initialize(members, 2, this.bridge.address, deployer),
                 truffleAssertions.ErrorType.REVERT
             );
         });
@@ -78,7 +115,7 @@ contract('Federation', async function (accounts) {
             for(let i = 0; i < 50; i++) {
                 members[i]=utils.getRandomAddress();
             }
-            await this.federators.initialize(members, 2, bridge, deployer);
+            await this.federators.initialize(members, 2, this.bridge.address, deployer);
             const resultMembers = await this.federators.getMembers();
             assert.equal(resultMembers.length, 50);
         });
@@ -88,7 +125,7 @@ contract('Federation', async function (accounts) {
 
         beforeEach(async function () {
             this.members  = [federator1, federator2];
-            await this.federators.initialize(this.members, 1, bridge, deployer);
+            await this.federators.initialize(this.members, 1, this.bridge.address, deployer);
         });
 
         describe('Members', async function () {
@@ -119,10 +156,10 @@ contract('Federation', async function (accounts) {
             });
 
             it('setBridge should work correctly', async function() {
-                const result = await this.federators.setBridge(anAccount);
+                const result = await this.federators.setBridge(this.bridge.address);
 
                 const bridge = await this.federators.bridge();
-                assert.equal(bridge, anAccount);
+                assert.equal(bridge, this.bridge.address);
 
                 truffleAssertions.eventEmitted(result, 'BridgeChanged', (ev) => {
                     return ev.bridge === bridge;
@@ -428,9 +465,9 @@ contract('Federation', async function (accounts) {
                 await this.allowTokens.methods['initialize(address,address,uint256,uint256,uint256,(string,(uint256,uint256,uint256,uint256,uint256))[])'](
                     deployer,
                     deployer,
-                    '0',
-                    '0',
-                    '0',
+                    '12',
+                    '12',
+                    '12',
                     [{
                         description:'RIF',
                         limits:{

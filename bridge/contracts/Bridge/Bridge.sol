@@ -513,7 +513,6 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 		uint256 _fee
 	) internal returns (uint256 receivedAmount) {
 		uint256 decimals = LibUtils.getDecimals(_originalTokenAddress);
-		require(decimals > 0 || decimals <= 18, "Bridge: decimals above 18 or below 0");
 		//As side tokens are ERC777 they will always have 18 decimals
 		uint256 formattedAmount = _amount.div(uint256(10) ** (18 - decimals));
 		require(_fee <= formattedAmount, "Bridge: fee too high");

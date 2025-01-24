@@ -15,8 +15,10 @@ library LibUtils {
         (bool success, bytes memory data) = tokenToUse.staticcall(abi.encodeWithSignature("decimals()"));
         require(success, "LibUtils: No decimals");
         // uint<M>: enc(X) is the big-endian encoding of X,
+        uint8 decimals = uint8(abi.decode(data, (uint256)));
+        require(decimals >= 0 || decimals <=18,"LibUtils: out of range");
         //padded on the higher-order (left) side with zero-bytes such that the length is 32 bytes.
-        return uint8(abi.decode(data, (uint256)));
+        return decimals;
     }
 
     function getGranularity(address tokenToUse) internal view returns (uint256) {
