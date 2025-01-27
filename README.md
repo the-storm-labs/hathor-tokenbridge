@@ -1,64 +1,67 @@
-# RSK <-> ETH Token Bridge
+# Hathor <-> EVM Token Bridge
 
-Ethereum/RSK Bridge that allows to move ERC20 tokens from one chain to the other.
+Hathor/EVM Bridge that allows moving ERC20-like tokens from one chain to the other.
 
 ## Rationale
 
-Cross chain events are very important in the future of crypto. Exchanging tokens between networks allows the token holders to use them in their favorite chain without beeing restricted to the contract owner network choice. Moreover this also allows layer 2 solutions to use the same tokens on different chains, this concept together with stable coins creates a great way of payment with low volatility across networks.
+Cross-chain events are crucial for the future of crypto. Exchanging tokens between networks enables token holders to use them on their preferred chain without being restricted by the contract owner’s network choice. Additionally, this allows Layer 2 solutions to leverage the same tokens across different chains. When combined with stablecoins, this concept creates an effective method for low-volatility payments across networks.
 
 ## Overview
 
-The smart contract on each network are connected by bridges, a bridge on one chain would receive and lock the ERC20 tokens, this action emits an event that will be served to the bridge on the other chain. This interoperability is achieved using a Federation that sends the event from one contract to the other, once the bridge on the other chain receives the event from the Federation, it mints the tokens on the mirror ERC20 contract.
-See the [FAQ](https://developers.rsk.co/tools/tokenbridge/faq/) to know more about how it works!
+The mechanism relies on a **Multisig** system on the Hathor network instead of a smart contract-based bridge. The process involves:
+
+1. A user deposits and locks tokens in the **Multisig wallet** on Hathor.
+2. This action triggers an off-chain event that is processed by a group of validators.
+3. Once a threshold of validators signs the transaction, an equivalent amount of tokens is minted on the EVM blockchain in an ERC20-compatible mirror contract.
+4. When tokens are transferred back, the process is reversed—tokens on the EVM side are burned, and validators release the locked tokens on Hathor.
+
+This model ensures security and decentralization while allowing seamless asset movement between the two blockchains.
 
 <p align="center">
   <img src="./docs/images/token-bridge-diagram.png"/>
 </p>
 
-The bridges on each contract are upgradeable, this would enable a smooth transition to a more decentralized bridge in the future. Here's is a link to the first 
-[POC of the trustless decentralized bridge](https://github.com/rsksmart/decentralized-tokenbridge)
-
 ## Usage
 
-You can use the ['Token Bridge Dapp'](https://tokenbridge.rsk.co/) together with [Nifty Wallet](https://chrome.google.com/webstore/detail/nifty-wallet/jbdaocneiiinmjbjlgalhcelgbejmnid) or [Metamask with custom network](https://github.com/rsksmart/rskj/wiki/Configure-Metamask-to-connect-with-RSK) to move tokens between networks. This is the [Dapp guide](https://developers.rsk.co/tools/tokenbridge/dappguide/) if you don't know how to use it.
-Or you can use a wallet with the abi of the contracts. See the ['interaction guide using MyCrypto'](https://developers.rsk.co/tools/tokenbridge/usingmycrypto/) for more information on how to use the bridge.
+You can use the **Hathor-EVM Token Bridge Dapp** with compatible wallets such as MetaMask (configured for the EVM network) and Hathor Wallet to transfer tokens between networks.
 
-## Contracts deployed on RSK, Ethereum, RSK Testnet and Kovan
+For detailed instructions, refer to the [Dapp Guide](#) (link to documentation).
 
-Here are the ['addresses'](./docs/ContractAddresses.md) of the deployed contracts in the different networks.
+## Contracts Deployed on Hathor and EVM Blockchain
+
+Here are the [addresses](#) of the deployed contracts on different networks.
 
 ## Report Security Vulnerabilities
 
-To report a vulnerability, please use the [vulnerability reporting guideline](./SECURITY.md) for details on how to do it.
+To report a vulnerability, please follow the [security reporting guidelines](#).
 
 ## Developers
 
 ### Contracts
 
-The smart contracts used by the bridge and the instructions to deploy them are in the ['bridge folder'](./bridge/README.md).
-The ABI to interact with the contracts are in the ['abi folder'](./bridge/abi)
+The smart contracts used by the bridge and the instructions for deployment are available in the [bridge folder](#).
+The ABI for interacting with the contracts is in the [abi folder](#).
 
 ### Dapp
 
-The dapp of the token bridge can be found in the repository ['tokenbirdge-ui'](https://github.com/rsksmart/tokenbridge-ui)
+The frontend for the token bridge can be found in the repository [hathor-evm-tokenbridge-ui](#).
 
+### Multisig Validators
 
-### Federation
+The Multisig system on Hathor ensures security by requiring a majority consensus before executing a transaction. A predefined number of signers must approve any token locking or unlocking event to maintain trust in the system.
 
-A federation sends notification of events happening in the bridge of one chain to another chain. The federation is composed of oracles listening to the events created in one chain and sending it to the other chain. When a majority of the federators votes on an event, the bridge accepts the event as valid and releases the tokens on the other chain.
-See the ['federator'](./federator/README.md) for more information about federations.
+For more details, see the [Multisig documentation](#).
 
 ### Integration Test
 
-An integration test is prepared for contracts and federators. To properly run integration test, you need check network config in the `truffle-config.js` and `package.json` in `bridge` folder with your test chains' configuration before run `npm run deployIntegrationTest`.
+Integration tests are prepared for contracts and validators. To properly run integration tests, ensure the network configuration is set up correctly in the `truffle-config.js` and `package.json` files in the `bridge` folder.
 
-For testing purposes only, you can let `env.FEDERATOR_KEY` empty, which fulfills the role that a `FEDERATOR_KEY` key would have in production.
-Also, a `test.local.config.js` configuration is provided in `federator/config` for the same purpose, acting as the `config.js` file would in a productive environment.
+Steps:
 
-1. Check `mnemonic.key` in `bridge`
-1. Check `infura.key` in `bridge` (must contain your Infura's project ID in plain text)
-1. Check your `networkName` in `bridge/migrations/4_deploy_erc1820.js` when your test network does not have **ERC1820:Pseudo-introspection Registry Contract** deployed.
+1. Check `mnemonic.key` in `bridge`.
+2. Ensure the correct network settings in the `bridge/migrations` folder.
+3. Run `npm run deployIntegrationTest` in `bridge`.
+4. Run `npm run integrationTest` in the `validator` folder.
 
-Then
-1. run `npm run deployIntegrationTest` in `bridge`
-1. run `npm run integrationTest` in `federator`
+By following these steps, you can verify that the bridge operates correctly across both networks.
+
