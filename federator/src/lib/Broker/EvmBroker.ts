@@ -4,6 +4,7 @@ import { ConfigData } from '../config';
 import { HathorException, CreateProposalResponse, TransactionTypes } from '../../types';
 import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
+import { MetricCollector } from '../MetricCollector';
 
 export class EvmBroker extends Broker {
   constructor(
@@ -11,8 +12,9 @@ export class EvmBroker extends Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    metricCollector: MetricCollector,
   ) {
-    super(config, logger, bridgeFactory, federationFactory);
+    super(config, logger, bridgeFactory, federationFactory, metricCollector);
   }
 
   async sendTokens(

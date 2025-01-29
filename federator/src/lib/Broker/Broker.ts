@@ -10,7 +10,6 @@ import {
   TransactionTypes,
   SignAndPushResponse,
   HathorResponse,
-  AddressIndexResponse,
 } from '../../types';
 import {
   BridgeFactory,
@@ -24,6 +23,7 @@ import {
 import { ConfigChain } from '../configChain';
 import { HathorWallet } from '../HathorWallet';
 import { TransactionSender } from '../TransactionSender';
+import { MetricCollector } from '../MetricCollector';
 
 const TOKEN_MELT_MASK = 0b00000010;
 const TOKEN_MINT_MASK = 0b00000001;
@@ -41,18 +41,21 @@ export abstract class Broker {
   private transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
   private wallet: HathorWallet;
+  private metricCollector: MetricCollector;
 
   constructor(
     config: ConfigData,
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    metricCollector: MetricCollector,
   ) {
     this.config = config;
     this.logger = logger;
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
     this.chainConfig = config.sidechain[0];
+    this.metricCollector = metricCollector;
 
     this.web3ByHost = new Map<string, Web3>();
     this.transactionSender = new TransactionSender(
@@ -193,7 +196,10 @@ export abstract class Broker {
 
     if (!receipt) {
       this.logger.error(`Failed to send proposal for transaction ${transactionHash}`);
+      this.metricCollector.trackHathorSentProposal(transactionHash, false);
     }
+
+    this.metricCollector.trackHathorSentProposal(transactionHash, true);
   }
 
   private async signProposal(
@@ -231,7 +237,10 @@ export abstract class Broker {
 
     if (!receipt.status) {
       this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+      this.metricCollector.trackHathorSignedProposal(transactionHash, false);
     }
+
+    this.metricCollector.trackHathorSignedProposal(transactionHash, true);
   }
 
   private async pushProposal(
@@ -247,7 +256,13 @@ export abstract class Broker {
   ) {
     const arrayLength = await this.hathorFederationContract.getSignatureCount(transactionId);
 
-    if (arrayLength < process.env.HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES) return;
+    const maxSignatures = process.env.HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES;
+
+    if (!maxSignatures) {
+      throw new HathorException('Max signatures not set', 'Max signatures not set');
+    }
+
+    if (arrayLength < maxSignatures) return;
 
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
       throw new HathorException('Invalid tx', 'Invalid tx');
@@ -259,7 +274,7 @@ export abstract class Broker {
     let txSent = false;
 
     try {
-      txId = await this.hathorPushProposal(txHex, signatures);
+      txId = await this.hathorPushProposal(txHex, signatures.slice(0, parseInt(maxSignatures)));
       txSent = true;
     } catch (error) {
       if (error instanceof HathorException) {
@@ -293,7 +308,10 @@ export abstract class Broker {
 
     if (!receipt.status) {
       this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+      this.metricCollector.trackHathorPushProposal(transactionHash, false);
     }
+
+    this.metricCollector.trackHathorSentProposal(transactionHash, true);
   }
 
   private async hathorPushProposal(txHex: string, signatures: string[]): Promise<string> {
@@ -441,22 +459,6 @@ export abstract class Broker {
     }
 
     return signatures;
-  }
-
-  private async isMyAddress(address: string) {
-    try {
-      const response = await this.wallet.requestWallet<AddressIndexResponse>(
-        false,
-        'multi',
-        'wallet/address-index',
-        null,
-        { address: address },
-      );
-
-      response.status == 200 && response.data.success;
-    } catch (error) {
-      throw Error(`Fail to isMyAddress: ${error}`);
-    }
   }
 
   protected convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {

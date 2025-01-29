@@ -6,10 +6,8 @@ async function main() {
   const {deployer} = await getNamedAccounts();
   const transactionEtherValue = 0;
   
-  const MainToken = await deployments.get('Bridge');
-  
-  const mainToken = "0x3Bd3b546F5FB3Ac5Fc50596646C5Efd27889f729";
-  const hathorToken = "00000000965355c07150672d8bac0bfa52486cfe8ec7c3af8e44cfb66a945b32";
+  const MainToken = await deployments.get('MainToken');  
+  const hathorToken = "000002c993795c9ef5b894571af2277aaf344438c2f8608a50daccc6ace7c0a1";
 
   const Bridge = await deployments.get('Bridge');
   const BridgeProxy = await deployments.get('BridgeProxy');
@@ -18,9 +16,11 @@ async function main() {
   const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
   const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
 
-  // const mainToken = await bridge.methods.uidToAddress(hathorToken).call({ from: deployer });
+  const mainToken = await bridge.methods.uidToAddress(hathorToken).call({ from: deployer });
 
-  const methodCallAddHathorToken = await bridge.methods.addHathorToken(11155111, mainToken, hathorToken);
+  console.log(`Bytes Main Token Address ${mainToken}`);
+
+  const methodCallAddHathorToken = await bridge.methods.addHathorToken(11155111, MainToken.address, hathorToken);
   const result = await methodCallAddHathorToken.call({ from: MultiSigWallet.address });
   console.log("Method call result", result);
 

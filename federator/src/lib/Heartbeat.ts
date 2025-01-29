@@ -219,7 +219,7 @@ export class Heartbeat {
       const from = await this.transactionSender.getAddress(this.config.privateKey);
       const isMember = await fedContract.isMember(from);
       if (!isMember) {
-        this.logger.warn(`This Federator addr:${from} is not part of the federation`)
+        this.logger.warn(`This Federator addr:${from} is not part of the federation`);
         return false;
       }
 
@@ -287,11 +287,11 @@ export class Heartbeat {
   }
 
   async _checkIfRsk() {
-    // const chainId = this.config.mainchain.chainId;
-    // if (!utils.checkIfItsInRSK(chainId)) {
-    //   this.logger.error(new Error(`Heartbeat should only run on RSK ${chainId}`));
-    //   process.exit(1);
-    // }
+    const chainId = this.config.mainchain.chainId;
+    if (!utils.checkIfItsInRSK(chainId)) {
+      this.logger.error(new Error(`Heartbeat should only run on RSK ${chainId}`));
+      process.exit(1);
+    }
 
     return false;
   }

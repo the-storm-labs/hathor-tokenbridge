@@ -12,6 +12,7 @@ import { ConfigChain } from './configChain';
 import { HathorBroker } from './Broker/HathorBroker';
 import TransactionSender from './TransactionSender';
 import { FileManagement } from '../utils/fileManagement';
+import { MetricCollector } from './MetricCollector';
 
 export class HathorService {
   public logger: LogWrapper;
@@ -21,6 +22,7 @@ export class HathorService {
   public transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
   private fileManagement: FileManagement;
+  private metricCollector: MetricCollector;
 
   private nonRetriableErrors = [
     /Invalid transaction. At least one of your inputs has already been spent./,
@@ -34,6 +36,7 @@ export class HathorService {
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
+    metricCollector: MetricCollector,
   ) {
     this.config = config;
     this.logger = logger;
@@ -42,6 +45,7 @@ export class HathorService {
     this.federationFactory = federationFactory;
     this.transactionSender = transactionSender;
     this.fileManagement = new FileManagement(config);
+    this.metricCollector = metricCollector;
   }
 
   async sendTokensToHathor(
@@ -51,7 +55,13 @@ export class HathorService {
     tokenAddress: string,
     txHash: string,
   ) {
-    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+    const broker = new EvmBroker(
+      this.config,
+      this.logger,
+      this.bridgeFactory,
+      this.federationFactory,
+      this.metricCollector,
+    );
     await broker.sendTokens(senderAddress, receiverAddress, qtd, tokenAddress, txHash);
   }
 
@@ -236,7 +246,13 @@ export class HathorService {
   }
 
   async sendTokensToEvm(tx: HathorTx): Promise<boolean> {
-    const broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+    const broker = new HathorBroker(
+      this.config,
+      this.logger,
+      this.bridgeFactory,
+      this.federationFactory,
+      this.metricCollector,
+    );
 
     const confirmed = await broker.isTxConfirmed(tx.tx_id);
     if (!confirmed) {

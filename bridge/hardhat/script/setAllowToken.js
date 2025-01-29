@@ -1,11 +1,11 @@
-// How to run the script: npx hardhat run ./hardhat/script/setAllowToken.js --network bsctestnet
+// How to run the script: npx hardhat run ./hardhat/script/setAllowToken.js --network sepolia
 const hre = require("hardhat");
 
 async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
 
-  const tokenToList = '0x00.....';
+  const tokenToList = '0x97118caaE1F773a84462490Dd01FE7a3e7C4cdCd';
   const tokenToListType = '0';
   const AllowTokens = await deployments.get('AllowTokens');
   const AllowTokensProxy = await deployments.get('AllowTokensProxy');

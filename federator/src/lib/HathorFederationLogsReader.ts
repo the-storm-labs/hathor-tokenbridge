@@ -5,6 +5,7 @@ import { Broker, EvmBroker, HathorBroker } from './Broker';
 import { ConfigData } from './config';
 import { ConfigChain } from './configChain';
 import { LogWrapper } from './logWrapper';
+import { MetricCollector } from './MetricCollector';
 import TransactionSender from './TransactionSender';
 
 export class HathorFederationLogsReader {
@@ -15,6 +16,7 @@ export class HathorFederationLogsReader {
   public transactionSender: TransactionSender;
   protected hathorFederationContract: IHathorFederationV1;
   protected chainConfig: ConfigChain;
+  private metricCollector: MetricCollector;
 
   constructor(
     config: ConfigData,
@@ -22,6 +24,7 @@ export class HathorFederationLogsReader {
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
+    metricCollector: MetricCollector,
   ) {
     this.config = config;
     this.logger = logger;
@@ -29,6 +32,7 @@ export class HathorFederationLogsReader {
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
     this.transactionSender = transactionSender;
+    this.metricCollector = metricCollector;
 
     this.hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
   }
@@ -43,7 +47,13 @@ export class HathorFederationLogsReader {
       case 'ProposalSent':
         result = this.handleProposalSent(event);
         if (result.transactionType == TransactionTypes.MELT) {
-          new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory).postProcessing(
+          new HathorBroker(
+            this.config,
+            this.logger,
+            this.bridgeFactory,
+            this.federationFactory,
+            this.metricCollector,
+          ).postProcessing(
             result.sender,
             result.receiver,
             result.value,
@@ -72,10 +82,22 @@ export class HathorFederationLogsReader {
     switch (Number.parseInt(result.transactionType)) {
       case TransactionTypes.MINT:
       case TransactionTypes.TRANSFER:
-        broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+        broker = new EvmBroker(
+          this.config,
+          this.logger,
+          this.bridgeFactory,
+          this.federationFactory,
+          this.metricCollector,
+        );
         break;
       case TransactionTypes.MELT:
-        broker = new HathorBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+        broker = new HathorBroker(
+          this.config,
+          this.logger,
+          this.bridgeFactory,
+          this.federationFactory,
+          this.metricCollector,
+        );
         break;
     }
 
@@ -99,7 +121,13 @@ export class HathorFederationLogsReader {
        Transaction Hex: ${txHex}`,
     );
 
-    const broker = new EvmBroker(this.config, this.logger, this.bridgeFactory, this.federationFactory);
+    const broker = new EvmBroker(
+      this.config,
+      this.logger,
+      this.bridgeFactory,
+      this.federationFactory,
+      this.metricCollector,
+    );
 
     await broker.hathorLockProposalInputs(txHex);
   }

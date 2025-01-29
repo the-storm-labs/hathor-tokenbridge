@@ -115,6 +115,8 @@ export default class FederatorHTR extends Federator {
       bridgeFactory,
     });
 
+    this.metricCollector.trackFederatorRun();
+
     return true;
   }
 
@@ -274,6 +276,7 @@ export default class FederatorHTR extends Federator {
       processTransactionParams.bridgeFactory,
       processTransactionParams.federationFactory,
       processTransactionParams.transactionSender,
+      this.metricCollector,
     );
 
     await hathorService.sendTokensToHathor(

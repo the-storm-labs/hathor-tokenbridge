@@ -97,6 +97,7 @@ export default class HathorMultisigManager extends Federator {
       bridgeFactory,
       federationFactory,
       transactionSender,
+      this.metricCollector,
     );
 
     /// First we process all the lock input events, so the proposals previously created are synced locally

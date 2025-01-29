@@ -147,8 +147,8 @@ module.exports = {
       url: 'https://sepolia.infura.io/v3/' + INFURA_PROJECT_ID,
       network_id: chains.SEPOLIA_TEST_NET_CHAIN_ID,
       token_symbol: 'e',
-      gas: 6700000,
-      gasPrice: 1100000000,
+      gas: "auto",
+      gasPrice: "auto",
       accounts: {
         mnemonic: MNEMONIC,
       },

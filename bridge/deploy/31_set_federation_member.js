@@ -17,7 +17,7 @@ module.exports = async function (hre) { // HardhatRuntimeEnvironment
 }
 
 module.exports.id = 'set_federation_member'; // id required to prevent reexecution
-module.exports.tags = ['DeployFromScratch'];
+// module.exports.tags = ['DeployFromScratch'];
 module.exports.dependencies = [
   'Bridge', 'Federation', 'MultiSigWallet'
 ];

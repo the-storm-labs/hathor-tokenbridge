@@ -1,13 +1,13 @@
-// How to run the script: npx hardhat run ./hardhat/script/deleteFederatorMemeber.js --network rsktestnetbsc
+// How to run the script: npx hardhat run ./hardhat/script/deleteFederatorMember.js --network sepolia
 const hre = require("hardhat");
 
 async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
 
-  const oldFederatorAddress = "0x8f397ff074ff190fc650e5cab4da039a8163e12a";
+  const oldFederatorAddress = "0xCC3CF44397Daa4572CDb20f72dee5700507454E4";
 
-  const Federation = await deployments.get('FederationV2');
+  const Federation = await deployments.get('Federation');
   const FederationProxy = await deployments.get('FederationProxy');
   const MultiSigWallet = await deployments.get('MultiSigWallet');
 

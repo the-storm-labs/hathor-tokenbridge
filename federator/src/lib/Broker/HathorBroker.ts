@@ -8,6 +8,7 @@ import { BN } from 'ethereumjs-util';
 import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
+import { MetricCollector } from '../MetricCollector';
 
 export class HathorBroker extends Broker {
   constructor(
@@ -15,8 +16,9 @@ export class HathorBroker extends Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
+    metricCollector: MetricCollector,
   ) {
-    super(config, logger, bridgeFactory, federationFactory);
+    super(config, logger, bridgeFactory, federationFactory, metricCollector);
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {

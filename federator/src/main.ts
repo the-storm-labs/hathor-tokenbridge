@@ -131,6 +131,7 @@ export class Main {
       new BridgeFactory(),
       new FederationFactory(),
       new TransactionSender(client, this.logger, this.config),
+      this.metricCollector,
     );
     const sync = new HathorHistorySinc(this.config, this.logger, service);
     await sync.processHistory();
