@@ -2,12 +2,12 @@ name: Docker Preview Image CI
 
 on:
   pull_request:
-    branches:
-      - "preview/**"
+    branches: ["master"]
 
 jobs:
   build-and-push-preview:
     runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'preview/')
 
     steps:
       - name: Checkout repository
