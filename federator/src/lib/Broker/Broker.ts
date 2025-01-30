@@ -394,13 +394,12 @@ export abstract class Broker {
         id: transactionId,
       });
 
-      if (response.data.error) {
+      // Ensure response exists before accessing its properties
+      if (!response || response.status !== 200 || response.data?.error || response.data?.is_voided) {
         return false;
       }
 
-      if (response.status == 200 && response.data) {
-        return response.data as Data;
-      }
+      return response.data as Data;
     } catch (error) {
       throw new HathorException(`Fail to getTransaction`, error);
     }
