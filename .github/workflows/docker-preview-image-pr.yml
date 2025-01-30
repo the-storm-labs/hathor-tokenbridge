@@ -25,11 +25,11 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f Dockerfile -t ${{ secrets.DOCKER_HUB_USERNAME }}/hathon-tokenbridge:${{ env.TAG }} .
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathon-tokenbridge:${{ env.TAG }} ${{ secrets.DOCKER_HUB_USERNAME }}/hathon-tokenbridge:preview-latest
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ env.TAG }} .
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ env.TAG }} ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:preview-latest
 
       - name: Push Docker image with preview tag
-        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathon-tokenbridge:${{ env.TAG }}
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:${{ env.TAG }}
 
       - name: Push Docker image with "preview-latest" tag
-        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathon-tokenbridge:preview-latest
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/hathor-tokenbridge:preview-latest
