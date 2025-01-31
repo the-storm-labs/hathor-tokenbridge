@@ -41,6 +41,14 @@ export class HathorBroker extends Broker {
     const proposalTx = await this.decodeTxHex(txHex);
     const originalTx = hathorTransaction as Data;
 
+    if (originalTx.version !== 1) {
+      throw Error(`Original hathor tx ${hathorTxId} has a invalid version.`);
+    }
+
+    if (originalTx.is_voided) {
+      throw Error(`Original hathor tx ${hathorTxId} is voided.`);
+    }
+
     const proposalInfo = this.getTransactionInfo(proposalTx);
 
     const originalTxTokenData = this.getCustomTokenData(originalTx.inputs, originalTx.outputs);

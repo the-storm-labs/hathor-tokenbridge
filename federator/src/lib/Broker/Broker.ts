@@ -488,7 +488,11 @@ export abstract class Broker {
 
   getCustomTokenData(inputs, outputs): any {
     const tokenData = outputs.filter(
-      (output) => output.token && output.spent_by == null && output.decoded.type == 'MultiSig',
+      (output) =>
+        output.token &&
+        output.spent_by == null &&
+        output.decoded.type == 'MultiSig' &&
+        output.decoded.timelock === null,
     );
 
     const tokens: Token[] = [];
