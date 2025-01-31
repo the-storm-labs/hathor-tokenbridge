@@ -261,6 +261,11 @@ export class HathorService {
 
     const token = tx.getCustomTokenData();
 
+    if (!token) {
+      this.logger.info('Transaction has no valid outputs.');
+      return true;
+    }
+
     const isMulsigAddress = await broker.isMultisigAddress(token.receiverAddress);
 
     if (!isMulsigAddress) {

@@ -145,7 +145,9 @@ export abstract class Broker {
       return true;
     }
 
-    // check headless state
+    if (this.config.mainchain.multisigOrder > 1) {
+      return true;
+    }
 
     const txHex = isTokenEvmNative
       ? await this.sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress)
