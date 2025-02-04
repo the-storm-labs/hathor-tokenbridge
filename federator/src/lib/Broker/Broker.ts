@@ -153,8 +153,6 @@ export abstract class Broker {
       ? await this.sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress)
       : await this.sendHathorNativeTokenProposal(receiverAddress, amount, tokenAddress);
 
-    await this.sleep(5000);
-
     return this.sendProposal(
       tokenAddress,
       txHash,
@@ -165,12 +163,6 @@ export abstract class Broker {
       txHex,
       transactionId,
     );
-  }
-
-  sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
   }
 
   private async sendProposal(
