@@ -141,7 +141,7 @@ export class EvmBroker extends Broker {
     };
     data.outputs.push(output);
 
-    const response = await wallet.requestWallet<CreateProposalResponse>(true, 'multi', 'wallet/tx-proposal', data);
+    const response = await wallet.requestWallet<CreateProposalResponse>(true, 'multi', 'wallet/p2sh/tx-proposal', data);
 
     if (response.status == 200 && response.data.success) {
       return response.data.txHex;
