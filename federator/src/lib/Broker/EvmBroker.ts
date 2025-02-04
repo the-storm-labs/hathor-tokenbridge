@@ -41,6 +41,9 @@ export class EvmBroker extends Broker {
   async validateTx(txHex: string, txHash: string): Promise<boolean> {
     const proposalTx = await this.decodeTxHex(txHex);
     const evmTx = await this.getWeb3(this.config.mainchain.host).eth.getTransaction(txHash);
+    if (!evmTx || evmTx === null) {
+      return false;
+    }
     const bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
     const events = await bridge.getPastEvents('Cross', this.config.sidechain[0].chainId, {
       fromBlock: evmTx.blockNumber,

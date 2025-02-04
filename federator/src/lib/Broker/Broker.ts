@@ -153,7 +153,9 @@ export abstract class Broker {
       ? await this.sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress)
       : await this.sendHathorNativeTokenProposal(receiverAddress, amount, tokenAddress);
 
-    this.sendProposal(
+    await this.sleep(5000);
+
+    return this.sendProposal(
       tokenAddress,
       txHash,
       amount,
@@ -163,8 +165,12 @@ export abstract class Broker {
       txHex,
       transactionId,
     );
+  }
 
-    return true;
+  sleep(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
   }
 
   private async sendProposal(
@@ -178,7 +184,8 @@ export abstract class Broker {
     contractTxId,
   ) {
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
-      throw new HathorException('Invalid tx', 'Invalid tx');
+      this.logger.error(`Invalid proposal: ${txHex} : ${transactionHash}`);
+      return false;
     }
     const sendProposalArgs = await this.hathorFederationContract.getSendTransactionProposalArgs(
       tokenAddress,

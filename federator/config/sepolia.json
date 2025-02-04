@@ -6,6 +6,6 @@
     "allowTokens": "0x278f39c10128e0e23bb1b65f0b4187200a9b061b",
     "chainId": 11155111,
     "testToken": "0x97118caae1f773a84462490dd01fe7a3e7c4cdcd",
-    "host": "https://eth-sepolia.g.alchemy.com/v2/",
-    "fromBlock": 7595536
+    "host": "https://eth-sepolia.g.alchemy.com/v2/NOMET2Oo7afi9Q4Sk19mczhmCT9pAaMh",
+    "fromBlock": 7610347
 }

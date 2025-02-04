@@ -4,6 +4,8 @@ import { HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
 import { LogWrapper } from './logWrapper';
 import { ConfigChain } from './configChain';
 import { ConfigData } from './config';
+import curlirize from 'axios-curlirize';
+curlirize(axios);
 
 export type Wallet = {
   ready: boolean;
