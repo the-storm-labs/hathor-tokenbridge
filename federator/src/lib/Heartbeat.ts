@@ -46,7 +46,7 @@ export class Heartbeat {
   }
 
   async run(): Promise<boolean> {
-    await this._checkIfRsk();
+    // await this._checkIfRsk();
     let retries = 3;
     const sleepAfterRetryMs = 3000;
     while (retries > 0) {

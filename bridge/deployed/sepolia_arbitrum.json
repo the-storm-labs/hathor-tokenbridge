@@ -1,0 +1,6 @@
+{
+    "network": "sepolia_arbitrum",
+    "smallAmountConfirmations": "300",
+    "mediumAmountConfirmations": "600",
+    "largeAmountConfirmations": "900"
+}

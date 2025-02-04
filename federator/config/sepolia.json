@@ -7,5 +7,5 @@
     "chainId": 11155111,
     "testToken": "0x97118caae1f773a84462490dd01fe7a3e7c4cdcd",
     "host": "https://eth-sepolia.g.alchemy.com/v2/",
-    "fromBlock": 7595536
+    "fromBlock": 7610347
 }

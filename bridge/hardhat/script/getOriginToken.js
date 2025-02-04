@@ -5,44 +5,46 @@ async function main() {
   const {getNamedAccounts, deployments} = hre;
   const {deployer} = await getNamedAccounts();
 
-  const Bridge = await deployments.get('Bridge');
-  const BridgeProxy = await deployments.get('BridgeProxy');
-  const MultiSigWallet = await deployments.get('MultiSigWallet');
+  console.log(deployer);
 
-  const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
-  const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
+  // const Bridge = await deployments.get('Bridge');
+  // const BridgeProxy = await deployments.get('BridgeProxy');
+  // const MultiSigWallet = await deployments.get('MultiSigWallet');
 
-  const hathorAddr = '000001f8107c19b57397acb4d44d66208015b6c0eb6cbc3c46651c6fc1e43cdd';
+  // const bridge = new web3.eth.Contract(Bridge.abi, BridgeProxy.address);
+  // const multiSigContract = new web3.eth.Contract(MultiSigWallet.abi, MultiSigWallet.address);
 
-  const addrFromToken = await bridge.methods.uidToAddress(hathorAddr).call({ from: deployer });
+  // const hathorAddr = '000001f8107c19b57397acb4d44d66208015b6c0eb6cbc3c46651c6fc1e43cdd';
 
-  const tokens = [
-    {
-      name: 'BogusC Coin (hBCC)',
-      symbol: 'hBCC',
-      typeId: 1,
-      originalHathorAddress: hathorAddr,
-      originalTokenAddress: addrFromToken,
-      chainId: 31
-    }
-  ];
+  // const addrFromToken = await bridge.methods.uidToAddress(hathorAddr).call({ from: deployer });
 
-  for (const token of tokens) {
-    console.log("Token", token);
-    console.log("deployer", deployer);
-    console.log("\nBridge", Bridge.address);
-    console.log("\nBridgeProxy", BridgeProxy.address);
-    console.log("\nMultiSigWallet", MultiSigWallet.address);
+  // const tokens = [
+  //   {
+  //     name: 'BogusC Coin (hBCC)',
+  //     symbol: 'hBCC',
+  //     typeId: 1,
+  //     originalHathorAddress: hathorAddr,
+  //     originalTokenAddress: addrFromToken,
+  //     chainId: 31
+  //   }
+  // ];
 
-
-    const mappedTokenAddress = await bridge.methods.sideTokenByOriginalToken(31, "0x0280f915ce595ec0d3457f89a0eba554999ec273").call({from: MultiSigWallet.address});
-    console.log("Mapped Token address for", token.name, ":", mappedTokenAddress);
+  // for (const token of tokens) {
+  //   console.log("Token", token);
+  //   console.log("deployer", deployer);
+  //   console.log("\nBridge", Bridge.address);
+  //   console.log("\nBridgeProxy", BridgeProxy.address);
+  //   console.log("\nMultiSigWallet", MultiSigWallet.address);
 
 
+  //   const mappedTokenAddress = await bridge.methods.sideTokenByOriginalToken(31, "0x0280f915ce595ec0d3457f89a0eba554999ec273").call({from: MultiSigWallet.address});
+  //   console.log("Mapped Token address for", token.name, ":", mappedTokenAddress);
 
-  }
 
-  console.log("finish");
+
+  // }
+
+  // console.log("finish");
 
   //0xfb163D3CB9D63b547eEbc060BcC32EA22D5d2838 -> mumbai
   //0x0280f915ce595ec0d3457f89a0eba554999ec273 -> hathor
