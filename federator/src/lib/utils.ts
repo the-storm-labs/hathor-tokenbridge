@@ -1,4 +1,5 @@
 import * as ethUtils from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import Web3 from 'web3';
 
 /**
@@ -220,4 +221,15 @@ export function clone(instance: any): any {
   const copy = new (instance.constructor as { new (): any })();
   Object.assign(copy, instance);
   return copy;
+}
+
+export function convertToEvmDecimals(originalQtd: number, tokenDecimals: number): BN {
+  try {
+    const hathorPrecision = tokenDecimals - 2;
+    const bnQtd = new BN(originalQtd);
+    const precision = new BN(Math.pow(10, hathorPrecision).toString());
+    return bnQtd.mul(precision);
+  } catch (error) {
+    console.log(error);
+  }
 }
