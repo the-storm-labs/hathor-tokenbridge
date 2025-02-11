@@ -118,8 +118,7 @@ export class HathorBroker extends Broker {
       originalTokenAddress = originalTokenAddress.substring(2);
     }
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
-    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
-    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals);
+    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount));
     this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
 
@@ -149,8 +148,7 @@ export class HathorBroker extends Broker {
       );
     }
 
-    const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
-    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals);
+    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount));
 
     return await this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }

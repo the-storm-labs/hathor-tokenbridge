@@ -223,11 +223,10 @@ export function clone(instance: any): any {
   return copy;
 }
 
-export function convertToEvmDecimals(originalQtd: number, tokenDecimals: number): BN {
+export function convertToEvmDecimals(originalQtd: number): BN {
   try {
-    const hathorPrecision = tokenDecimals - 2;
     const bnQtd = new BN(originalQtd);
-    const precision = new BN(Math.pow(10, hathorPrecision).toString());
+    const precision = new BN(Math.pow(10, 16).toString());
     return bnQtd.mul(precision);
   } catch (error) {
     console.log(error);
