@@ -9,6 +9,7 @@ import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 import { MetricCollector } from '../MetricCollector';
+import { convertToEvmDecimals } from '../utils';
 
 export class HathorBroker extends Broker {
   constructor(
@@ -118,7 +119,7 @@ export class HathorBroker extends Broker {
     }
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
-    const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
+    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals);
     this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
 
@@ -149,7 +150,7 @@ export class HathorBroker extends Broker {
     }
 
     const evmTokenDecimals = await this.getTokenDecimals(evmTokenAddress, originalChainId);
-    const convertedAmount = new BN(this.convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals));
+    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount), evmTokenDecimals);
 
     return await this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
@@ -245,11 +246,6 @@ export class HathorBroker extends Broker {
     }
 
     return false;
-  }
-
-  private convertToEvmDecimals(originalQtd: number, tokenDecimals: number): string {
-    const hathorPrecision = tokenDecimals - 2;
-    return (originalQtd * Math.pow(10, hathorPrecision)).toString();
   }
 
   public async isMultisigAddress(address: string) {
