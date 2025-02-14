@@ -50,8 +50,8 @@ export default abstract class Federator {
     return client.eth.net.getId();
   }
 
-  getLastBlockPath(mainChainId: number, sideChainId: number): string {
-    return `${this.config.storagePath}/lastBlock_${mainChainId}_${sideChainId}.txt`;
+  getLastBlockPath(mainChainId: number, sideChainId: number, origin: string): string {
+    return `${this.config.storagePath}/lastBlock_${origin}_${mainChainId}_${sideChainId}.txt`;
   }
 
   getRevertedTxnsPath(sideChainId: number, mainChainId: number): string {
@@ -75,11 +75,11 @@ export default abstract class Federator {
     return this.getWeb3(host);
   }
 
-  getLastBlock(mainChainId: number, sideChainId: number): number {
+  getLastBlock(mainChainId: number, sideChainId: number, origin: string): number {
     let fromBlock: number;
     const originalFromBlock = this.config.mainchain.fromBlock || 0;
     try {
-      fromBlock = parseInt(fs.readFileSync(this.getLastBlockPath(mainChainId, sideChainId), 'utf8'));
+      fromBlock = parseInt(fs.readFileSync(this.getLastBlockPath(mainChainId, sideChainId, origin), 'utf8'));
     } catch (err) {
       fromBlock = originalFromBlock;
     }
@@ -89,11 +89,11 @@ export default abstract class Federator {
     return fromBlock;
   }
 
-  getLastBlockFromEnv(mainChainId: number, sideChainId: number): number {
+  getLastBlockFromEnv(mainChainId: number, sideChainId: number, origin: string): number {
     let fromBlock: number;
     const originalFromBlock = Number.parseInt(process.env.FEDERATION_FROM_BLOCK) || 0;
     try {
-      fromBlock = parseInt(fs.readFileSync(this.getLastBlockPath(mainChainId, sideChainId), 'utf8'));
+      fromBlock = parseInt(fs.readFileSync(this.getLastBlockPath(mainChainId, sideChainId, origin), 'utf8'));
     } catch (err) {
       fromBlock = originalFromBlock;
     }

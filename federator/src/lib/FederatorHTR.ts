@@ -23,6 +23,7 @@ import {
 } from '../types/federator';
 
 export default class FederatorHTR extends Federator {
+  private readonly PATH_ORIGIN = 'fhtr';
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
     super(config, logger, metricCollector);
   }
@@ -74,7 +75,7 @@ export default class FederatorHTR extends Federator {
       return false;
     }
 
-    let fromBlock = this.getLastBlock(mainChainId, sideChainId);
+    let fromBlock = this.getLastBlock(mainChainId, sideChainId, this.PATH_ORIGIN);
     if (fromBlock >= toBlock && fromBlock >= newToBlock) {
       this.logger.warn(
         `Current chain ${mainChainId} Height ${toBlock} is the same or lesser than the last block processed ${fromBlock}`,
@@ -159,7 +160,10 @@ export default class FederatorHTR extends Federator {
         logs,
       });
       if (!getLogParams.mediumAndSmall) {
-        this._saveProgress(this.getLastBlockPath(getLogParams.mainChainId, getLogParams.sideChainId), toPagedBlock);
+        this._saveProgress(
+          this.getLastBlockPath(getLogParams.mainChainId, getLogParams.sideChainId, this.PATH_ORIGIN),
+          toPagedBlock,
+        );
       }
       fromPageBlock = toPagedBlock + 1;
     }

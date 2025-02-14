@@ -10,6 +10,7 @@ import { LogWrapper } from './logWrapper';
 import { HathorFederationLogsReader } from './HathorFederationLogsReader';
 
 export default class HathorMultisigManager extends Federator {
+  private readonly PATH_ORIGIN = 'hmm';
   constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
     super(config, logger, metricCollector);
   }
@@ -52,7 +53,7 @@ export default class HathorMultisigManager extends Federator {
       return false;
     }
 
-    let fromBlock = this.getLastBlockFromEnv(Number.parseInt(process.env.FEDERATION_CHAIN_ID), 31);
+    let fromBlock = this.getLastBlockFromEnv(Number.parseInt(process.env.FEDERATION_CHAIN_ID), 31, this.PATH_ORIGIN);
     if (fromBlock >= toBlock) {
       this.logger.warn(
         `Current chain ${mainChainId} Height ${toBlock} is the same or lesser than the last block processed ${fromBlock}`,
@@ -63,7 +64,7 @@ export default class HathorMultisigManager extends Federator {
     this.logger.debug('Running from Block', fromBlock);
     await this.getLogsAndProcess(currentBlock, fromBlock, toBlock, bridgeFactory, federationFactory, transactionSender);
 
-    this._saveProgress(this.getLastBlockPath(mainChainId, 31), toBlock);
+    this._saveProgress(this.getLastBlockPath(mainChainId, 31, this.PATH_ORIGIN), toBlock);
 
     return true;
   }
