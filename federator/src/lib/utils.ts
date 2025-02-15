@@ -232,3 +232,16 @@ export function convertToEvmDecimals(originalQtd: number): BN {
     console.log(error);
   }
 }
+
+export function convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
+  // Hathor Network tokens always have two decimals,
+  // so here we get the number of decimals we need to discard
+  const decimalDifference = tokenDecimals - 2;
+  // The original number minus the amount of decimals we need to discard
+  const result = originalQtd.substring(0, originalQtd.length - decimalDifference);
+  // If the number is less than the two decimals, lets say 0,001
+  // for a token with 6 digits we would have "100".
+  // Then we would get the substring to -1 which would lead to a empty ('') result.
+  // That's why we parse 0, as it's not a valid return.
+  return parseInt(!result ? '0' : result);
+}

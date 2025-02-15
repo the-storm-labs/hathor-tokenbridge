@@ -461,11 +461,6 @@ export abstract class Broker {
     return signatures;
   }
 
-  protected convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
-    const hathorPrecision = tokenDecimals - 2;
-    return Math.ceil(Number.parseInt(originalQtd) * Math.pow(10, -hathorPrecision));
-  }
-
   protected sumByAddressAndToken(transactions) {
     const result = {};
     transactions.forEach((txn) => {

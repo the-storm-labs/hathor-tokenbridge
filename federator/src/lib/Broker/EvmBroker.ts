@@ -5,6 +5,7 @@ import { HathorException, CreateProposalResponse, TransactionTypes } from '../..
 import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 import { MetricCollector } from '../MetricCollector';
+import { convertToHathorDecimals } from '../utils';
 
 export class EvmBroker extends Broker {
   constructor(
@@ -62,7 +63,7 @@ export class EvmBroker extends Broker {
 
     const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
 
-    const convertedQuantity = this.convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
+    const convertedQuantity = convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
 
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
@@ -103,7 +104,7 @@ export class EvmBroker extends Broker {
     const [destinationToken] = await this.getSideChainTokenAddress(token);
     const data = {
       address: `${receiverAddress}`,
-      amount: this.convertToHathorDecimals(qtd, tokenDecimals),
+      amount: convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
       mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
@@ -136,7 +137,7 @@ export class EvmBroker extends Broker {
     };
     const output = {
       address: `${receiverAddress}`,
-      value: this.convertToHathorDecimals(qtd, tokenDecimals),
+      value: convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
     };
     data.outputs.push(output);
