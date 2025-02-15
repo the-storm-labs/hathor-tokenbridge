@@ -2,6 +2,7 @@ config/config.js
 config/federator.key
 config/federator2.key
 config/etherscan.key
+config/sepolia.json
 rskregtest.json
 development.json
 development_1.json
