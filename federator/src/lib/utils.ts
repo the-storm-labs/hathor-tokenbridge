@@ -1,6 +1,7 @@
 import * as ethUtils from 'ethereumjs-util';
 import { BN } from 'ethereumjs-util';
 import Web3 from 'web3';
+import { HathorException } from '../types';
 
 /**
  * Retry system with async / await
@@ -242,6 +243,17 @@ export function convertToHathorDecimals(originalQtd: string, tokenDecimals: numb
   // If the number is less than the two decimals, lets say 0,001
   // for a token with 6 digits we would have "100".
   // Then we would get the substring to -1 which would lead to a empty ('') result.
-  // That's why we parse 0, as it's not a valid return.
-  return parseInt(!result ? '0' : result);
+  // We throw a exception, as we can have 0 or invalid value sent to hathor.
+
+  if (!result) {
+    throw new HathorException(`Unable to convert amount to Hathor amount. ${originalQtd} is invalid.`);
+  }
+
+  const amount = parseInt(result);
+
+  if (isNaN(amount) || amount === 0) {
+    throw new HathorException(`Invalid amount. ${originalQtd} is NaN or 0.`);
+  }
+
+  return amount;
 }

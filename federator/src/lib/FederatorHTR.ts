@@ -21,6 +21,7 @@ import {
   ProcessToHathorTransactionParams,
   VoteHathorTransactionParams,
 } from '../types/federator';
+import { HathorException } from '../types';
 
 export default class FederatorHTR extends Federator {
   private readonly PATH_ORIGIN = 'fhtr';
@@ -274,22 +275,29 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const hathorService = new HathorService(
-      this.config,
-      this.logger,
-      processTransactionParams.bridgeFactory,
-      processTransactionParams.federationFactory,
-      processTransactionParams.transactionSender,
-      this.metricCollector,
-    );
+    try {
+      const hathorService = new HathorService(
+        this.config,
+        this.logger,
+        processTransactionParams.bridgeFactory,
+        processTransactionParams.federationFactory,
+        processTransactionParams.transactionSender,
+        this.metricCollector,
+      );
 
-    await hathorService.sendTokensToHathor(
-      processTransactionParams.senderAddress,
-      processTransactionParams.receiver,
-      processTransactionParams.amount.toString(),
-      processTransactionParams.tokenAddress,
-      processTransactionParams.log.transactionHash,
-    );
+      await hathorService.sendTokensToHathor(
+        processTransactionParams.senderAddress,
+        processTransactionParams.receiver,
+        processTransactionParams.amount.toString(),
+        processTransactionParams.tokenAddress,
+        processTransactionParams.log.transactionHash,
+      );
+    } catch (error) {
+      if (!(error instanceof HathorException)) throw error;
+
+      const htrException = error as HathorException;
+      this.logger.error(htrException.message, htrException.getOriginalMessage());
+    }
   }
 
   async _processLogs(processLogsParams: ProcessLogsParams) {
