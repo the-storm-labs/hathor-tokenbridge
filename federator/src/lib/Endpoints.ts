@@ -42,6 +42,7 @@ export class Endpoint {
       try {
         const metrics = await this.register.metrics();
         res.status(200).write(metrics);
+        res.end();
       } catch (error) {
         this.logger.error('metrics endpoint failed');
       }
