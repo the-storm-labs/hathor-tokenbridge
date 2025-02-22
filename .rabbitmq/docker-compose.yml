@@ -1,3 +1,6 @@
+networks:
+  federator_${HATHOR_MULTISIG_ORDER}:
+
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -11,6 +14,8 @@ services:
     volumes:
       - ./rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
       - ./rabbitmq_definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - federator_${HATHOR_MULTISIG_ORDER}
   
   init-rabbitmq:
     image: alpine:3.12
@@ -36,6 +41,8 @@ services:
       start_period: 5s
     volumes:
       - ./init-rabbitmq.sh:/init-rabbitmq.sh
+    networks:
+      - federator_${HATHOR_MULTISIG_ORDER}
 
   hathor-wallet:
     image: toggera/hathor-wallet-rabbitmq:preview.0.0.2
@@ -57,9 +64,23 @@ services:
       HEADLESS_PLUGIN_DEBUG_LONG: all
       HEADLESS_PLUGIN_RABBITMQ_QUEUE: main_queue
       HEADLESS_PLUGIN_RABBITMQ_URL: amqp://rabbitmq
+    networks:
+      - federator_${HATHOR_MULTISIG_ORDER}
+
+  prometheus:
+    image: prom/prometheus:v2.49.0
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - 9090:9090
+    networks:
+      - grafana      
 
   hathor-federator:
-    image: toggera/hathor-tokenbridge:latest
+    image: toggera/hathor-tokenbridge:preview-1739634765
     container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}    
     depends_on:
       - hathor-wallet
@@ -85,6 +106,8 @@ services:
       HATHOR_LAST_TIMESTAMP: ${HATHOR_LAST_TIMESTAMP}
       HATHOR_INPUT_BLOCK_TTL: ${HATHOR_INPUT_BLOCK_TTL}
       DATADOG_API_KEY: ${DATADOG_API_KEY}
+    networks:
+      - federator_${HATHOR_MULTISIG_ORDER}
 
 volumes:
   federator_db:

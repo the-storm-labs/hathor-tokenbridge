@@ -8,7 +8,7 @@ import { BN } from 'ethereumjs-util';
 import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
-import { MetricCollector } from '../MetricCollector';
+import MetricRegister from '../../utils/MetricRegister';
 import { convertToEvmDecimals } from '../utils';
 
 export class HathorBroker extends Broker {
@@ -17,9 +17,9 @@ export class HathorBroker extends Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    metricCollector: MetricCollector,
+    metricRegister: MetricRegister,
   ) {
-    super(config, logger, bridgeFactory, federationFactory, metricCollector);
+    super(config, logger, bridgeFactory, federationFactory, metricRegister);
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
@@ -160,7 +160,7 @@ export class HathorBroker extends Broker {
     txId: string,
     ogSenderAddress: string,
   ): Promise<boolean> {
-    const federator = new FederatorHTR(this.config, this.logger, null);
+    const federator = new FederatorHTR(this.config, this.logger, this.metricRegister);
 
     const sender = Web3.utils.keccak256(ogSenderAddress);
     const thirdTwoBytesSender = Web3.utils.toChecksumAddress(sender.substring(0, 42));

@@ -4,7 +4,7 @@ import { ConfigData } from '../config';
 import { HathorException, CreateProposalResponse, TransactionTypes } from '../../types';
 import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
-import { MetricCollector } from '../MetricCollector';
+import MetricRegister from '../../utils/MetricRegister';
 import { convertToHathorDecimals } from '../utils';
 
 export class EvmBroker extends Broker {
@@ -13,9 +13,9 @@ export class EvmBroker extends Broker {
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    metricCollector: MetricCollector,
+    metricRegister: MetricRegister,
   ) {
-    super(config, logger, bridgeFactory, federationFactory, metricCollector);
+    super(config, logger, bridgeFactory, federationFactory, metricRegister);
   }
 
   async sendTokens(

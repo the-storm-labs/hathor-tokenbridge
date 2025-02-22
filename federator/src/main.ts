@@ -1,9 +1,6 @@
 import { Config } from './lib/config';
-import * as utils from './lib/utils';
 import Scheduler from './services/Scheduler';
 import Federator from './lib/FederatorHTR';
-import Heartbeat from './lib/Heartbeat';
-import { MetricCollector } from './lib/MetricCollector';
 import { Endpoint } from './lib/Endpoints';
 import { ConfigChain } from './lib/configChain';
 import { LogWrapper } from './lib/logWrapper';
@@ -12,7 +9,6 @@ import {
   LOGGER_CATEGORY_FEDERATOR,
   LOGGER_CATEGORY_FEDERATOR_MAIN,
   LOGGER_CATEGORY_FEDERATOR_SIDE,
-  LOGGER_CATEGORY_HEARTBEAT,
   LOGGER_CATEGORY_ENDPOINT,
 } from './lib/logs';
 import HathorService from './lib/HathorService';
@@ -24,45 +20,43 @@ import HathorMultisigManager from './lib/HathorMultisigManager';
 import FederatorHTR from './lib/FederatorHTR';
 import Web3 from 'web3';
 import { HathorHistorySinc } from './lib/HathorHistorySync';
+import { Registry } from 'prom-client';
+import MetricRegister from './utils/MetricRegister';
 
 export class Main {
   logger: LogWrapper;
   endpoint: any;
-  metricCollector: MetricCollector;
   rskFederator: FederatorHTR;
   hathorFederation: HathorMultisigManager;
   config: Config;
-  heartbeat: Heartbeat;
   heartBeatScheduler: Scheduler;
   federatorScheduler: Scheduler;
+  register: Registry;
+  metricRegister: MetricRegister;
 
   constructor() {
     this.logger = Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR);
     this.config = Config.getInstance();
-    this.endpoint = new Endpoint(Logs.getInstance().getLogger(LOGGER_CATEGORY_ENDPOINT), this.config.endpointsPort);
-    this.endpoint.init();
-    try {
-      this.metricCollector = new MetricCollector();
-    } catch (error) {
-      this.logger.warn(`Error creating MetricCollector instance:`, error);
-    }
-
-    this.heartbeat = new Heartbeat(
-      this.config,
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_HEARTBEAT),
-      this.metricCollector,
+    this.register = new Registry();
+    this.register.setDefaultLabels({ app: `federator_${this.config.mainchain.multisigOrder}` });
+    this.metricRegister = new MetricRegister(this.register);
+    this.endpoint = new Endpoint(
+      Logs.getInstance().getLogger(LOGGER_CATEGORY_ENDPOINT),
+      this.config.endpointsPort,
+      this.register,
     );
+    this.endpoint.init();
 
     this.rskFederator = new Federator(
       this.config,
       Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
-      this.metricCollector,
+      this.metricRegister,
     );
 
     this.hathorFederation = new HathorMultisigManager(
       this.config,
       Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_SIDE),
-      this.metricCollector,
+      this.metricRegister,
     );
   }
 
@@ -116,7 +110,7 @@ export class Main {
         sidechain: [this.config.mainchain],
       },
       Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_SIDE),
-      this.metricCollector,
+      this.metricRegister,
     );
 
     this.logger.info('Side Host', sideChainConfig.host);
@@ -131,7 +125,7 @@ export class Main {
       new BridgeFactory(),
       new FederationFactory(),
       new TransactionSender(client, this.logger, this.config),
-      this.metricCollector,
+      this.metricRegister,
     );
     const sync = new HathorHistorySinc(this.config, this.logger, service);
     await sync.processHistory();
@@ -171,31 +165,6 @@ export class Main {
 
     this.federatorScheduler.start().catch((err) => {
       this.logger.error('Unhandled Error on federatorScheduler.start()', err);
-    });
-  }
-
-  async scheduleHeartbeatProcesses() {
-    const heartBeatPollingInterval = await utils.getHeartbeatPollingInterval({
-      host: this.config.mainchain.host,
-      runHeartbeatEvery: this.config.runHeartbeatEvery,
-    });
-
-    this.heartBeatScheduler = new Scheduler(heartBeatPollingInterval, this.logger, {
-      run: async () => {
-        try {
-          const result = await this.heartbeat.run();
-          if (!result) {
-            this.logger.warn('Heartbeat run run was not successful.');
-          }
-        } catch (err) {
-          this.logger.error('Unhandled Error on runHeartbeat()', err);
-          process.exit(1);
-        }
-      },
-    });
-
-    this.heartBeatScheduler.start().catch((err) => {
-      this.logger.error('Unhandled Error on heartBeatScheduler.start()', err);
     });
   }
 }

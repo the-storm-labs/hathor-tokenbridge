@@ -23,7 +23,7 @@ import {
 import { ConfigChain } from '../configChain';
 import { HathorWallet } from '../HathorWallet';
 import { TransactionSender } from '../TransactionSender';
-import { MetricCollector } from '../MetricCollector';
+import MetricRegister from '../../utils/MetricRegister';
 
 const TOKEN_MELT_MASK = 0b00000010;
 const TOKEN_MINT_MASK = 0b00000001;
@@ -41,21 +41,21 @@ export abstract class Broker {
   private transactionSender: TransactionSender;
   protected chainConfig: ConfigChain;
   private wallet: HathorWallet;
-  private metricCollector: MetricCollector;
+  protected metricRegister: MetricRegister;
 
   constructor(
     config: ConfigData,
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
-    metricCollector: MetricCollector,
+    metricRegister: MetricRegister,
   ) {
     this.config = config;
     this.logger = logger;
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
     this.chainConfig = config.sidechain[0];
-    this.metricCollector = metricCollector;
+    this.metricRegister = metricRegister;
 
     this.web3ByHost = new Map<string, Web3>();
     this.transactionSender = new TransactionSender(
@@ -176,6 +176,7 @@ export abstract class Broker {
     contractTxId,
   ) {
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
+      this.metricRegister.increaseInvalidProposalCounter(transactionHash);
       this.logger.error(`Invalid proposal: ${txHex} : ${transactionHash}`);
       return false;
     }
@@ -195,12 +196,20 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    if (!receipt) {
-      this.logger.error(`Failed to send proposal for transaction ${transactionHash}`);
-      this.metricCollector.trackHathorSentProposal(transactionHash, false);
-    }
+    this.metricRegister.increaseSuccessfulProposalCounter(
+      transactionHash,
+      contractTxId,
+      tokenAddress,
+      sender,
+      receiver,
+      value,
+      txHex,
+    );
 
-    this.metricCollector.trackHathorSentProposal(transactionHash, true);
+    if (!receipt) {
+      this.metricRegister.increaseInvalidProposalCounter(transactionHash);
+      this.logger.error(`Failed to send proposal for transaction ${transactionHash}`);
+    }
   }
 
   private async signProposal(
@@ -214,6 +223,15 @@ export abstract class Broker {
     contractTxId,
   ) {
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
+      this.metricRegister.increaseInvalidSigningCounter(
+        transactionHash,
+        contractTxId,
+        tokenAddress,
+        senderAddress,
+        receiverAddress,
+        amount,
+        txHex,
+      );
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
     const signature = await this.getMySignatures(txHex);
@@ -236,12 +254,28 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    if (!receipt.status) {
-      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
-      this.metricCollector.trackHathorSignedProposal(transactionHash, false);
-    }
+    this.metricRegister.increaseSigningCounter(
+      transactionHash,
+      contractTxId,
+      tokenAddress,
+      senderAddress,
+      receiverAddress,
+      amount,
+      txHex,
+    );
 
-    this.metricCollector.trackHathorSignedProposal(transactionHash, true);
+    if (!receipt.status) {
+      this.metricRegister.increaseInvalidSigningCounter(
+        transactionHash,
+        contractTxId,
+        tokenAddress,
+        senderAddress,
+        receiverAddress,
+        amount,
+        txHex,
+      );
+      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+    }
   }
 
   private async pushProposal(
@@ -266,6 +300,15 @@ export abstract class Broker {
     if (arrayLength < maxSignatures) return;
 
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
+      this.metricRegister.increaseInvalidPushProposalCounter(
+        transactionHash,
+        transactionId,
+        tokenAddress,
+        senderAddress,
+        receiverAddress,
+        amount,
+        txHex,
+      );
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
     const signatures = await this.getSignaturesFromArray(transactionId);
@@ -287,6 +330,16 @@ export abstract class Broker {
           txId = '4d616e75616c20436865636b205472616e73616374696f6e0000000000000000';
         }
       }
+
+      this.metricRegister.increaseInvalidPushProposalCounter(
+        transactionHash,
+        transactionId,
+        tokenAddress,
+        senderAddress,
+        receiverAddress,
+        amount,
+        txHex,
+      );
     }
 
     const args = await this.hathorFederationContract.getUpdateTransactionStateArgs(
@@ -307,12 +360,28 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    if (!receipt.status) {
-      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
-      this.metricCollector.trackHathorPushProposal(transactionHash, false);
-    }
+    this.metricRegister.increasePushProposalCounter(
+      transactionHash,
+      transactionId,
+      tokenAddress,
+      senderAddress,
+      receiverAddress,
+      amount,
+      txHex,
+    );
 
-    this.metricCollector.trackHathorSentProposal(transactionHash, true);
+    if (!receipt.status) {
+      this.metricRegister.increaseInvalidPushProposalCounter(
+        transactionHash,
+        transactionId,
+        tokenAddress,
+        senderAddress,
+        receiverAddress,
+        amount,
+        txHex,
+      );
+      this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
+    }
   }
 
   private async hathorPushProposal(txHex: string, signatures: string[]): Promise<string> {
