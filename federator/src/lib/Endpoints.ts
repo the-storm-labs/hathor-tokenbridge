@@ -40,7 +40,8 @@ export class Endpoint {
 
     this.router.get('/metrics', async (req, res) => {
       try {
-        res.status(200).json(await this.register.metrics());
+        const metrics = await this.register.metrics();
+        res.status(200).write(metrics);
       } catch (error) {
         this.logger.error('metrics endpoint failed');
       }
