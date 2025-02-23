@@ -38,8 +38,10 @@ export class Main {
     this.logger = Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR);
     this.config = Config.getInstance();
     this.register = new Registry();
-    this.register.setDefaultLabels({ app: `federator_${this.config.mainchain.multisigOrder}` });
-    this.metricRegister = new MetricRegister(this.register);
+    this.register.setDefaultLabels({
+      instance_address: process.env.FEDERATOR_ADDRESS,
+    });
+    this.metricRegister = new MetricRegister(this.register, `federator_${this.config.mainchain.multisigOrder}`);
     this.endpoint = new Endpoint(
       Logs.getInstance().getLogger(LOGGER_CATEGORY_ENDPOINT),
       this.config.endpointsPort,

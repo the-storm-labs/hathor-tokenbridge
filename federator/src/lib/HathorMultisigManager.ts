@@ -64,7 +64,7 @@ export default class HathorMultisigManager extends Federator {
     this.logger.debug('Running from Block', fromBlock);
     await this.getLogsAndProcess(currentBlock, fromBlock, toBlock, bridgeFactory, federationFactory, transactionSender);
 
-    this.metricRegister.increaseHtrRunCounter(fromBlock, toBlock);
+    this.metricRegister.increaseHtrRunCounter();
     this._saveProgress(this.getLastBlockPath(mainChainId, 31, this.PATH_ORIGIN), toBlock);
 
     return true;

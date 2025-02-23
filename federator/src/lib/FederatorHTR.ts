@@ -167,7 +167,7 @@ export default class FederatorHTR extends Federator {
       fromPageBlock = toPagedBlock + 1;
     }
 
-    this.metricRegister.increaseEvmRunCounter(getLogParams.fromBlock, getLogParams.toBlock);
+    this.metricRegister.increaseEvmRunCounter();
   }
 
   async checkFederatorIsMember(sideFedContract: IFederation, federatorAddress: string) {

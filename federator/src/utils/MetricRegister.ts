@@ -1,52 +1,32 @@
 import { collectDefaultMetrics, Counter, Registry } from 'prom-client';
 
 class MetricRegister {
-  private federatorAddress = process.env.FEDERATOR_ADDRESS;
-
   private evmFederationRunCounter = new Counter({
     name: 'evm_run_count',
     help: 'Counter of EVM federation runs.',
-    labelNames: ['federator', 'start_block', 'end_block'],
   });
 
   private htrFederationRunCounter = new Counter({
     name: 'htr_run_count',
     help: 'Counter of Hathor federation runs.',
-    labelNames: ['federator', 'start_block', 'end_block'],
   });
 
   private successVoteCounter = new Counter({
     name: 'success_vote_count',
     help: 'Counter of successful votes',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'blockHash',
-      'transactionId',
-      'originalTokenAddress',
-      'receiver',
-      'amount',
-    ],
+    labelNames: ['transactionHash', 'blockHash', 'transactionId', 'originalTokenAddress', 'receiver', 'amount'],
   });
 
   private failedVoteCounter = new Counter({
     name: 'failed_vote_count',
     help: 'Counter of failed votes',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'blockHash',
-      'transactionId',
-      'originalTokenAddress',
-      'receiver',
-      'amount',
-    ],
+    labelNames: ['transactionHash', 'blockHash', 'transactionId', 'originalTokenAddress', 'receiver', 'amount'],
   });
 
   private invalidProposalCounter = new Counter({
     name: 'invalid_proposal_count',
     help: 'Counter of invalid proposals',
-    labelNames: ['transactionHash', 'federator'],
+    labelNames: ['transactionHash'],
   });
 
   private proposalCounter = new Counter({
@@ -55,7 +35,6 @@ class MetricRegister {
     labelNames: [
       'status',
       'transactionHash',
-      'federator',
       'transactionId',
       'originalTokenAddress',
       'sender',
@@ -68,64 +47,28 @@ class MetricRegister {
   private invalidSigningCounter = new Counter({
     name: 'invalid_signing_count',
     help: 'Counter of signatures',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'transactionId',
-      'originalTokenAddress',
-      'sender',
-      'receiver',
-      'amount',
-      'txHex',
-    ],
+    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private signingCounter = new Counter({
     name: 'signing_count',
     help: 'Counter of signatures',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'transactionId',
-      'originalTokenAddress',
-      'sender',
-      'receiver',
-      'amount',
-      'txHex',
-    ],
+    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private invalidPushedProposalCounter = new Counter({
     name: 'invalid_pushed_proposal_count',
     help: 'Counter of proposals pushed',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'transactionId',
-      'originalTokenAddress',
-      'sender',
-      'receiver',
-      'amount',
-      'txHex',
-    ],
+    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private pushedProposalCounter = new Counter({
     name: 'pushed_proposal_count',
     help: 'Counter of proposals pushed',
-    labelNames: [
-      'transactionHash',
-      'federator',
-      'transactionId',
-      'originalTokenAddress',
-      'sender',
-      'receiver',
-      'amount',
-      'txHex',
-    ],
+    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
-  constructor(register: Registry) {
+  constructor(register: Registry, prefix: string) {
     register.registerMetric(this.evmFederationRunCounter);
     register.registerMetric(this.htrFederationRunCounter);
     register.registerMetric(this.successVoteCounter);
@@ -134,27 +77,15 @@ class MetricRegister {
     register.registerMetric(this.proposalCounter);
     register.registerMetric(this.signingCounter);
     register.registerMetric(this.pushedProposalCounter);
-    collectDefaultMetrics({ register });
+    collectDefaultMetrics({ register, prefix });
   }
 
-  increaseEvmRunCounter(startBlock: number, endBlock: number) {
-    this.evmFederationRunCounter
-      .labels({
-        federator: this.federatorAddress,
-        start_block: startBlock,
-        end_block: endBlock,
-      })
-      .inc();
+  increaseEvmRunCounter() {
+    this.evmFederationRunCounter.inc();
   }
 
-  increaseHtrRunCounter(startBlock: number, endBlock: number) {
-    this.htrFederationRunCounter
-      .labels({
-        federator: this.federatorAddress,
-        start_block: startBlock,
-        end_block: endBlock,
-      })
-      .inc();
+  increaseHtrRunCounter() {
+    this.htrFederationRunCounter.inc();
   }
 
   increaseSuccessfulVoteCounter(
@@ -168,7 +99,6 @@ class MetricRegister {
     this.successVoteCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         blockHash,
         transactionId,
         originalTokenAddress,
@@ -189,7 +119,6 @@ class MetricRegister {
     this.failedVoteCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         blockHash,
         transactionId,
         originalTokenAddress,
@@ -200,7 +129,7 @@ class MetricRegister {
   }
 
   increaseInvalidProposalCounter(transactionHash: string) {
-    this.invalidProposalCounter.labels({ federator: this.federatorAddress, transactionHash: transactionHash }).inc();
+    this.invalidProposalCounter.labels({ transactionHash: transactionHash }).inc();
   }
 
   increaseSuccessfulProposalCounter(
@@ -215,7 +144,6 @@ class MetricRegister {
     this.proposalCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         transactionId,
         originalTokenAddress,
         sender,
@@ -238,7 +166,6 @@ class MetricRegister {
     this.invalidSigningCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         transactionId,
         originalTokenAddress,
         sender,
@@ -261,7 +188,6 @@ class MetricRegister {
     this.signingCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         transactionId,
         originalTokenAddress,
         sender,
@@ -284,7 +210,6 @@ class MetricRegister {
     this.invalidPushedProposalCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         transactionId,
         originalTokenAddress,
         sender,
@@ -307,7 +232,6 @@ class MetricRegister {
     this.pushedProposalCounter
       .labels({
         transactionHash,
-        federator: this.federatorAddress,
         transactionId,
         originalTokenAddress,
         sender,
