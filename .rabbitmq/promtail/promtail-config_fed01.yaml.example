@@ -1,0 +1,18 @@
+server:
+  http_listen_port: 0
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: {{grafana-url}}
+
+scrape_configs:
+  - job_name: federator
+    static_configs:
+      - targets:
+          - hathor-federator:5000
+        labels:
+          job: federator-0{{your federation number}}
+          __path__: /var/log/*.log
