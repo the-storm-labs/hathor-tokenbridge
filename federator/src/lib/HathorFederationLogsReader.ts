@@ -5,7 +5,7 @@ import { Broker, EvmBroker, HathorBroker } from './Broker';
 import { ConfigData } from './config';
 import { ConfigChain } from './configChain';
 import { LogWrapper } from './logWrapper';
-import { MetricCollector } from './MetricCollector';
+import MetricRegister from '../utils/MetricRegister';
 import TransactionSender from './TransactionSender';
 
 export class HathorFederationLogsReader {
@@ -16,7 +16,7 @@ export class HathorFederationLogsReader {
   public transactionSender: TransactionSender;
   protected hathorFederationContract: IHathorFederationV1;
   protected chainConfig: ConfigChain;
-  private metricCollector: MetricCollector;
+  private metricRegister: MetricRegister;
 
   constructor(
     config: ConfigData,
@@ -24,7 +24,7 @@ export class HathorFederationLogsReader {
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
-    metricCollector: MetricCollector,
+    metricRegister: MetricRegister,
   ) {
     this.config = config;
     this.logger = logger;
@@ -32,7 +32,7 @@ export class HathorFederationLogsReader {
     this.bridgeFactory = bridgeFactory;
     this.federationFactory = federationFactory;
     this.transactionSender = transactionSender;
-    this.metricCollector = metricCollector;
+    this.metricRegister = metricRegister;
 
     this.hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
   }
@@ -52,7 +52,7 @@ export class HathorFederationLogsReader {
             this.logger,
             this.bridgeFactory,
             this.federationFactory,
-            this.metricCollector,
+            this.metricRegister,
           ).postProcessing(
             result.sender,
             result.receiver,
@@ -87,7 +87,7 @@ export class HathorFederationLogsReader {
           this.logger,
           this.bridgeFactory,
           this.federationFactory,
-          this.metricCollector,
+          this.metricRegister,
         );
         break;
       case TransactionTypes.MELT:
@@ -96,7 +96,7 @@ export class HathorFederationLogsReader {
           this.logger,
           this.bridgeFactory,
           this.federationFactory,
-          this.metricCollector,
+          this.metricRegister,
         );
         break;
     }
@@ -126,7 +126,7 @@ export class HathorFederationLogsReader {
       this.logger,
       this.bridgeFactory,
       this.federationFactory,
-      this.metricCollector,
+      this.metricRegister,
     );
 
     await broker.hathorLockProposalInputs(txHex);

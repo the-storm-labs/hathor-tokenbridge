@@ -1,17 +1,21 @@
 import express from 'express';
+import { Registry } from 'prom-client';
 
 export class Endpoint {
   app: express.Express;
   router: express.Router;
   logger: any;
   port: number;
+  register: Registry;
 
-  constructor(_logger, port: number) {
+  constructor(_logger, port: number, register: Registry) {
     this.logger = _logger;
     this.port = port;
     if (this.logger.upsertContext) {
       this.logger.upsertContext('service', this.constructor.name);
     }
+
+    this.register = register;
   }
 
   logCall(req, res, next) {
@@ -31,6 +35,15 @@ export class Endpoint {
         });
       } catch (err) {
         this.logger.error('isAlive/ endpoint failed');
+      }
+    });
+
+    this.router.get('/metrics', async (req, res) => {
+      try {
+        const metrics = await this.register.metrics();
+        res.status(200).send(metrics);
+      } catch (error) {
+        this.logger.error('metrics endpoint failed');
       }
     });
 

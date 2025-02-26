@@ -1,5 +1,4 @@
 import { ConfigData } from './config';
-import { MetricCollector } from './MetricCollector';
 import web3 from 'web3';
 import TransactionSender from './TransactionSender';
 import { BridgeFactory, IFederation, FederationFactory } from '../contracts';
@@ -8,11 +7,12 @@ import Federator from './Federator';
 import { ConfigChain } from './configChain';
 import { LogWrapper } from './logWrapper';
 import { HathorFederationLogsReader } from './HathorFederationLogsReader';
+import MetricRegister from '../utils/MetricRegister';
 
 export default class HathorMultisigManager extends Federator {
   private readonly PATH_ORIGIN = 'hmm';
-  constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
-    super(config, logger, metricCollector);
+  constructor(config: ConfigData, logger: LogWrapper, metricRegister: MetricRegister) {
+    super(config, logger, metricRegister);
   }
 
   async run({
@@ -64,6 +64,7 @@ export default class HathorMultisigManager extends Federator {
     this.logger.debug('Running from Block', fromBlock);
     await this.getLogsAndProcess(currentBlock, fromBlock, toBlock, bridgeFactory, federationFactory, transactionSender);
 
+    this.metricRegister.increaseHtrRunCounter();
     this._saveProgress(this.getLastBlockPath(mainChainId, 31, this.PATH_ORIGIN), toBlock);
 
     return true;
@@ -98,7 +99,7 @@ export default class HathorMultisigManager extends Federator {
       bridgeFactory,
       federationFactory,
       transactionSender,
-      this.metricCollector,
+      this.metricRegister,
     );
 
     /// First we process all the lock input events, so the proposals previously created are synced locally
@@ -164,14 +165,5 @@ export default class HathorMultisigManager extends Federator {
     if (!isMember) {
       throw new Error(`This Federator addr:${federatorAddress} is not part of the federation`);
     }
-  }
-
-  async trackTransactionResultMetric(wasTransactionVoted, federatorAddress, federator: IFederation) {
-    this.metricCollector?.trackERC20FederatorVotingResult(
-      wasTransactionVoted,
-      federatorAddress,
-      federator.getVersion(),
-      await this.getCurrentChainId(),
-    );
   }
 }

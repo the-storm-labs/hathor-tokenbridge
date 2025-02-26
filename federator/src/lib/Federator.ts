@@ -1,6 +1,4 @@
 import { ConfigData } from './config';
-import { MetricCollector } from './MetricCollector';
-
 import web3 from 'web3';
 import fs from 'fs';
 import TransactionSender from './TransactionSender';
@@ -11,17 +9,18 @@ import * as typescriptUtils from './typescriptUtils';
 import { ConfigChain } from './configChain';
 import { IFederation } from '../contracts/IFederation';
 import { LogWrapper } from './logWrapper';
+import MetricRegister from '../utils/MetricRegister';
 
 export default abstract class Federator {
   public logger: LogWrapper;
   public config: ConfigData;
-  public metricCollector: MetricCollector;
+  public metricRegister: MetricRegister;
   public chainId: number;
   public sideChain: ConfigChain;
   public web3ByHost: Map<string, web3>;
   private numberOfRetries: number;
 
-  constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
+  constructor(config: ConfigData, logger: LogWrapper, metricRegister: MetricRegister) {
     this.config = config;
     this.logger = logger;
     if (this.logger.upsertContext) {
@@ -33,7 +32,7 @@ export default abstract class Federator {
       throw new Error(`Invalid host configuration, https or localhost required`);
     }
 
-    this.metricCollector = metricCollector;
+    this.metricRegister = metricRegister;
     this.numberOfRetries = config.federatorRetries;
     this.web3ByHost = new Map<string, web3>();
     this.checkStoragePath();

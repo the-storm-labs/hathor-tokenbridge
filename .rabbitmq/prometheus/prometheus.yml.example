@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "federator"
+
+    # Override global settings
+    scrape_interval: 60s
+
+    static_configs:
+      - targets: ["hathor-federator:5000"]
+
+remote_write:
+  - url: {{grafana-host}}
+    basic_auth:
+      username: {{grafana-user}}
+      password: {{grafana-password}}

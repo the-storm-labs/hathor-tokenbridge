@@ -1,5 +1,4 @@
 import { ConfigData } from './config';
-import { MetricCollector } from './MetricCollector';
 import web3 from 'web3';
 import fs from 'fs';
 import TransactionSender from './TransactionSender';
@@ -21,11 +20,13 @@ import {
   ProcessToHathorTransactionParams,
   VoteHathorTransactionParams,
 } from '../types/federator';
+import { HathorException } from '../types';
+import MetricRegister from '../utils/MetricRegister';
 
 export default class FederatorHTR extends Federator {
   private readonly PATH_ORIGIN = 'fhtr';
-  constructor(config: ConfigData, logger: LogWrapper, metricCollector: MetricCollector) {
-    super(config, logger, metricCollector);
+  constructor(config: ConfigData, logger: LogWrapper, metricRegister: MetricRegister) {
+    super(config, logger, metricRegister);
   }
 
   async run({
@@ -116,8 +117,6 @@ export default class FederatorHTR extends Federator {
       bridgeFactory,
     });
 
-    this.metricCollector.trackFederatorRun();
-
     return true;
   }
 
@@ -167,6 +166,8 @@ export default class FederatorHTR extends Federator {
       }
       fromPageBlock = toPagedBlock + 1;
     }
+
+    this.metricRegister.increaseEvmRunCounter();
   }
 
   async checkFederatorIsMember(sideFedContract: IFederation, federatorAddress: string) {
@@ -274,22 +275,29 @@ export default class FederatorHTR extends Federator {
   }
 
   async processTransaction(processTransactionParams: ProcessToHathorTransactionParams) {
-    const hathorService = new HathorService(
-      this.config,
-      this.logger,
-      processTransactionParams.bridgeFactory,
-      processTransactionParams.federationFactory,
-      processTransactionParams.transactionSender,
-      this.metricCollector,
-    );
+    try {
+      const hathorService = new HathorService(
+        this.config,
+        this.logger,
+        processTransactionParams.bridgeFactory,
+        processTransactionParams.federationFactory,
+        processTransactionParams.transactionSender,
+        this.metricRegister,
+      );
 
-    await hathorService.sendTokensToHathor(
-      processTransactionParams.senderAddress,
-      processTransactionParams.receiver,
-      processTransactionParams.amount.toString(),
-      processTransactionParams.tokenAddress,
-      processTransactionParams.log.transactionHash,
-    );
+      await hathorService.sendTokensToHathor(
+        processTransactionParams.senderAddress,
+        processTransactionParams.receiver,
+        processTransactionParams.amount.toString(),
+        processTransactionParams.tokenAddress,
+        processTransactionParams.log.transactionHash,
+      );
+    } catch (error) {
+      if (!(error instanceof HathorException)) throw error;
+
+      const htrException = error as HathorException;
+      this.logger.error(htrException.message, htrException.getOriginalMessage());
+    }
   }
 
   async _processLogs(processLogsParams: ProcessLogsParams) {
@@ -357,6 +365,14 @@ export default class FederatorHTR extends Federator {
       );
 
       if (!receipt.status) {
+        this.metricRegister.increaseFailedVoteCounter(
+          receipt.transactionHash,
+          voteTransactionParams.blockHash,
+          voteTransactionParams.transactionId,
+          voteTransactionParams.tokenAddress,
+          voteTransactionParams.receiver,
+          voteTransactionParams.amount.toString(),
+        );
         this.logger.error(
           `Voting ${voteTransactionParams.amount} of originalTokenAddress:${voteTransactionParams.tokenAddress}
           TransactionId ${voteTransactionParams.transactionId} failed, check the receipt`,
@@ -381,29 +397,33 @@ export default class FederatorHTR extends Federator {
             },
           }),
         );
+
+        return false;
       }
 
-      await this.trackTransactionResultMetric(
-        receipt.status,
-        voteTransactionParams.federatorAddress,
-        voteTransactionParams.sideFedContract,
+      this.metricRegister.increaseSuccessfulVoteCounter(
+        receipt.transactionHash,
+        voteTransactionParams.blockHash,
+        voteTransactionParams.transactionId,
+        voteTransactionParams.tokenAddress,
+        voteTransactionParams.receiver,
+        voteTransactionParams.amount.toString(),
       );
 
       return true;
     } catch (err) {
+      this.metricRegister.increaseFailedVoteCounter(
+        null,
+        voteTransactionParams.blockHash,
+        voteTransactionParams.transactionId,
+        voteTransactionParams.tokenAddress,
+        voteTransactionParams.receiver,
+        voteTransactionParams.amount.toString(),
+      );
       throw new CustomError(
         `Exception Voting tx:${voteTransactionParams.transactionHash} block: ${voteTransactionParams.blockHash} originalTokenAddress: ${voteTransactionParams.tokenAddress}`,
         err,
       );
     }
-  }
-
-  async trackTransactionResultMetric(wasTransactionVoted, federatorAddress, federator: IFederation) {
-    this.metricCollector?.trackERC20FederatorVotingResult(
-      wasTransactionVoted,
-      federatorAddress,
-      federator.getVersion(),
-      await this.getCurrentChainId(),
-    );
   }
 }

@@ -154,9 +154,9 @@ module.exports = {
       },
       tags: ['staging'],
     },  
-    arbitrum_one: {
+    arbitrum_mainnet: {
       live: true,
-      url: 'https://arbitrum.infura.io/v3/' + INFURA_PROJECT_ID,
+      url: 'https://arbitrum-mainnet.infura.io/v3/' + INFURA_PROJECT_ID,
       network_id: chains.ARBITRUM_ONE_MAIN_NET_CHAIN_ID,
       token_symbol: 'e',
       gas: "auto",
