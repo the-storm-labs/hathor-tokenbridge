@@ -4,7 +4,6 @@ import { LogWrapper } from '../logWrapper';
 import { Broker } from './Broker';
 import FederatorHTR from '../FederatorHTR';
 import Web3 from 'web3';
-import { BN } from 'ethereumjs-util';
 import TransactionSender from '../TransactionSender';
 import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
@@ -155,7 +154,7 @@ export class HathorBroker extends Broker {
 
   async voteOnEvm(
     receiverAddress: string,
-    amount: BN,
+    amount: BigInt,
     tokenAddress: string,
     txId: string,
     ogSenderAddress: string,

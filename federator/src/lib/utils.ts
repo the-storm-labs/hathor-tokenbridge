@@ -1,6 +1,5 @@
 import * as ethUtils from 'ethereumjs-util';
-import { BN } from 'ethereumjs-util';
-import Web3 from 'web3';
+import Web3, { FMT_BYTES, FMT_NUMBER } from 'web3';
 import { HathorException } from '../types';
 
 /**
@@ -165,7 +164,10 @@ export function checkIfItsInRSK(chainId = -1) {
 
 export async function getHeartbeatPollingInterval({ host, runHeartbeatEvery = 1 }) {
   const web3 = new Web3(host);
-  const chainId = await web3.eth.net.getId();
+  const chainId = await web3.eth.net.getId({
+    number: FMT_NUMBER.NUMBER,
+    bytes: FMT_BYTES.HEX,
+  });
   return [30, 31].includes(chainId) ? 1000 * 60 * 60 : runHeartbeatEvery * 1000 * 60;
 }
 
@@ -224,11 +226,11 @@ export function clone(instance: any): any {
   return copy;
 }
 
-export function convertToEvmDecimals(originalQtd: number): BN {
+export function convertToEvmDecimals(originalQtd: number): BigInt {
   try {
-    const bnQtd = new BN(originalQtd);
-    const precision = new BN(Math.pow(10, 16).toString());
-    return bnQtd.mul(precision);
+    const bnQtd = BigInt(originalQtd);
+    const precision = BigInt(Math.pow(10, 16).toString());
+    return bnQtd * precision;
   } catch (error) {
     console.log(error);
   }
@@ -237,9 +239,10 @@ export function convertToEvmDecimals(originalQtd: number): BN {
 export function convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
   // Hathor Network tokens always have two decimals,
   // so here we get the number of decimals we need to discard
-  const decimalDifference = tokenDecimals - 2;
+  const decimalDifference = BigInt(tokenDecimals) - BigInt(2);
+  const originalQtdString = originalQtd.toString();
   // The original number minus the amount of decimals we need to discard
-  const result = originalQtd.substring(0, originalQtd.length - decimalDifference);
+  const result = originalQtdString.substring(0, originalQtdString.length - Number(decimalDifference));
   // If the number is less than the two decimals, lets say 0,001
   // for a token with 6 digits we would have "100".
   // Then we would get the substring to -1 which would lead to a empty ('') result.

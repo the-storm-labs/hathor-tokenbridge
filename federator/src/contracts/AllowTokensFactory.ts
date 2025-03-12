@@ -1,9 +1,7 @@
 import abiAllowTokensV1 from '../../../bridge/abi/AllowTokens.json';
 import { IAllowTokensV1 } from './IAllowTokensV1';
-import { IAllowTokensV0 } from './IAllowTokensV0';
 import * as typescriptUtils from '../lib/typescriptUtils';
 import { ContractFactory } from './ContractFactory';
-import { AbiItem } from 'web3-utils';
 import { VERSIONS } from './Constants';
 import { IAllowTokens } from './IAllowTokens';
 import { ConfigChain } from '../lib/configChain';
@@ -21,7 +19,7 @@ export class AllowTokensFactory extends ContractFactory {
     const web3 = this.getWeb3(configChain.host);
     const chainId = configChain.chainId;
     const allowTokensContract = this.getContractByAbiAndChainId(
-      abiAllowTokensV1 as AbiItem[],
+      abiAllowTokensV1,
       configChain.allowTokens,
       web3,
       chainId,

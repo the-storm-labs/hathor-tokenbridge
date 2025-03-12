@@ -1,15 +1,15 @@
-import { Contract, EventData } from 'web3-eth-contract';
+import { Contract, EventLog } from 'web3-eth-contract';
 import { CustomError } from '../lib/CustomError';
 import { IHathorFederation } from './IHathorFederation';
-import Web3 from 'web3';
+import Web3, { ContractAbi } from 'web3';
 import { TransactionTypes } from '../types/transactionTypes';
 
 export class IHathorFederationV1 implements IHathorFederation {
-  hathorFederationContract: Contract;
+  hathorFederationContract: Contract<ContractAbi>;
   chainId: number;
   web3: Web3;
 
-  constructor(hathorFederationContract: Contract, chainId: number, web3: Web3) {
+  constructor(hathorFederationContract: Contract<ContractAbi>, chainId: number, web3: Web3) {
     this.hathorFederationContract = hathorFederationContract;
     this.chainId = chainId;
     this.web3 = web3;
@@ -49,7 +49,7 @@ export class IHathorFederationV1 implements IHathorFederation {
 
   async transactionHex(transactionId: string): Promise<string> {
     try {
-      const txHex = await this.hathorFederationContract.methods.transactionHex(transactionId).call();
+      const txHex = (await this.hathorFederationContract.methods.transactionHex(transactionId).call()) as string;
       return txHex.substring(2);
     } catch (err) {
       throw new CustomError(`Exception transactionHex at hathorFederation Contract`, err);
@@ -71,7 +71,7 @@ export class IHathorFederationV1 implements IHathorFederation {
     sender,
     receiver,
     transactionType: TransactionTypes,
-  ) {
+  ): Promise<string> {
     try {
       // Convert the string parameters to bytes32 where necessary
       const bytesOriginalTokenAddress = this.setPadding(originalTokenAddress);
@@ -177,7 +177,7 @@ export class IHathorFederationV1 implements IHathorFederation {
       )
       .encodeABI();
   }
-  getPastEvents(eventName: string, options: any): Promise<EventData[]> {
+  getPastEvents(eventName, options: any): Promise<(string | EventLog)[]> {
     return this.hathorFederationContract.getPastEvents(eventName, options);
   }
 

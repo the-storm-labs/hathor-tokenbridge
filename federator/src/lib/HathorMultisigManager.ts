@@ -1,5 +1,5 @@
 import { ConfigData } from './config';
-import web3 from 'web3';
+import web3, { FMT_BYTES, FMT_NUMBER } from 'web3';
 import TransactionSender from './TransactionSender';
 import { BridgeFactory, IFederation, FederationFactory } from '../contracts';
 import * as typescriptUtils from './typescriptUtils';
@@ -28,7 +28,10 @@ export default class HathorMultisigManager extends Federator {
     bridgeFactory: BridgeFactory;
     federationFactory: FederationFactory;
   }): Promise<boolean> {
-    const currentBlock = await this.getChainWeb3(process.env.HATHOR_STATE_CONTRACT_HOST_URL).eth.getBlockNumber();
+    const currentBlock = await this.getChainWeb3(process.env.HATHOR_STATE_CONTRACT_HOST_URL).eth.getBlockNumber({
+      number: FMT_NUMBER.NUMBER,
+      bytes: FMT_BYTES.HEX,
+    });
     const mainChainId = Number.parseInt(process.env.FEDERATION_CHAIN_ID);
     this.logger.upsertContext('Main Chain ID', mainChainId);
 
