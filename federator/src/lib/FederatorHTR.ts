@@ -22,7 +22,6 @@ import {
 } from '../types/federator';
 import { HathorException } from '../types';
 import MetricRegister from '../utils/MetricRegister';
-import { BN } from 'ethereumjs-util';
 
 export default class FederatorHTR extends Federator {
   private readonly PATH_ORIGIN = 'fhtr';
@@ -330,7 +329,7 @@ export default class FederatorHTR extends Federator {
         ${voteTransactionParams.sideChainConfig.bridge} to receiver ${voteTransactionParams.receiver}`,
       );
 
-      const txDataAbi = await voteTransactionParams.sideFedContract.getVoteTransactionABI({
+      const txDataAbi = voteTransactionParams.sideFedContract.getVoteTransactionABI({
         originalTokenAddress: voteTransactionParams.tokenAddress,
         sender: voteTransactionParams.senderAddress,
         receiver: voteTransactionParams.receiver,

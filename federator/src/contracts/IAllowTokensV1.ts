@@ -1,4 +1,3 @@
-import { BN } from 'ethereumjs-util';
 import { Contract } from 'web3-eth-contract';
 import { CustomError } from '../lib/CustomError';
 import { VERSIONS } from './Constants';

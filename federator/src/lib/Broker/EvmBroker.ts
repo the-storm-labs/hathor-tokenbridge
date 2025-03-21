@@ -6,7 +6,6 @@ import { IBridgeV4, FederationFactory, BridgeFactory } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 import MetricRegister from '../../utils/MetricRegister';
 import { convertToHathorDecimals } from '../utils';
-import { EventLog } from 'web3-eth-contract';
 
 export class EvmBroker extends Broker {
   constructor(

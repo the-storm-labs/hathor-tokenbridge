@@ -21,3 +21,4 @@ server/package-lock.json
 
 .rabbitmq/prometheus/prometheus.yml
 .rabbitmq/promtail/**.yaml
+.rabbitmq/**.tf
