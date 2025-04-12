@@ -53,6 +53,10 @@ export class HathorBroker extends Broker {
 
     const originalTxTokenData = this.getCustomTokenData(originalTx.inputs, originalTx.outputs);
 
+    if (!originalTxTokenData) {
+      throw Error(`Original hathor tx ${hathorTxId} has no non spent or valid custom token data.`);
+    }
+
     // MELT
 
     if (!proposalInfo.canMelt[originalTxTokenData.tokenAddress]) {

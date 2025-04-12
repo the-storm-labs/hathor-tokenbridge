@@ -159,6 +159,10 @@ export class HathorService {
   }
 
   private isNonRetriableError(errorMessage) {
+    if (!errorMessage || typeof errorMessage !== 'string') {
+      return false;
+    }
+
     let isNonRetriable = false;
     for (let index = 0; index < this.nonRetriableErrors.length; index++) {
       const rgxError = this.nonRetriableErrors[index];
