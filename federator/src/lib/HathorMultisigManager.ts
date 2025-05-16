@@ -90,7 +90,7 @@ export default class HathorMultisigManager extends Federator {
     }
     this.logger.upsertContext('Current Block', currentBlock);
 
-    const recordsPerPage = 1000;
+    const recordsPerPage = 500;
     const numberOfPages = Math.ceil((toBlock - fromBlock) / recordsPerPage);
     this.logger.debug(`Total pages ${numberOfPages}, blocks per page ${recordsPerPage}`);
 
