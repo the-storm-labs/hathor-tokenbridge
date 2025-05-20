@@ -9,6 +9,10 @@ WORKDIR /app
 RUN mkdir -p /app/db && chown -R node:node /app/db
 USER node
 
+WORKDIR /app
+RUN mkdir -p /app/log && chown -R node:node /app/log
+USER node
+
 COPY --chown=node:node ./federator/package*.json ./federator/
 WORKDIR ./federator
 RUN (npm install) && (npm ci)
