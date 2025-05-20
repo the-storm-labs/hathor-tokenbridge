@@ -1,6 +1,6 @@
-FROM node:16-alpine
+FROM node:22-alpine3.21
 
-RUN apk add --no-cache build-base git python3
+RUN apk add --no-cache build-base python3
 
 WORKDIR /home/node
 USER node

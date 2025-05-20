@@ -1,15 +1,16 @@
-import { Contract, EventData } from 'web3-eth-contract';
+import { Contract, EventLog } from 'web3-eth-contract';
 import { VERSIONS } from './Constants';
 import { IFederation } from './IFederation';
 import { ConfigChain } from '../lib/configChain';
 import { TransactionIdParams, VoteTransactionV3Params } from '../types/federator';
+import { ContractAbi } from 'web3';
 
 export class IFederationV3 implements IFederation {
-  federationContract: Contract;
+  federationContract: Contract<ContractAbi>;
   config: ConfigChain;
   privateKey: string;
 
-  constructor(config: ConfigChain, fedContract: Contract, privateKey: string) {
+  constructor(config: ConfigChain, fedContract: Contract<ContractAbi>, privateKey: string) {
     this.federationContract = fedContract;
     this.config = config;
     this.privateKey = privateKey;
@@ -47,7 +48,7 @@ export class IFederationV3 implements IFederation {
     return this.federationContract.methods.hasVoted(txId).call({ from });
   }
 
-  getVoteTransactionABI(paramsObj: VoteTransactionV3Params): Promise<any> {
+  getVoteTransactionABI(paramsObj: VoteTransactionV3Params): string {
     return this.federationContract.methods
       .voteTransaction(
         paramsObj.originalTokenAddress,
@@ -67,7 +68,7 @@ export class IFederationV3 implements IFederation {
     return this.federationContract.options.address;
   }
 
-  getPastEvents(eventName: string, options: any): Promise<EventData[]> {
+  getPastEvents(eventName, options: any): Promise<(string | EventLog)[]> {
     return this.federationContract.getPastEvents(eventName, options);
   }
 

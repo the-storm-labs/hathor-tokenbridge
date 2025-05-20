@@ -50,20 +50,24 @@ export class EvmBroker extends Broker {
       fromBlock: evmTx.blockNumber,
       toBlock: evmTx.blockNumber,
     });
-    const event = events.find((e) => e.transactionHash === txHash);
+    const event = events.find((e) => typeof e !== 'string' && e.transactionHash === txHash);
 
     if (!event) {
       this.logger.error(`Invalid tx. Unable to find event on EVM. HEX: ${txHex} | HASH: ${txHash}`);
       return false;
     }
 
-    const tokenAddress = event.returnValues['_tokenAddress'];
+    if (typeof event === 'string') {
+      throw Error('Invalid event type');
+    }
+
+    const tokenAddress = event.returnValues['_tokenAddress'] as string;
 
     const [destinationChainTokenAddress, originalChainId] = await this.getSideChainTokenAddress(tokenAddress);
 
     const tokenDecimals = await this.getTokenDecimals(tokenAddress, originalChainId);
 
-    const convertedQuantity = convertToHathorDecimals(event.returnValues['_amount'], tokenDecimals);
+    const convertedQuantity = convertToHathorDecimals(event.returnValues['_amount'] as string, tokenDecimals);
 
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 

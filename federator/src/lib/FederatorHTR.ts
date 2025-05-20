@@ -1,5 +1,5 @@
 import { ConfigData } from './config';
-import web3 from 'web3';
+import web3, { FMT_BYTES, FMT_NUMBER } from 'web3';
 import fs from 'fs';
 import TransactionSender from './TransactionSender';
 import { CustomError } from './CustomError';
@@ -42,7 +42,10 @@ export default class FederatorHTR extends Federator {
     bridgeFactory: BridgeFactory;
     federationFactory: FederationFactory;
   }): Promise<boolean> {
-    const currentBlock = await this.getMainChainWeb3().eth.getBlockNumber();
+    const currentBlock = await this.getMainChainWeb3().eth.getBlockNumber({
+      number: FMT_NUMBER.NUMBER,
+      bytes: FMT_BYTES.HEX,
+    });
     const mainChainId = await this.getCurrentChainId();
     const sideChainId = 31;
     this.logger.upsertContext('Main Chain ID', mainChainId);
@@ -131,7 +134,7 @@ export default class FederatorHTR extends Federator {
     this.logger.upsertContext('Current Block', getLogParams.currentBlock);
     const mainBridge = await getLogParams.bridgeFactory.createInstance(this.config.mainchain);
 
-    const recordsPerPage = 1000;
+    const recordsPerPage = 500;
     const numberOfPages = Math.ceil((getLogParams.toBlock - getLogParams.fromBlock) / recordsPerPage);
     this.logger.debug(`Total pages ${numberOfPages}, blocks per page ${recordsPerPage}`);
 
@@ -231,14 +234,14 @@ export default class FederatorHTR extends Federator {
       }
     }
 
-    const mediumAmountBN = web3.utils.toBN(mediumAmount);
-    const largeAmountBN = web3.utils.toBN(largeAmount);
-    const amountBN = web3.utils.toBN(amount);
+    const mediumAmountBN = web3.utils.toBigInt(mediumAmount);
+    const largeAmountBN = web3.utils.toBigInt(largeAmount);
+    const amountBN = web3.utils.toBigInt(amount);
 
     if (processLogParams.mediumAndSmall) {
       // At this point we're processing blocks newer than largeAmountConfirmations
       // and older than smallAmountConfirmations
-      if (amountBN.gte(largeAmountBN)) {
+      if (amountBN > largeAmountBN) {
         const confirmations = processLogParams.currentBlock - blockNumber;
         const neededConfirmations = processLogParams.confirmations.largeAmountConfirmations;
         this.logger.debug(
@@ -248,7 +251,7 @@ export default class FederatorHTR extends Federator {
       }
 
       if (
-        amountBN.gte(mediumAmountBN) &&
+        amountBN > mediumAmountBN &&
         processLogParams.currentBlock - blockNumber < processLogParams.confirmations.mediumAmountConfirmations
       ) {
         const confirmations = processLogParams.currentBlock - blockNumber;
@@ -326,7 +329,7 @@ export default class FederatorHTR extends Federator {
         ${voteTransactionParams.sideChainConfig.bridge} to receiver ${voteTransactionParams.receiver}`,
       );
 
-      const txDataAbi = await voteTransactionParams.sideFedContract.getVoteTransactionABI({
+      const txDataAbi = voteTransactionParams.sideFedContract.getVoteTransactionABI({
         originalTokenAddress: voteTransactionParams.tokenAddress,
         sender: voteTransactionParams.senderAddress,
         receiver: voteTransactionParams.receiver,

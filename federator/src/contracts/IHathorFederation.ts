@@ -1,8 +1,9 @@
-import { Contract, EventData } from 'web3-eth-contract';
+import { Contract, EventLog } from 'web3-eth-contract';
 import { TransactionTypes } from '../types/transactionTypes';
+import { ContractAbi } from 'web3';
 
 export interface IHathorFederation {
-  hathorFederationContract: Contract;
+  hathorFederationContract: Contract<ContractAbi>;
 
   isProcessed(transactionId: string): Promise<boolean>;
   isSigned(transactionId: string, federatorAddress: string): Promise<boolean>;
@@ -41,5 +42,5 @@ export interface IHathorFederation {
     sent,
     txId,
   ): Promise<any>;
-  getPastEvents(eventName: string, options: any): Promise<EventData[]>;
+  getPastEvents(eventName: string, options: any): Promise<(string | EventLog)[]>;
 }

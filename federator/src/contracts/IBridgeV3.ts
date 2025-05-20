@@ -1,26 +1,27 @@
-import { Contract, EventData } from 'web3-eth-contract';
+import { Contract, EventLog } from 'web3-eth-contract';
 import { IBridge } from './IBridge';
+import { ContractAbi } from 'web3';
 
 interface MappedTokensParams {
   originalTokenAddress: string;
 }
 
 export class IBridgeV3 implements IBridge {
-  bridgeContract: Contract;
+  bridgeContract: Contract<ContractAbi>;
 
-  constructor(bridgeContract: Contract) {
+  constructor(bridgeContract: Contract<ContractAbi>) {
     this.bridgeContract = bridgeContract;
   }
 
   getFederation(): Promise<string> {
-    return this.bridgeContract.methods.getFederation();
+    return this.bridgeContract.methods.getFederation().call();
   }
 
   getAllowedTokens(): Promise<string> {
-    return this.bridgeContract.methods.allowedTokens();
+    return this.bridgeContract.methods.allowedTokens().call();
   }
 
-  async getPastEvents(eventName: string, destinationChainId: number, options: any): Promise<EventData[]> {
+  async getPastEvents(eventName, destinationChainId: number, options: any): Promise<(string | EventLog)[]> {
     return this.bridgeContract.getPastEvents(eventName, options);
   }
 

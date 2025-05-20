@@ -19,5 +19,6 @@ server/package-lock.json
 **.terraform*
 **.tfstate*
 
-./rabbitmq/prometheus/prometheus.yml
-./rabbitmq/promtail/**.yaml
+.rabbitmq/prometheus/prometheus.yml
+.rabbitmq/promtail/**.yaml
+.rabbitmq/**.tf

@@ -1,5 +1,4 @@
 import { IBridge } from '../contracts/IBridge';
-import { BN } from 'ethereumjs-util';
 import { IAllowTokens } from '../contracts/IAllowTokens';
 import { TransactionSender } from '../lib/TransactionSender';
 import { ConfigChain } from '../lib/configChain';
@@ -47,7 +46,7 @@ export interface ProcessTransactionParams extends ProcessLogParams {
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BN;
+  amount: BigInt;
   typeId: string;
   transactionId: string;
   originChainId: number;
@@ -58,7 +57,7 @@ export interface ProcessToHathorTransactionParams extends ProcessToHathorLogPara
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BN;
+  amount: BigInt;
   typeId: string;
   originChainId: number;
   destinationChainId: number;
@@ -74,7 +73,7 @@ export interface VoteHathorTransactionParams {
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BN;
+  amount: BigInt;
   transactionId: string;
   originChainId: number;
   destinationChainId: number;
@@ -93,7 +92,7 @@ export interface TransactionIdParams {
   originalTokenAddress: string;
   sender: string;
   receiver: string;
-  amount: BN;
+  amount: BigInt;
   blockHash: string;
   transactionHash: string;
   logIndex: number;

@@ -1,5 +1,5 @@
 import { ConfigData } from './config';
-import web3 from 'web3';
+import web3, { FMT_BYTES, FMT_NUMBER } from 'web3';
 import fs from 'fs';
 import TransactionSender from './TransactionSender';
 import { BridgeFactory } from '../contracts/BridgeFactory';
@@ -40,7 +40,10 @@ export default abstract class Federator {
 
   async getCurrentChainId() {
     if (this.chainId === undefined) {
-      this.chainId = await this.getMainChainWeb3().eth.net.getId();
+      this.chainId = await this.getMainChainWeb3().eth.net.getId({
+        number: FMT_NUMBER.NUMBER,
+        bytes: FMT_BYTES.HEX,
+      });
     }
     return this.chainId;
   }

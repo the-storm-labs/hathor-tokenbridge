@@ -23,7 +23,7 @@ describe("Hathor Broker module tests", () => {
   it("Should convert numbers from Hathor to EVM", async () => {
 
     const result = convertToEvmDecimals(1000000).toString();
-    const comparison = new BN("10000000000000000000000").toString();
+    const comparison = BigInt("10000000000000000000000").toString();
     expect(result.toString()).toEqual(comparison);
 
     const result2 = convertToEvmDecimals(1000000).toString();
@@ -58,22 +58,20 @@ describe("Hathor Broker module tests", () => {
   });
 
   it("Should convert number from EVM to Hathor", async () => {
-    const result = convertToHathorDecimals("18999999", 6);
+    const result = convertToHathorDecimals(BigInt(18990000), 6);
     expect(result).toEqual(1899);
 
-    const result2 = convertToHathorDecimals("999999", 6);
+    const result2 = convertToHathorDecimals(BigInt(999999), 6);
     expect(result2).toEqual(99);
 
-    const result3 = convertToHathorDecimals("9999", 6);
-    expect(result3).toEqual(0);
+    expect(() => { convertToHathorDecimals(BigInt(9999), 18) }).toThrow(
+      "Unable to convert amount to Hathor amount. 9999 is invalid."
+    );
 
-    const result4 = convertToHathorDecimals("9999", 18);
-    expect(result4).toEqual(0);
-
-    const result5 = convertToHathorDecimals("999999999999999999", 18);
+    const result5 = convertToHathorDecimals(BigInt("999999999999999999"), 18);
     expect(result5).toEqual(99);
 
-    const result6 = convertToHathorDecimals("1048932999999999999999999", 18);
+    const result6 = convertToHathorDecimals(BigInt("1048932999999999999999999"), 18);
     expect(result6).toEqual(104893299);
   });
 

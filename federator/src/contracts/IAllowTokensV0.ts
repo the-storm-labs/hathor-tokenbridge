@@ -1,6 +1,7 @@
 import { Contract } from 'web3-eth-contract';
 import { VERSIONS } from './Constants';
 import { IAllowTokens } from './IAllowTokens';
+import { ContractAbi } from 'web3';
 
 export interface ConfirmationsReturn {
   smallAmountConfirmations: number;
@@ -9,12 +10,12 @@ export interface ConfirmationsReturn {
 }
 
 export class IAllowTokensV0 implements IAllowTokens {
-  allowTokensContract: Contract;
+  allowTokensContract: Contract<ContractAbi>;
   mapTokenInfoAndLimits: any;
   chainId: any;
   federatorInstance: number;
 
-  constructor(allowTokensContract: Contract, chainId: number, federatorInstance = 1) {
+  constructor(allowTokensContract: Contract<ContractAbi>, chainId: number, federatorInstance = 1) {
     this.allowTokensContract = allowTokensContract;
     this.mapTokenInfoAndLimits = {};
     this.chainId = chainId;
@@ -41,7 +42,6 @@ export class IAllowTokensV0 implements IAllowTokens {
     }
 
     confirmations *= this.federatorInstance;
-    console.log(`Confirmation set: ${this.federatorInstance} | ${confirmations}`);
 
     return {
       smallAmountConfirmations: confirmations,

@@ -2,13 +2,14 @@ import { Contract } from 'web3-eth-contract';
 import { VERSIONS } from './Constants';
 import { IFederation } from './IFederation';
 import { ConfigChain } from '../lib/configChain';
+import { ContractAbi } from 'web3';
 
 export class IFederationV2 implements IFederation {
-  federationContract: Contract;
+  federationContract: Contract<ContractAbi>;
   config: ConfigChain;
   privateKey: string;
 
-  constructor(config: ConfigChain, fedContract: Contract, privateKey: string) {
+  constructor(config: ConfigChain, fedContract: Contract<ContractAbi>, privateKey: string) {
     this.federationContract = fedContract;
     this.config = config;
     this.privateKey = privateKey;
@@ -19,7 +20,7 @@ export class IFederationV2 implements IFederation {
   }
 
   isMember(address: string) {
-    return this.federationContract.methods.isMember(address);
+    return this.federationContract.methods.isMember(address).call();
   }
 
   getTransactionId(paramsObj: any) {
