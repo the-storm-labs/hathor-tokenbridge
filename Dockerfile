@@ -25,5 +25,8 @@ WORKDIR ./federator
 RUN (cd ./config/ && cp config.sample.js config.js) && \
     npx tsc --build
 
+COPY fix-perms.sh /usr/local/bin/fix-perms.sh
+ENTRYPOINT ["fix-perms.sh"]
+
 WORKDIR ./built/federator
 CMD ["node", "./src/main.js"]
