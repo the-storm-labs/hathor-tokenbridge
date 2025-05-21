@@ -2,7 +2,7 @@
     "appenders": {
         "file": {
             "type": "file",
-            "filename": "/app/log/federator.log",
+            "filename": "/app/logs/federator.log",
             "maxLogSize": 10485760,
             "backups": 3,
             "compress": true,

@@ -6,11 +6,7 @@ WORKDIR /home/node
 USER node
 
 WORKDIR /app
-RUN mkdir -p /app/db && chown -R node:node /app/db
-USER node
-
-WORKDIR /app
-RUN mkdir -p /app/log && chown -R node:node /app/log
+RUN mkdir -p /app/db && mkdir -p /app/log && chown -R node:node /app
 USER node
 
 COPY --chown=node:node ./federator/package*.json ./federator/
