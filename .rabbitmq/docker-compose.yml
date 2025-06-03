@@ -67,7 +67,7 @@ services:
       - "500${HATHOR_MULTISIG_ORDER}:5000"
     volumes:
       - federator_db:/app/db
-      - federator_db:/app/federator/built/federator/logs
+      - federator_db:/var/log
     environment:
       HTR_CONFIG: '{"name":"${HATHOR_NAME}","chainId":${HATHOR_CHAIN_ID},"fromBlock":${HATHOR_FROM_BLOCK},"walletUrl":"${HATHOR_WALLET_URL}","walletKey":"${HEADLESS_API_KEY}","singleWalletId":"${HATHOR_SINGLE_WALLET_ID}","singleSeedKey":"${HATHOR_SINGLE_SEED_KEY}","multisigWalletId":"${HATHOR_MULTISIG_WALLET_ID}","multisigSeedKey":"${HATHOR_MULTISIG_SEED_KEY}","multisigRequiredSignatures":${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES},"multisigOrder":${HATHOR_MULTISIG_ORDER},"minimumConfirmations":${HATHOR_MINIMUM_CONFIRMATIONS},"eventQueueType":"rabbitmq"}'
       EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK},"multisigOrder":${HATHOR_MULTISIG_ORDER}}'
@@ -104,7 +104,7 @@ services:
       - hathor-federator
     volumes:
       - ./promtail/:/etc/promtail/
-      - federator_db:/app/federator/built/federator/logs
+      - federator_db:/var/log
     command:
       - "--config.file=/etc/promtail/promtail-config_fed0${HATHOR_MULTISIG_ORDER}.yaml"
 
