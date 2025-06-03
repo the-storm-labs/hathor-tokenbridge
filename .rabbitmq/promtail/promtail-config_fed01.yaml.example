@@ -15,4 +15,4 @@ scrape_configs:
           - hathor-federator:5000
         labels:
           job: federator-0{{your federation number}}
-          __path__: /var/log/*.log
+          __path__: /app/federator/built/federator/logs/*.log
