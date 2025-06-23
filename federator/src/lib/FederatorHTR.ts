@@ -134,7 +134,7 @@ export default class FederatorHTR extends Federator {
     this.logger.upsertContext('Current Block', getLogParams.currentBlock);
     const mainBridge = await getLogParams.bridgeFactory.createInstance(this.config.mainchain);
 
-    const recordsPerPage = 500;
+    const recordsPerPage = 450;
     const numberOfPages = Math.ceil((getLogParams.toBlock - getLogParams.fromBlock) / recordsPerPage);
     this.logger.debug(`Total pages ${numberOfPages}, blocks per page ${recordsPerPage}`);
 
