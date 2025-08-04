@@ -119,7 +119,7 @@ contract Bridge is Initializable, IBridge, IERC777Recipient, UpgradablePausable,
 			block.chainid,
 			address(this)
 		);
-		initiated == true;
+		initiated = true;
 	}
 
 	modifier whenNotUpgrading() {
