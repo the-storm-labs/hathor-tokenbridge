@@ -13,59 +13,42 @@ class MetricRegister {
 
   private successVoteCounter = new Counter({
     name: 'success_vote_count',
-    help: 'Counter of successful votes',
-    labelNames: ['transactionHash', 'blockHash', 'transactionId', 'originalTokenAddress', 'receiver', 'amount'],
+    help: 'Counter of successful votes'
   });
 
   private failedVoteCounter = new Counter({
     name: 'failed_vote_count',
     help: 'Counter of failed votes',
-    labelNames: ['transactionHash', 'blockHash', 'transactionId', 'originalTokenAddress', 'receiver', 'amount'],
   });
 
   private invalidProposalCounter = new Counter({
     name: 'invalid_proposal_count',
     help: 'Counter of invalid proposals',
-    labelNames: ['transactionHash'],
   });
 
   private proposalCounter = new Counter({
     name: 'successful_proposal_count',
     help: 'Counter of proposals',
-    labelNames: [
-      'status',
-      'transactionHash',
-      'transactionId',
-      'originalTokenAddress',
-      'sender',
-      'receiver',
-      'amount',
-      'txHex',
-    ],
   });
 
   private invalidSigningCounter = new Counter({
     name: 'invalid_signing_count',
     help: 'Counter of signatures',
-    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private signingCounter = new Counter({
     name: 'signing_count',
     help: 'Counter of signatures',
-    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private invalidPushedProposalCounter = new Counter({
     name: 'invalid_pushed_proposal_count',
     help: 'Counter of proposals pushed',
-    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   private pushedProposalCounter = new Counter({
     name: 'pushed_proposal_count',
     help: 'Counter of proposals pushed',
-    labelNames: ['transactionHash', 'transactionId', 'originalTokenAddress', 'sender', 'receiver', 'amount', 'txHex'],
   });
 
   constructor(register: Registry, prefix: string) {
@@ -88,158 +71,36 @@ class MetricRegister {
     this.htrFederationRunCounter.inc();
   }
 
-  increaseSuccessfulVoteCounter(
-    transactionHash: string,
-    blockHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    receiver: string,
-    amount: string,
-  ) {
-    this.successVoteCounter
-      .labels({
-        transactionHash,
-        blockHash,
-        transactionId,
-        originalTokenAddress,
-        receiver,
-        amount,
-      })
-      .inc();
+  increaseSuccessfulVoteCounter() {
+    this.successVoteCounter.inc();
   }
 
-  increaseFailedVoteCounter(
-    transactionHash: string,
-    blockHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    receiver: string,
-    amount: string,
-  ) {
-    this.failedVoteCounter
-      .labels({
-        transactionHash,
-        blockHash,
-        transactionId,
-        originalTokenAddress,
-        receiver,
-        amount,
-      })
-      .inc();
+  increaseFailedVoteCounter() {
+    this.failedVoteCounter.inc();
   }
 
   increaseInvalidProposalCounter(transactionHash: string) {
-    this.invalidProposalCounter.labels({ transactionHash: transactionHash }).inc();
+    this.invalidProposalCounter.inc();
   }
 
-  increaseSuccessfulProposalCounter(
-    transactionHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    sender: string,
-    receiver: string,
-    amount: string,
-    txHex: string,
-  ) {
-    this.proposalCounter
-      .labels({
-        transactionHash,
-        transactionId,
-        originalTokenAddress,
-        sender,
-        receiver,
-        amount,
-        txHex,
-      })
-      .inc();
+  increaseSuccessfulProposalCounter() {
+    this.proposalCounter.inc();
   }
 
-  increaseInvalidSigningCounter(
-    transactionHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    sender: string,
-    receiver: string,
-    amount: string,
-    txHex: string,
-  ) {
-    this.invalidSigningCounter
-      .labels({
-        transactionHash,
-        transactionId,
-        originalTokenAddress,
-        sender,
-        receiver,
-        amount,
-        txHex,
-      })
-      .inc();
+  increaseInvalidSigningCounter() {
+    this.invalidSigningCounter.inc();
   }
 
-  increaseSigningCounter(
-    transactionHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    sender: string,
-    receiver: string,
-    amount: string,
-    txHex: string,
-  ) {
-    this.signingCounter
-      .labels({
-        transactionHash,
-        transactionId,
-        originalTokenAddress,
-        sender,
-        receiver,
-        amount,
-        txHex,
-      })
-      .inc();
+  increaseSigningCounter() {
+    this.signingCounter.inc();
   }
 
-  increaseInvalidPushProposalCounter(
-    transactionHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    sender: string,
-    receiver: string,
-    amount: string,
-    txHex: string,
-  ) {
-    this.invalidPushedProposalCounter
-      .labels({
-        transactionHash,
-        transactionId,
-        originalTokenAddress,
-        sender,
-        receiver,
-        amount,
-        txHex,
-      })
-      .inc();
+  increaseInvalidPushProposalCounter() {
+    this.invalidPushedProposalCounter.inc();
   }
 
-  increasePushProposalCounter(
-    transactionHash: string,
-    transactionId: string,
-    originalTokenAddress: string,
-    sender: string,
-    receiver: string,
-    amount: string,
-    txHex: string,
-  ) {
-    this.pushedProposalCounter
-      .labels({
-        transactionHash,
-        transactionId,
-        originalTokenAddress,
-        sender,
-        receiver,
-        amount,
-        txHex,
-      })
-      .inc();
+  increasePushProposalCounter() {
+    this.pushedProposalCounter.inc();
   }
 }
 
