@@ -8,7 +8,7 @@ module.exports = {
   sidechain: [
     JSON.parse(process.env.HTR_CONFIG), //the json containing the smart contract addresses in eth
   ],
-  runEvery: 1, // In minutes,
+  runEvery: 0.75, // In minutes,
   privateKey: process.env.FEDERATOR_KEY,
   storagePath: "/app/db",
   etherscanApiKey: process.env.ETHERSCAN_KEY,
