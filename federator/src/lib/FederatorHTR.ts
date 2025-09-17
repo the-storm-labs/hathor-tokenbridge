@@ -368,14 +368,7 @@ export default class FederatorHTR extends Federator {
       );
 
       if (!receipt.status) {
-        this.metricRegister.increaseFailedVoteCounter(
-          receipt.transactionHash,
-          voteTransactionParams.blockHash,
-          voteTransactionParams.transactionId,
-          voteTransactionParams.tokenAddress,
-          voteTransactionParams.receiver,
-          voteTransactionParams.amount.toString(),
-        );
+        this.metricRegister.increaseFailedVoteCounter();
         this.logger.error(
           `Voting ${voteTransactionParams.amount} of originalTokenAddress:${voteTransactionParams.tokenAddress}
           TransactionId ${voteTransactionParams.transactionId} failed, check the receipt`,
@@ -404,25 +397,11 @@ export default class FederatorHTR extends Federator {
         return false;
       }
 
-      this.metricRegister.increaseSuccessfulVoteCounter(
-        receipt.transactionHash,
-        voteTransactionParams.blockHash,
-        voteTransactionParams.transactionId,
-        voteTransactionParams.tokenAddress,
-        voteTransactionParams.receiver,
-        voteTransactionParams.amount.toString(),
-      );
+      this.metricRegister.increaseSuccessfulVoteCounter();
 
       return true;
     } catch (err) {
-      this.metricRegister.increaseFailedVoteCounter(
-        null,
-        voteTransactionParams.blockHash,
-        voteTransactionParams.transactionId,
-        voteTransactionParams.tokenAddress,
-        voteTransactionParams.receiver,
-        voteTransactionParams.amount.toString(),
-      );
+      this.metricRegister.increaseFailedVoteCounter();
       throw new CustomError(
         `Exception Voting tx:${voteTransactionParams.transactionHash} block: ${voteTransactionParams.blockHash} originalTokenAddress: ${voteTransactionParams.tokenAddress}`,
         err,

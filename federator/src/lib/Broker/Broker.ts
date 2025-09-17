@@ -196,15 +196,7 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    this.metricRegister.increaseSuccessfulProposalCounter(
-      transactionHash,
-      contractTxId,
-      tokenAddress,
-      sender,
-      receiver,
-      value,
-      txHex,
-    );
+    this.metricRegister.increaseSuccessfulProposalCounter();
 
     if (!receipt) {
       this.metricRegister.increaseInvalidProposalCounter(transactionHash);
@@ -223,15 +215,7 @@ export abstract class Broker {
     contractTxId,
   ) {
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
-      this.metricRegister.increaseInvalidSigningCounter(
-        transactionHash,
-        contractTxId,
-        tokenAddress,
-        senderAddress,
-        receiverAddress,
-        amount,
-        txHex,
-      );
+      this.metricRegister.increaseInvalidSigningCounter();
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
     const signature = await this.getMySignatures(txHex);
@@ -254,26 +238,10 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    this.metricRegister.increaseSigningCounter(
-      transactionHash,
-      contractTxId,
-      tokenAddress,
-      senderAddress,
-      receiverAddress,
-      amount,
-      txHex,
-    );
+    this.metricRegister.increaseSigningCounter();
 
     if (!receipt.status) {
-      this.metricRegister.increaseInvalidSigningCounter(
-        transactionHash,
-        contractTxId,
-        tokenAddress,
-        senderAddress,
-        receiverAddress,
-        amount,
-        txHex,
-      );
+      this.metricRegister.increaseInvalidSigningCounter();
       this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
     }
   }
@@ -300,15 +268,7 @@ export abstract class Broker {
     if (arrayLength < maxSignatures) return;
 
     if (!(await this.validateTx(txHex, transactionHash, contractTxId))) {
-      this.metricRegister.increaseInvalidPushProposalCounter(
-        transactionHash,
-        transactionId,
-        tokenAddress,
-        senderAddress,
-        receiverAddress,
-        amount,
-        txHex,
-      );
+      this.metricRegister.increaseInvalidPushProposalCounter();
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
     const signatures = await this.getSignaturesFromArray(transactionId);
@@ -331,15 +291,7 @@ export abstract class Broker {
         }
       }
 
-      this.metricRegister.increaseInvalidPushProposalCounter(
-        transactionHash,
-        transactionId,
-        tokenAddress,
-        senderAddress,
-        receiverAddress,
-        amount,
-        txHex,
-      );
+      this.metricRegister.increaseInvalidPushProposalCounter();
     }
 
     const args = await this.hathorFederationContract.getUpdateTransactionStateArgs(
@@ -360,26 +312,10 @@ export abstract class Broker {
       this.config.privateKey,
     );
 
-    this.metricRegister.increasePushProposalCounter(
-      transactionHash,
-      transactionId,
-      tokenAddress,
-      senderAddress,
-      receiverAddress,
-      amount,
-      txHex,
-    );
+    this.metricRegister.increasePushProposalCounter();
 
     if (!receipt.status) {
-      this.metricRegister.increaseInvalidPushProposalCounter(
-        transactionHash,
-        transactionId,
-        tokenAddress,
-        senderAddress,
-        receiverAddress,
-        amount,
-        txHex,
-      );
+      this.metricRegister.increaseInvalidPushProposalCounter();
       this.logger.error(`Sending tokens from evm to hathor failed`, receipt);
     }
   }
