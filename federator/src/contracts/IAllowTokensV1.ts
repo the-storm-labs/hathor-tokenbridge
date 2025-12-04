@@ -93,6 +93,7 @@ export class IAllowTokensV1 implements IAllowTokens {
           .getInfoAndLimits(objParams.tokenAddress)
           .call()) as TokenAndLimits;
         result = {
+          min: infoAndLimits.limit.min,
           allowed: infoAndLimits.info.allowed,
           mediumAmount: infoAndLimits.limit.mediumAmount,
           largeAmount: infoAndLimits.limit.largeAmount,

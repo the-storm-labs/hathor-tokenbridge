@@ -5,20 +5,26 @@ import { Broker } from './Broker';
 import FederatorHTR from '../FederatorHTR';
 import Web3 from 'web3';
 import TransactionSender from '../TransactionSender';
-import { BridgeFactory, FederationFactory, IBridgeV4 } from '../../contracts';
+import { BridgeFactory, FederationFactory, IBridgeV4, AllowTokensFactory, IAllowTokensV1 } from '../../contracts';
 import { HathorWallet } from '../HathorWallet';
 import MetricRegister from '../../utils/MetricRegister';
 import { convertToEvmDecimals } from '../utils';
 
 export class HathorBroker extends Broker {
+
+  private allowTokensContract: IAllowTokensV1;
+  private bridge: IBridgeV4;
+
   constructor(
     config: ConfigData,
     logger: LogWrapper,
     bridgeFactory: BridgeFactory,
     federationFactory: FederationFactory,
     metricRegister: MetricRegister,
+    allowTokensContract: IAllowTokensV1,
   ) {
     super(config, logger, bridgeFactory, federationFactory, metricRegister);
+    this.allowTokensContract = allowTokensContract;
   }
 
   async validateTx(txHex: string, hathorTxId: string, contractTxId: string): Promise<boolean> {
@@ -103,11 +109,36 @@ export class HathorBroker extends Broker {
     return;
   }
 
+  private async getBridge(): Promise<IBridgeV4> {
+    if (!this.bridge) {
+      this.bridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    }
+    return this.bridge;
+  }
+
   async getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]> {
-    const originBridge = (await this.bridgeFactory.createInstance(this.config.mainchain)) as IBridgeV4;
+    const originBridge = await this.getBridge();
     const originalToken = await originBridge.HathorToEvmTokenMap(tokenAddress);
 
     return [originalToken.tokenAddress, originalToken.originChainId];
+  }
+
+  async isAmountAboveMinimumTransferAmount(isTokenEvmNative: boolean, _originalChainId: number, _tokenAddress: string, amount: BigInt): Promise<boolean> {
+
+    let evmTokenAddress = _tokenAddress;
+
+    if (!isTokenEvmNative) {
+      const bridge = await this.getBridge();
+      evmTokenAddress = await bridge.sideTokenByOriginalToken(_originalChainId, _tokenAddress);
+    }
+
+    const minimunTransferAmount = await this.getMinimumTransferAmount(evmTokenAddress);
+    return amount >= minimunTransferAmount;
+  }
+
+  async getMinimumTransferAmount(_tokenAddress: string): Promise<BigInt> {
+    const limits = await this.allowTokensContract.getLimits({ tokenAddress: _tokenAddress });
+    return limits.min;
   }
 
   async postProcessing(
@@ -139,6 +170,15 @@ export class HathorBroker extends Broker {
     const [evmTokenAddress, originalChainId] = await this.getSideChainTokenAddress(originalTokenAddress);
     const isTokenEvmNative = originalChainId == this.config.mainchain.chainId;
 
+    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount));
+
+    const isAboveMinimum = await this.isAmountAboveMinimumTransferAmount(isTokenEvmNative, originalChainId, evmTokenAddress, convertedAmount);
+
+    if (!isAboveMinimum) {
+      this.logger.info(`txHash ${txHash} amount - ${amount} below minimum for token ${evmTokenAddress}.`);
+      return true;
+    }
+
     if (isTokenEvmNative) {
       return await super.sendTokens(
         senderAddress,
@@ -150,8 +190,6 @@ export class HathorBroker extends Broker {
         isTokenEvmNative,
       );
     }
-
-    const convertedAmount = convertToEvmDecimals(Number.parseInt(amount));
 
     return await this.voteOnEvm(receiverAddress, convertedAmount, evmTokenAddress, txHash, senderAddress);
   }
