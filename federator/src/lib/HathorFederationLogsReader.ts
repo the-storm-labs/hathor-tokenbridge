@@ -1,5 +1,5 @@
 /* eslint-disable prefer-const */
-import { BridgeFactory, FederationFactory, HathorFederationFactory, IHathorFederationV1 } from '../contracts';
+import { BridgeFactory, FederationFactory, HathorFederationFactory, IAllowTokensV1, IHathorFederationV1 } from '../contracts';
 import { TransactionTypes } from '../types';
 import { Broker, EvmBroker, HathorBroker } from './Broker';
 import { ConfigData } from './config';
@@ -17,6 +17,7 @@ export class HathorFederationLogsReader {
   protected hathorFederationContract: IHathorFederationV1;
   protected chainConfig: ConfigChain;
   private metricRegister: MetricRegister;
+  private allowTokensContract: IAllowTokensV1;
 
   constructor(
     config: ConfigData,
@@ -25,6 +26,7 @@ export class HathorFederationLogsReader {
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
     metricRegister: MetricRegister,
+    allowTokensContract: IAllowTokensV1,
   ) {
     this.config = config;
     this.logger = logger;
@@ -33,6 +35,7 @@ export class HathorFederationLogsReader {
     this.federationFactory = federationFactory;
     this.transactionSender = transactionSender;
     this.metricRegister = metricRegister;
+    this.allowTokensContract = allowTokensContract;
 
     this.hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
   }
@@ -53,6 +56,7 @@ export class HathorFederationLogsReader {
             this.bridgeFactory,
             this.federationFactory,
             this.metricRegister,
+            this.allowTokensContract
           ).postProcessing(
             result.sender,
             result.receiver,
@@ -97,6 +101,7 @@ export class HathorFederationLogsReader {
           this.bridgeFactory,
           this.federationFactory,
           this.metricRegister,
+          this.allowTokensContract
         );
         break;
     }

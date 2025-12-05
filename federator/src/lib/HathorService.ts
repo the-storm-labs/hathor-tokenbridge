@@ -13,6 +13,7 @@ import { HathorBroker } from './Broker/HathorBroker';
 import TransactionSender from './TransactionSender';
 import { FileManagement } from '../utils/fileManagement';
 import MetricRegister from '../utils/MetricRegister';
+import { IAllowTokensV1 } from '../contracts';
 
 export class HathorService {
   public logger: LogWrapper;
@@ -23,6 +24,7 @@ export class HathorService {
   protected chainConfig: ConfigChain;
   private fileManagement: FileManagement;
   private metricRegister: MetricRegister;
+  private allowTokensContract: IAllowTokensV1;
 
   private nonRetriableErrors = [
     /Invalid transaction. At least one of your inputs has already been spent./,
@@ -37,6 +39,7 @@ export class HathorService {
     federationFactory: FederationFactory,
     transactionSender: TransactionSender,
     metricRegister: MetricRegister,
+    allowTokensContract: IAllowTokensV1,
   ) {
     this.config = config;
     this.logger = logger;
@@ -46,6 +49,7 @@ export class HathorService {
     this.transactionSender = transactionSender;
     this.fileManagement = new FileManagement(config);
     this.metricRegister = metricRegister;
+    this.allowTokensContract = allowTokensContract;
   }
 
   async sendTokensToHathor(
@@ -256,6 +260,7 @@ export class HathorService {
       this.bridgeFactory,
       this.federationFactory,
       this.metricRegister,
+      this.allowTokensContract,
     );
 
     const confirmed = await broker.isTxConfirmed(tx.tx_id);

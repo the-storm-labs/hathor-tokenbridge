@@ -22,6 +22,7 @@ import Web3 from 'web3';
 import { HathorHistorySinc } from './lib/HathorHistorySync';
 import { Registry } from 'prom-client';
 import MetricRegister from './utils/MetricRegister';
+import { AllowTokensFactory, IAllowTokensV1 } from './contracts';
 
 export class Main {
   logger: LogWrapper;
@@ -121,6 +122,8 @@ export class Main {
 
   async listenToHathorTransactions() {
     const client = new Web3(this.config.mainchain.host);
+    const allowTokensFactory = new AllowTokensFactory();
+    const allowTokensContract = await allowTokensFactory.createInstance(this.config.mainchain) as IAllowTokensV1;  
     const service = new HathorService(
       this.config,
       this.logger,
@@ -128,6 +131,7 @@ export class Main {
       new FederationFactory(),
       new TransactionSender(client, this.logger, this.config),
       this.metricRegister,
+      allowTokensContract
     );
     const sync = new HathorHistorySinc(this.config, this.logger, service);
     await sync.processHistory();

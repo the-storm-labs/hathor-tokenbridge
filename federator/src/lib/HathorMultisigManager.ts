@@ -1,7 +1,7 @@
 import { ConfigData } from './config';
 import web3, { FMT_BYTES, FMT_NUMBER } from 'web3';
 import TransactionSender from './TransactionSender';
-import { BridgeFactory, IFederation, FederationFactory } from '../contracts';
+import { BridgeFactory, IFederation, FederationFactory, AllowTokensFactory, IAllowTokensV1 } from '../contracts';
 import * as typescriptUtils from './typescriptUtils';
 import Federator from './Federator';
 import { ConfigChain } from './configChain';
@@ -96,6 +96,8 @@ export default class HathorMultisigManager extends Federator {
 
     let fromPageBlock = fromBlock;
 
+    const allowTokensContract = await new AllowTokensFactory().createInstance(this.config.mainchain) as IAllowTokensV1;
+
     const logsReader = new HathorFederationLogsReader(
       this.config,
       this.logger,
@@ -103,6 +105,7 @@ export default class HathorMultisigManager extends Federator {
       federationFactory,
       transactionSender,
       this.metricRegister,
+      allowTokensContract
     );
 
     /// First we process all the lock input events, so the proposals previously created are synced locally

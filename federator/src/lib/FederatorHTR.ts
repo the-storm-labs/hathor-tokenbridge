@@ -22,6 +22,7 @@ import {
 } from '../types/federator';
 import { HathorException } from '../types';
 import MetricRegister from '../utils/MetricRegister';
+import { IAllowTokensV1 } from '../contracts';
 
 export default class FederatorHTR extends Federator {
   private readonly PATH_ORIGIN = 'fhtr';
@@ -286,6 +287,7 @@ export default class FederatorHTR extends Federator {
         processTransactionParams.federationFactory,
         processTransactionParams.transactionSender,
         this.metricRegister,
+        processTransactionParams.allowTokens as IAllowTokensV1,
       );
 
       await hathorService.sendTokensToHathor(
