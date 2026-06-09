@@ -123,7 +123,7 @@ export class HathorBroker extends Broker {
     return [originalToken.tokenAddress, originalToken.originChainId];
   }
 
-  async isAmountAboveMinimumTransferAmount(isTokenEvmNative: boolean, _originalChainId: number, _tokenAddress: string, amount: BigInt): Promise<boolean> {
+  async isAmountAboveMinimumTransferAmount(isTokenEvmNative: boolean, _originalChainId: number, _tokenAddress: string, amount: bigint): Promise<boolean> {
 
     let evmTokenAddress = _tokenAddress;
 
@@ -136,7 +136,7 @@ export class HathorBroker extends Broker {
     return amount >= minimunTransferAmount;
   }
 
-  async getMinimumTransferAmount(_tokenAddress: string): Promise<BigInt> {
+  async getMinimumTransferAmount(_tokenAddress: string): Promise<bigint> {
     const limits = await this.allowTokensContract.getLimits({ tokenAddress: _tokenAddress });
     return limits.min;
   }
@@ -196,7 +196,7 @@ export class HathorBroker extends Broker {
 
   async voteOnEvm(
     receiverAddress: string,
-    amount: BigInt,
+    amount: bigint,
     tokenAddress: string,
     txId: string,
     ogSenderAddress: string,

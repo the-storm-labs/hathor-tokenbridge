@@ -6,6 +6,7 @@ import { FederationFactory } from '../contracts/FederationFactory';
 import { AllowTokensFactory } from '../contracts/AllowTokensFactory';
 import { BridgeFactory } from '../contracts/BridgeFactory';
 import { IFederation } from '../contracts/IFederation';
+import { EventLog } from 'web3-eth-contract';
 
 export interface BaseLogsParams {
   sideChainId: number;
@@ -20,22 +21,37 @@ export interface BaseLogsParams {
   bridgeFactory: BridgeFactory;
 }
 
+export interface CrossEventReturnValues {
+  [key: string]: unknown;
+  _to: string;
+  _from: string;
+  _amount: bigint;
+  _tokenAddress: string;
+  _typeId: string;
+  _originChainId: bigint | number | string;
+  _destinationChainId: bigint | number | string;
+}
+
+export type CrossEventLog = EventLog & {
+  returnValues: CrossEventReturnValues;
+};
+
 export interface GetLogsParams extends BaseLogsParams {
   fromBlock: number;
   toBlock: number;
 }
 
 export interface ProcessLogsParams extends BaseLogsParams {
-  logs: any[];
+  logs: CrossEventLog[];
 }
 
 export interface ProcessToHathorLogParams extends BaseLogsParams {
-  log: any;
+  log: CrossEventLog;
   allowTokens: IAllowTokens;
 }
 
 export interface ProcessLogParams extends BaseLogsParams {
-  log: any;
+  log: CrossEventLog;
   sideFedContract: IFederation;
   allowTokens: IAllowTokens;
   federatorAddress: string;
@@ -46,7 +62,7 @@ export interface ProcessTransactionParams extends ProcessLogParams {
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BigInt;
+  amount: bigint;
   typeId: string;
   transactionId: string;
   originChainId: number;
@@ -57,7 +73,7 @@ export interface ProcessToHathorTransactionParams extends ProcessToHathorLogPara
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BigInt;
+  amount: bigint;
   typeId: string;
   originChainId: number;
   destinationChainId: number;
@@ -73,7 +89,7 @@ export interface VoteHathorTransactionParams {
   tokenAddress: string;
   senderAddress: string;
   receiver: string;
-  amount: BigInt;
+  amount: bigint;
   transactionId: string;
   originChainId: number;
   destinationChainId: number;
@@ -92,7 +108,7 @@ export interface TransactionIdParams {
   originalTokenAddress: string;
   sender: string;
   receiver: string;
-  amount: BigInt;
+  amount: bigint;
   blockHash: string;
   transactionHash: string;
   logIndex: number;

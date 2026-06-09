@@ -226,7 +226,7 @@ export function clone(instance: any): any {
   return copy;
 }
 
-export function convertToEvmDecimals(originalQtd: number): BigInt {
+export function convertToEvmDecimals(originalQtd: number): bigint {
   try {
     const bnQtd = BigInt(originalQtd);
     const precision = BigInt(Math.pow(10, 16).toString());
