@@ -14,6 +14,7 @@ import { IFederation } from '../contracts/IFederation';
 import { LogWrapper } from './logWrapper';
 import { HathorService } from './HathorService';
 import {
+  CrossEventLog,
   GetLogsParams,
   ProcessLogsParams,
   ProcessToHathorLogParams,
@@ -23,6 +24,7 @@ import {
 import { HathorException } from '../types';
 import MetricRegister from '../utils/MetricRegister';
 import { IAllowTokensV1 } from '../contracts';
+import { EventLog } from 'web3-eth-contract';
 
 export default class FederatorHTR extends Federator {
   private readonly PATH_ORIGIN = 'fhtr';
@@ -157,10 +159,12 @@ export default class FederatorHTR extends Federator {
         throw new Error('Failed to obtain the logs');
       }
 
-      this.logger.info(`Found ${logs.length} logs`);
+      const crossLogs = logs.filter((log): log is EventLog => typeof log !== 'string') as CrossEventLog[];
+
+      this.logger.info(`Found ${crossLogs.length} logs`);
       await this._processLogs({
         ...getLogParams,
-        logs,
+        logs: crossLogs,
       });
       if (!getLogParams.mediumAndSmall) {
         this._saveProgress(
@@ -243,7 +247,7 @@ export default class FederatorHTR extends Federator {
       // At this point we're processing blocks newer than largeAmountConfirmations
       // and older than smallAmountConfirmations
       if (amountBN > largeAmountBN) {
-        const confirmations = processLogParams.currentBlock - blockNumber;
+        const confirmations = processLogParams.currentBlock - Number(blockNumber);
         const neededConfirmations = processLogParams.confirmations.largeAmountConfirmations;
         this.logger.debug(
           `[large amount] Tx: ${transactionHash} ${amount} originalTokenAddress:${tokenAddress} won't be proccessed yet ${confirmations} < ${neededConfirmations}`,
@@ -253,9 +257,9 @@ export default class FederatorHTR extends Federator {
 
       if (
         amountBN > mediumAmountBN &&
-        processLogParams.currentBlock - blockNumber < processLogParams.confirmations.mediumAmountConfirmations
+        processLogParams.currentBlock - Number(blockNumber) < processLogParams.confirmations.mediumAmountConfirmations
       ) {
-        const confirmations = processLogParams.currentBlock - blockNumber;
+        const confirmations = processLogParams.currentBlock - Number(blockNumber);
         const neededConfirmations = processLogParams.confirmations.mediumAmountConfirmations;
         this.logger.debug(
           `[medium amount] Tx: ${transactionHash} ${amount} originalTokenAddress:${tokenAddress} won't be proccessed yet ${confirmations} < ${neededConfirmations}`,
@@ -290,12 +294,17 @@ export default class FederatorHTR extends Federator {
         processTransactionParams.allowTokens as IAllowTokensV1,
       );
 
+      const transactionHash = processTransactionParams.log.transactionHash;
+      if (!transactionHash) {
+        throw new Error('Missing transactionHash on Cross event log');
+      }
+
       await hathorService.sendTokensToHathor(
         processTransactionParams.senderAddress,
         processTransactionParams.receiver,
         processTransactionParams.amount.toString(),
         processTransactionParams.tokenAddress,
-        processTransactionParams.log.transactionHash,
+        transactionHash,
       );
     } catch (error) {
       if (!(error instanceof HathorException)) throw error;

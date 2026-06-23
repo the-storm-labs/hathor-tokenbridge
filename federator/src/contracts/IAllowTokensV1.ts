@@ -61,7 +61,7 @@ export class IAllowTokensV1 implements IAllowTokens {
     return confirmation * this.federatorInstance;
   }
 
-  async getSmallAmountConfirmations(): Promise<BigInt> {
+  async getSmallAmountConfirmations(): Promise<bigint> {
     try {
       return this.allowTokensContract.methods.smallAmountConfirmations().call();
     } catch (err) {
@@ -69,7 +69,7 @@ export class IAllowTokensV1 implements IAllowTokens {
     }
   }
 
-  async getMediumAmountConfirmations(): Promise<BigInt> {
+  async getMediumAmountConfirmations(): Promise<bigint> {
     try {
       return this.allowTokensContract.methods.mediumAmountConfirmations().call();
     } catch (err) {
@@ -77,7 +77,7 @@ export class IAllowTokensV1 implements IAllowTokens {
     }
   }
 
-  async getLargeAmountConfirmations(): Promise<BigInt> {
+  async getLargeAmountConfirmations(): Promise<bigint> {
     try {
       return this.allowTokensContract.methods.largeAmountConfirmations().call();
     } catch (err) {
