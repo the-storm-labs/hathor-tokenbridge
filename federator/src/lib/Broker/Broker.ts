@@ -87,6 +87,15 @@ export abstract class Broker {
     return hostWeb3;
   }
 
+  /**
+   * The address to use for change/deposit/authority outputs on the multisig wallet - always the
+   * same one (derivation index 0), so proposals stop growing the set of addresses the wallet has
+   * to track and sync. See HathorWallet#getFixedAddress.
+   */
+  protected async getFixedMultisigAddress(): Promise<string> {
+    return this.wallet.getFixedAddress('multi');
+  }
+
   abstract validateTx(txHex: string, originalTxId: string, contractTxId: string): Promise<boolean>;
   abstract getSideChainTokenAddress(tokenAddress: string): Promise<[string, number]>;
   abstract sendEvmNativeTokenProposal(receiverAddress, amount, tokenAddress);

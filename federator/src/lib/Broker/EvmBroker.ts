@@ -106,12 +106,17 @@ export class EvmBroker extends Broker {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
     const tokenDecimals = await this.getTokenDecimals(token, this.config.mainchain.chainId);
     const [destinationToken] = await this.getSideChainTokenAddress(token);
+    const fixedAddress = await this.getFixedMultisigAddress();
     const data = {
       address: `${receiverAddress}`,
       amount: convertToHathorDecimals(qtd, tokenDecimals),
       token: `${destinationToken}`,
       mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
+      // Pin change/mint-authority outputs to our own known address instead of letting the
+      // wallet fall back to its auto-incrementing default - see getFixedMultisigAddress.
+      change_address: fixedAddress,
+      mint_authority_address: fixedAddress,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -133,11 +138,14 @@ export class EvmBroker extends Broker {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
     const tokenDecimals = await this.getTokenDecimals(token, this.config.sidechain[0].chainId);
     const [destinationToken] = await this.getSideChainTokenAddress(token);
+    const fixedAddress = await this.getFixedMultisigAddress();
 
     const data = {
       mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
       outputs: [],
+      // Pin the change output to our own known address - see getFixedMultisigAddress.
+      change_address: fixedAddress,
     };
     const output = {
       address: `${receiverAddress}`,

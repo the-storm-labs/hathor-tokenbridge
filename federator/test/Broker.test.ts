@@ -1,4 +1,5 @@
 import { EvmBroker } from '../src/lib/Broker/EvmBroker';
+import { HathorBroker } from '../src/lib/Broker/HathorBroker';
 import { LogWrapper } from '../src/lib/logWrapper';
 import { ConfigData } from '../src/lib/config';
 import { BridgeFactory } from '../src/contracts/BridgeFactory';
@@ -134,6 +135,80 @@ describe('Broker - signing-time signature coverage', () => {
         true,
       );
       expect((broker as any).transactionSender.sendTransaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('fixed multisig address', () => {
+    const FIXED_ADDRESS = 'WfixedMultisigAddress00000000000000';
+
+    beforeEach(() => {
+      // getFixedAddress caches per wallet-id on the (process-wide singleton) HathorWallet
+      // instance; clear it so each test starts from a clean slate regardless of test order.
+      (broker as any).wallet.fixedAddressCache.clear();
+
+      jest.spyOn(broker as any, 'getTokenDecimals').mockResolvedValue(2);
+      jest.spyOn(broker, 'getSideChainTokenAddress').mockResolvedValue(['destinationToken', 1]);
+
+      requestWallet.mockImplementation((_post, _id, path) => {
+        if (path === 'wallet/address') {
+          return Promise.resolve({ status: 200, data: { success: true, address: FIXED_ADDRESS } });
+        }
+        return Promise.resolve({ status: 200, data: { success: true, txHex: 'abc123' } });
+      });
+    });
+
+    it('mint-tokens pins change_address and mint_authority_address to the fixed address', async () => {
+      await broker.sendEvmNativeTokenProposal('receiver', '10', 'token');
+
+      const mintCall = requestWallet.mock.calls.find((call) => call[2] === 'wallet/p2sh/tx-proposal/mint-tokens');
+      expect(mintCall).toBeDefined();
+      const [, , , data] = mintCall;
+      expect(data.address).toEqual('receiver'); // the real bridge recipient - must NOT be pinned
+      expect(data.change_address).toEqual(FIXED_ADDRESS);
+      expect(data.mint_authority_address).toEqual(FIXED_ADDRESS);
+    });
+
+    it('generic tx-proposal pins change_address to the fixed address', async () => {
+      await broker.sendHathorNativeTokenProposal('receiver', '10', 'token');
+
+      const proposalCall = requestWallet.mock.calls.find((call) => call[2] === 'wallet/p2sh/tx-proposal');
+      expect(proposalCall).toBeDefined();
+      const [, , , data] = proposalCall;
+      expect(data.outputs[0].address).toEqual('receiver'); // real recipient, untouched
+      expect(data.change_address).toEqual(FIXED_ADDRESS);
+    });
+
+    it('melt-tokens pins deposit_address, change_address, and melt_authority_address', async () => {
+      const allowTokensContract = {} as any;
+      const bridgeFactory = { createInstance: jest.fn() } as unknown as BridgeFactory;
+      const federationFactory = { createInstance: jest.fn() } as unknown as FederationFactory;
+      const hathorBroker = new HathorBroker(
+        mockConfig,
+        mockLogger,
+        bridgeFactory,
+        federationFactory,
+        (broker as any).metricRegister,
+        allowTokensContract,
+      );
+      (hathorBroker as any).wallet.requestWallet = requestWallet;
+      (hathorBroker as any).wallet.fixedAddressCache.clear();
+
+      await hathorBroker.sendEvmNativeTokenProposal('receiver', 10, 'token');
+
+      const meltCall = requestWallet.mock.calls.find((call) => call[2] === 'wallet/p2sh/tx-proposal/melt-tokens');
+      expect(meltCall).toBeDefined();
+      const [, , , data] = meltCall;
+      expect(data.deposit_address).toEqual(FIXED_ADDRESS);
+      expect(data.change_address).toEqual(FIXED_ADDRESS);
+      expect(data.melt_authority_address).toEqual(FIXED_ADDRESS);
+    });
+
+    it('reuses the cached address instead of calling wallet/address again', async () => {
+      await broker.sendEvmNativeTokenProposal('receiver', '10', 'token');
+      await broker.sendEvmNativeTokenProposal('receiver', '10', 'token');
+
+      const addressCalls = requestWallet.mock.calls.filter((call) => call[2] === 'wallet/address');
+      expect(addressCalls.length).toEqual(1);
     });
   });
 });

@@ -11,7 +11,6 @@ import MetricRegister from '../../utils/MetricRegister';
 import { convertToEvmDecimals } from '../utils';
 
 export class HathorBroker extends Broker {
-
   private allowTokensContract: IAllowTokensV1;
   private bridge: IBridgeV4;
 
@@ -82,12 +81,19 @@ export class HathorBroker extends Broker {
 
   async sendEvmNativeTokenProposal(receiver: string, qtd: number, token: string): Promise<string> {
     const wallet = HathorWallet.getInstance(this.config, this.logger);
+    const fixedAddress = await this.getFixedMultisigAddress();
 
     const data = {
       amount: qtd,
       token: `${token}`,
       mark_inputs_as_used: true,
       ttl: process.env.HATHOR_INPUT_BLOCK_TTL,
+      // A melt has no external recipient - the HTR deposit, token change, and melt-authority
+      // outputs all return to our own wallet, so pin all three to the same known address
+      // instead of letting the wallet fall back to its auto-incrementing default.
+      deposit_address: fixedAddress,
+      change_address: fixedAddress,
+      melt_authority_address: fixedAddress,
     };
 
     const response = await wallet.requestWallet<CreateProposalResponse>(
@@ -123,8 +129,12 @@ export class HathorBroker extends Broker {
     return [originalToken.tokenAddress, originalToken.originChainId];
   }
 
-  async isAmountAboveMinimumTransferAmount(isTokenEvmNative: boolean, _originalChainId: number, _tokenAddress: string, amount: bigint): Promise<boolean> {
-
+  async isAmountAboveMinimumTransferAmount(
+    isTokenEvmNative: boolean,
+    _originalChainId: number,
+    _tokenAddress: string,
+    amount: bigint,
+  ): Promise<boolean> {
     let evmTokenAddress = _tokenAddress;
 
     if (!isTokenEvmNative) {
@@ -172,7 +182,12 @@ export class HathorBroker extends Broker {
 
     const convertedAmount = convertToEvmDecimals(Number.parseInt(amount));
 
-    const isAboveMinimum = await this.isAmountAboveMinimumTransferAmount(isTokenEvmNative, originalChainId, evmTokenAddress, convertedAmount);
+    const isAboveMinimum = await this.isAmountAboveMinimumTransferAmount(
+      isTokenEvmNative,
+      originalChainId,
+      evmTokenAddress,
+      convertedAmount,
+    );
 
     if (!isAboveMinimum) {
       this.logger.info(`txHash ${txHash} amount - ${amount} below minimum for token ${evmTokenAddress}.`);
