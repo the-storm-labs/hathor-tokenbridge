@@ -1,6 +1,7 @@
 import Web3 from 'web3';
 import { LogWrapper } from '../logWrapper';
 import { ConfigData } from '../config';
+import { selectCompleteSignatures, parseSignatureEntry, sleep } from '../utils';
 import {
   Data,
   HathorException,
@@ -28,6 +29,12 @@ import MetricRegister from '../../utils/MetricRegister';
 const TOKEN_MELT_MASK = 0b00000010;
 const TOKEN_MINT_MASK = 0b00000001;
 const TOKEN_AUTHORITY_MASK = 0b10000000;
+
+// getMySignatures can come back covering only some of the tx's inputs if this federator's own
+// wallet hadn't yet recognized every referenced UTXO as spendable at signing time. Retry a few
+// times, giving the local wallet a chance to catch up, before giving up on this round entirely.
+const SIGN_RETRY_ATTEMPTS = 3;
+const SIGN_RETRY_DELAY_MS = 5000;
 
 type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
 
@@ -218,7 +225,23 @@ export abstract class Broker {
       this.metricRegister.increaseInvalidSigningCounter();
       throw new HathorException('Invalid tx', 'Invalid tx');
     }
-    const signature = await this.getMySignatures(txHex);
+
+    const { inputs } = await this.decodeTxHex(txHex);
+    const signature = await this.getCompleteSignature(txHex, inputs.length);
+
+    if (!signature) {
+      // Refuse to sign rather than submit a signature that can't cover every input: storing a
+      // partial one on-chain can later get selected for a push and break Hathor's P2SH redeem
+      // script validation ("Signatures are incompatible with redeemScript"). Simply not signing
+      // this round is safe - the multisig only needs HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES
+      // out of all federators, so the others can still reach quorum without this one.
+      this.logger.warn(
+        `signProposal: refusing to submit a signature for transaction ${contractTxId} - this wallet could not ` +
+          `produce one covering all ${inputs.length} input(s) after ${SIGN_RETRY_ATTEMPTS} attempt(s).`,
+      );
+      this.metricRegister.increaseInvalidSigningCounter();
+      return;
+    }
 
     const args = await this.hathorFederationContract.getUpdateSignatureStateArgs(
       tokenAddress,
@@ -273,12 +296,30 @@ export abstract class Broker {
     }
     const signatures = await this.getSignaturesFromArray(transactionId);
 
+    // Not every stored signature necessarily covers every input of txHex: a signer's own wallet
+    // can return a partial signature (e.g. if it hadn't yet recognized one of the UTXOs as
+    // spendable at signing time - see getMySignatures). Selecting one of those by array position
+    // alone silently breaks the whole push, since Hathor rejects the P2SH redeem script as soon
+    // as one selected signer is missing coverage for any input ("Signatures are incompatible with
+    // redeemScript"). Only ever select from signatures that fully cover the transaction.
+    const { inputs } = await this.decodeTxHex(txHex);
+    const completeSignatures = selectCompleteSignatures(signatures, inputs.length);
+
+    if (completeSignatures.length < parseInt(maxSignatures)) {
+      this.logger.warn(
+        `pushProposal: only ${completeSignatures.length}/${signatures.length} stored signatures for transaction ` +
+          `${transactionId} fully cover all ${inputs.length} input(s) of the proposal; ${maxSignatures} are ` +
+          `needed. Waiting for more complete signatures before pushing.`,
+      );
+      return;
+    }
+
     let txId;
 
     let txSent = false;
 
     try {
-      txId = await this.hathorPushProposal(txHex, signatures.slice(0, parseInt(maxSignatures)));
+      txId = await this.hathorPushProposal(txHex, completeSignatures.slice(0, parseInt(maxSignatures)));
       txSent = true;
     } catch (error) {
       if (error instanceof HathorException) {
@@ -452,6 +493,46 @@ export abstract class Broker {
     } catch (error) {
       throw Error(`Fail to getMySignature: ${error}`);
     }
+  }
+
+  /**
+   * Calls getMySignatures and only accepts a result that covers every one of the tx's
+   * `inputCount` inputs. If the wallet comes back with a partial signature - e.g. it hadn't yet
+   * recognized one of the referenced UTXOs as spendable - retries a few times with a short delay
+   * instead of accepting it right away. Returns null (never a partial signature) if it still
+   * can't get a complete one after all attempts, so the caller can refuse to sign instead.
+   */
+  private async getCompleteSignature(txHex: string, inputCount: number): Promise<string | null> {
+    for (let attempt = 1; attempt <= SIGN_RETRY_ATTEMPTS; attempt++) {
+      let signature: string;
+      try {
+        signature = await this.getMySignatures(txHex);
+      } catch (error) {
+        this.logger.warn(`getMySignatures attempt ${attempt}/${SIGN_RETRY_ATTEMPTS} failed: ${error}`);
+        if (attempt < SIGN_RETRY_ATTEMPTS) {
+          await sleep(SIGN_RETRY_DELAY_MS);
+        }
+        continue;
+      }
+
+      const { indices } = parseSignatureEntry(signature);
+      const missing = Array.from({ length: inputCount }, (_, i) => i).filter((idx) => !indices.includes(idx));
+      if (missing.length === 0) {
+        return signature;
+      }
+
+      this.logger.warn(
+        `getMySignatures attempt ${attempt}/${SIGN_RETRY_ATTEMPTS}: signature only covers input indices ` +
+          `[${indices.join(', ')}], missing [${missing.join(', ')}] of ${inputCount} required. ` +
+          (attempt < SIGN_RETRY_ATTEMPTS
+            ? `Retrying in ${SIGN_RETRY_DELAY_MS}ms - the wallet may still be syncing one of the inputs.`
+            : 'Giving up for this round.'),
+      );
+      if (attempt < SIGN_RETRY_ATTEMPTS) {
+        await sleep(SIGN_RETRY_DELAY_MS);
+      }
+    }
+    return null;
   }
 
   private async getSignaturesFromArray(transactionId: string): Promise<string[]> {

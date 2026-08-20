@@ -236,6 +236,36 @@ export function convertToEvmDecimals(originalQtd: number): bigint {
   }
 }
 
+/**
+ * Parses one entry returned by the Hathor headless wallet's
+ * `wallet/p2sh/tx-proposal/get-my-signatures` endpoint. The wallet formats each signer's
+ * contribution as `<pubkey>|<inputIndex>:<derSignature>|<inputIndex>:<derSignature>|...`.
+ * A signer that, for whatever local reason (e.g. its own wallet not yet recognizing every
+ * UTXO as spendable at signing time), only produced a signature for some of the transaction's
+ * inputs yields fewer `<inputIndex>:<derSignature>` segments here than the tx actually has.
+ */
+export function parseSignatureEntry(entry: string): { pubkey: string; indices: number[] } {
+  const [pubkey, ...parts] = entry.split('|');
+  const indices = parts.map((part) => Number(part.split(':')[0])).filter((idx) => Number.isInteger(idx));
+  return { pubkey, indices };
+}
+
+/**
+ * Filters `signatures` (entries in the format above) down to the ones that cover every input
+ * index in [0, inputCount). A partial signature - one missing coverage for at least one of the
+ * transaction's inputs - can never complete a valid P2SH redeem script on its own: including one
+ * in a push (however the rest of the set is chosen) makes the whole `sign-and-push` call fail
+ * with "Signatures are incompatible with redeemScript". Selection for push must only ever
+ * consider signatures from this filtered set, never raw array position.
+ */
+export function selectCompleteSignatures(signatures: string[], inputCount: number): string[] {
+  const requiredIndices = Array.from({ length: inputCount }, (_, i) => i);
+  return signatures.filter((entry) => {
+    const { indices } = parseSignatureEntry(entry);
+    return requiredIndices.every((idx) => indices.includes(idx));
+  });
+}
+
 export function convertToHathorDecimals(originalQtd: string, tokenDecimals: number): number {
   // Hathor Network tokens always have two decimals,
   // so here we get the number of decimals we need to discard
