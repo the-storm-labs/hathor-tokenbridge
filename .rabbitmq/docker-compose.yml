@@ -90,31 +90,32 @@ services:
       HATHOR_LAST_TIMESTAMP: ${HATHOR_LAST_TIMESTAMP}
       HATHOR_INPUT_BLOCK_TTL: ${HATHOR_INPUT_BLOCK_TTL}
 
-  prometheus:
-    image: prom/prometheus:v2.49.0
+  # Single agent that scrapes this instance's /metrics and tails its log file, pushing both
+  # to Grafana Cloud. Replaces the old prometheus + promtail pair (see .rabbitmq/alloy/config.alloy
+  # for the full rationale and required env vars) - no port needs to be published for this
+  # service, it only ever makes outbound connections.
+  alloy:
+    image: grafana/alloy:v1.19.0
+    container_name: hathor_alloy_${HATHOR_MULTISIG_ORDER}
     restart: unless-stopped
     depends_on:
       - hathor-federator
     volumes:
-      - ./prometheus/:/etc/prometheus/
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-    ports:
-      - 909${HATHOR_MULTISIG_ORDER}:9090
-
-  promtail:
-    image: grafana/promtail:2.0.0
-    restart: unless-stopped
-    depends_on:
-      - hathor-federator
-    volumes:
-      - ./promtail/:/etc/promtail/
+      - ./alloy/:/etc/alloy/
       - federator_db:/var/log
-    command:
-      - "--config.file=/etc/promtail/promtail-config_fed0${HATHOR_MULTISIG_ORDER}.yaml"
+      - alloy_data:/var/lib/alloy/data
+    environment:
+      GRAFANA_CLOUD_PROMETHEUS_URL: ${GRAFANA_CLOUD_PROMETHEUS_URL}
+      GRAFANA_CLOUD_PROMETHEUS_USER: ${GRAFANA_CLOUD_PROMETHEUS_USER}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY}
+      HATHOR_MULTISIG_ORDER: ${HATHOR_MULTISIG_ORDER}
 
 volumes:
   federator_db:
     name: hathor_federator_db_${HATHOR_MULTISIG_ORDER}
+    driver: local
+  alloy_data:
+    name: hathor_alloy_data_${HATHOR_MULTISIG_ORDER}
     driver: local
