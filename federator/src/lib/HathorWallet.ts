@@ -1,6 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
 import EventEmmiter from 'node:events';
-import { HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
+import { GetAddressResponse, HathorResponse, StatusResponse } from '../types/HathorResponseTypes';
 import { LogWrapper } from './logWrapper';
 import { ConfigChain } from './configChain';
 import { ConfigData } from './config';
@@ -15,16 +15,20 @@ export type Wallet = {
 export class HathorWallet {
   private static wallet: HathorWallet;
 
-  private WALLET_STATUS_CONNECTING = 1;
-  private WALLET_STATUS_SYNCING = 2;
-  private WALLET_STATUS_READY = 3;
+  private readonly WALLET_STATUS_CONNECTING = 1;
+  private readonly WALLET_STATUS_SYNCING = 2;
+  private readonly WALLET_STATUS_READY = 3;
 
-  public logger: LogWrapper;
-  public chainConfig: ConfigChain;
-  private wallets: Map<string, Wallet>;
-  public walletEmmiter: EventEmmiter;
+  public readonly logger: LogWrapper;
+  public readonly chainConfig: ConfigChain;
+  private readonly wallets: Map<string, Wallet>;
+  public readonly walletEmmiter: EventEmmiter;
 
-  private baseDelay = 10000;
+  private readonly baseDelay = 10000;
+
+  // Caches the address resolved by getFixedAddress per wallet id, so every caller within this
+  // process reuses the exact same address instead of asking the headless wallet again.
+  private readonly fixedAddressCache: Map<string, string>;
 
   private constructor(config: ConfigData, logger: LogWrapper) {
     logger.info('New instance of the wallet class');
@@ -33,6 +37,7 @@ export class HathorWallet {
     this.chainConfig = config.sidechain[0];
     this.wallets = new Map<string, Wallet>();
     this.wallets.set('multisig', { ready: false, lastCheck: new Date(0) });
+    this.fixedAddressCache = new Map<string, string>();
   }
 
   public static getInstance(config: ConfigData, logger: LogWrapper): HathorWallet {
@@ -40,6 +45,35 @@ export class HathorWallet {
       HathorWallet.wallet = new HathorWallet(config, logger);
     }
     return HathorWallet.wallet;
+  }
+
+  /**
+   * Resolves a stable, reusable address for `walletId` - always the address at `index`
+   * (derivation index 0 by default), fetched via `GET wallet/address?index=<index>`. This is
+   * deterministic (never uses `mark_as_used`, so it never advances the wallet's internal
+   * "current address" cursor) and cached per wallet id, so every caller gets back the exact
+   * same address for the lifetime of this process instead of letting the headless wallet fall
+   * back to its own auto-incrementing default for change/deposit/authority outputs.
+   */
+  public async getFixedAddress(walletId: string, index = 0): Promise<string> {
+    const cacheKey = `${walletId}:${index}`;
+    if (this.fixedAddressCache.has(cacheKey)) {
+      return this.fixedAddressCache.get(cacheKey);
+    }
+
+    const response = await this.requestWallet<GetAddressResponse>(false, walletId, 'wallet/address', null, {
+      index,
+    });
+    if (response.status !== 200 || !response.data?.address) {
+      throw new Error(
+        `Fail to get fixed address for wallet ${walletId} at index ${index}: ${response.status} - ${JSON.stringify(
+          response.data,
+        )}`,
+      );
+    }
+
+    this.fixedAddressCache.set(cacheKey, response.data.address);
+    return response.data.address;
   }
 
   public async areWalletsReady(): Promise<[boolean, EventEmmiter]> {

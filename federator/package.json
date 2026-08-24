@@ -18,12 +18,13 @@
     "test": "jest --detectOpenHandles test/",
     "integrationTest": "npm run clean && npx ts-node ./integrationTest/integrationTest.js",
     "integrationHeartbeatTest": "npm run clean && npx ts-node ./integrationTest/integrationHeartbeatTest.js && rm heartbeat.log federator.log",
+    "replay:pushProposal": "npx ts-node ./src/scripts/replayPushProposal.ts",
     "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",
     "lint": "eslint . --ext .ts",
     "clean": "rm -rf ./db/* ./built"
   },
   "dependencies": {
-    "@google-cloud/pubsub": "^4.0.7",
+    "@google-cloud/pubsub": "^6.0.1",
     "@types/amqplib": "^0.10.5",
     "amqplib": "^0.10.4",
     "dotenv": "^16.0.1",
@@ -64,6 +65,11 @@
   "resolutions": {
     "axios": "^0.21.2",
     "tar": ">=4.4.18"
+  },
+  "overrides": {
+    "node-notifier": {
+      "uuid": "^11.1.1"
+    }
   },
   "engines": {
     "node": "22"
