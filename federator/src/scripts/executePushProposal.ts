@@ -52,6 +52,29 @@ function buildLocalLogger(): LogWrapper {
   return new LogWrapper(log4js.getLogger('EXECUTE'), 'EXECUTE');
 }
 
+// Locate the event carrying a given transactionId's sender/receiver/value/token/type - same
+// getPastEvents call HathorFederationLogsReader uses, but filtered to the one we asked for.
+async function findTransactionEvent(
+  hathorFederationContract: IHathorFederationV1,
+  transactionId: string,
+  fromBlock: number,
+  toBlock: number,
+  batchSize: number,
+): Promise<any> {
+  for (let cur = fromBlock; cur <= toBlock; cur += batchSize) {
+    const to = Math.min(cur + batchSize - 1, toBlock);
+    const events = await hathorFederationContract.getPastEvents('allEvents', { fromBlock: cur, toBlock: to });
+    for (const ev of events) {
+      if (typeof ev === 'string') continue;
+      const rv = ev.returnValues as any;
+      if (rv?.transactionId === transactionId && rv?.sender && rv?.receiver) {
+        return rv;
+      }
+    }
+  }
+  return undefined;
+}
+
 async function main() {
   if (!TARGET_TRANSACTION_ID) {
     throw new Error(
@@ -76,20 +99,13 @@ async function main() {
     return;
   }
 
-  // Locate the event carrying this transactionId's sender/receiver/value/token/type — same
-  // getPastEvents call HathorFederationLogsReader uses, but filtered to the one we asked for.
-  let match: any;
-  for (let cur = FROM_BLOCK; cur <= TO_BLOCK && !match; cur += BATCH_SIZE) {
-    const to = Math.min(cur + BATCH_SIZE - 1, TO_BLOCK);
-    const events = await hathorFederationContract.getPastEvents('allEvents', { fromBlock: cur, toBlock: to });
-    for (const ev of events) {
-      if (typeof ev === 'string') continue;
-      const rv = ev.returnValues as any;
-      if (rv?.transactionId === TARGET_TRANSACTION_ID && rv?.sender && rv?.receiver) {
-        match = rv;
-      }
-    }
-  }
+  const match = await findTransactionEvent(
+    hathorFederationContract,
+    TARGET_TRANSACTION_ID,
+    FROM_BLOCK,
+    TO_BLOCK,
+    BATCH_SIZE,
+  );
 
   if (!match) {
     throw new Error(

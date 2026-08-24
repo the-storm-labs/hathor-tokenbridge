@@ -39,16 +39,16 @@ const SIGN_RETRY_DELAY_MS = 5000;
 type Token = { tokenAddress: string; senderAddress: string; receiverAddress: string; amount: number };
 
 export abstract class Broker {
-  public logger: LogWrapper;
-  public config: ConfigData;
-  public bridgeFactory: BridgeFactory;
-  public federationFactory: FederationFactory;
-  private hathorFederationFactory: HathorFederationFactory;
-  protected hathorFederationContract: IHathorFederationV1;
-  private transactionSender: TransactionSender;
-  protected chainConfig: ConfigChain;
-  private wallet: HathorWallet;
-  protected metricRegister: MetricRegister;
+  public readonly logger: LogWrapper;
+  public readonly config: ConfigData;
+  public readonly bridgeFactory: BridgeFactory;
+  public readonly federationFactory: FederationFactory;
+  private readonly hathorFederationFactory: HathorFederationFactory;
+  protected readonly hathorFederationContract: IHathorFederationV1;
+  private readonly transactionSender: TransactionSender;
+  protected readonly chainConfig: ConfigChain;
+  private readonly wallet: HathorWallet;
+  protected readonly metricRegister: MetricRegister;
 
   constructor(
     config: ConfigData,
@@ -76,7 +76,7 @@ export abstract class Broker {
     this.hathorFederationContract = this.hathorFederationFactory.createInstance() as IHathorFederationV1;
   }
 
-  public web3ByHost: Map<string, Web3>;
+  public readonly web3ByHost: Map<string, Web3>;
 
   getWeb3(host: string): Web3 {
     let hostWeb3 = this.web3ByHost.get(host);
@@ -314,7 +314,7 @@ export abstract class Broker {
     const { inputs } = await this.decodeTxHex(txHex);
     const completeSignatures = selectCompleteSignatures(signatures, inputs.length);
 
-    if (completeSignatures.length < parseInt(maxSignatures)) {
+    if (completeSignatures.length < Number.parseInt(maxSignatures)) {
       this.logger.warn(
         `pushProposal: only ${completeSignatures.length}/${signatures.length} stored signatures for transaction ` +
           `${transactionId} fully cover all ${inputs.length} input(s) of the proposal; ${maxSignatures} are ` +
@@ -328,7 +328,7 @@ export abstract class Broker {
     let txSent = false;
 
     try {
-      txId = await this.hathorPushProposal(txHex, completeSignatures.slice(0, parseInt(maxSignatures)));
+      txId = await this.hathorPushProposal(txHex, completeSignatures.slice(0, Number.parseInt(maxSignatures)));
       txSent = true;
     } catch (error) {
       if (error instanceof HathorException) {

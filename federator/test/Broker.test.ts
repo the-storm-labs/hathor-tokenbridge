@@ -208,7 +208,7 @@ describe('Broker - signing-time signature coverage', () => {
       await broker.sendEvmNativeTokenProposal('receiver', '10', 'token');
 
       const addressCalls = requestWallet.mock.calls.filter((call) => call[2] === 'wallet/address');
-      expect(addressCalls.length).toEqual(1);
+      expect(addressCalls).toHaveLength(1);
     });
   });
 });

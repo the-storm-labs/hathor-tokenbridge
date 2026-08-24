@@ -15,20 +15,20 @@ export type Wallet = {
 export class HathorWallet {
   private static wallet: HathorWallet;
 
-  private WALLET_STATUS_CONNECTING = 1;
-  private WALLET_STATUS_SYNCING = 2;
-  private WALLET_STATUS_READY = 3;
+  private readonly WALLET_STATUS_CONNECTING = 1;
+  private readonly WALLET_STATUS_SYNCING = 2;
+  private readonly WALLET_STATUS_READY = 3;
 
-  public logger: LogWrapper;
-  public chainConfig: ConfigChain;
-  private wallets: Map<string, Wallet>;
-  public walletEmmiter: EventEmmiter;
+  public readonly logger: LogWrapper;
+  public readonly chainConfig: ConfigChain;
+  private readonly wallets: Map<string, Wallet>;
+  public readonly walletEmmiter: EventEmmiter;
 
-  private baseDelay = 10000;
+  private readonly baseDelay = 10000;
 
   // Caches the address resolved by getFixedAddress per wallet id, so every caller within this
   // process reuses the exact same address instead of asking the headless wallet again.
-  private fixedAddressCache: Map<string, string>;
+  private readonly fixedAddressCache: Map<string, string>;
 
   private constructor(config: ConfigData, logger: LogWrapper) {
     logger.info('New instance of the wallet class');

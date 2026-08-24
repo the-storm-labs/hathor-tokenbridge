@@ -29,7 +29,7 @@
 
 import log4js from 'log4js';
 import { Registry } from 'prom-client';
-import { Config } from '../lib/config';
+import { Config, ConfigData } from '../lib/config';
 import { LogWrapper } from '../lib/logWrapper';
 import { Broker, EvmBroker, HathorBroker } from '../lib/Broker';
 import { HathorWallet } from '../lib/HathorWallet';
@@ -66,6 +66,22 @@ interface EventInfo {
   eventName: string;
 }
 
+type ReadCallFn = 'isProcessed' | 'isSigned' | 'isProposed' | 'getSignatureCount';
+type ReadCall = (fn: ReadCallFn, callArgs: any[]) => Promise<any>;
+
+// Bundles everything a single transactionId's replay needs, so per-transaction helpers don't
+// have to take a dozen positional parameters each.
+interface ReplayContext {
+  config: ConfigData;
+  hathorFederationContract: IHathorFederationV1;
+  rawContract: any;
+  pinBlock: number | undefined;
+  maxSignaturesEnv: string;
+  logger: LogWrapper;
+  readCall: ReadCall;
+  brokers?: { evmBroker: EvmBroker; hathorBroker: HathorBroker };
+}
+
 // Deliberately NOT using Logs.getInstance() here: config/log-config.json points its file
 // appender at the container-only path /var/log/federator.log (writable inside the docker
 // federator service via its volume mount), which throws EACCES when running this script
@@ -79,28 +95,17 @@ function buildLocalLogger(): LogWrapper {
   return new LogWrapper(log4js.getLogger('REPLAY'), 'REPLAY');
 }
 
-async function main() {
-  const config = Config.getInstance();
-  const logger = buildLocalLogger();
-
-  logger.info(
-    `Replay (READ-ONLY) fromBlock=${FROM_BLOCK} toBlock=${TO_BLOCK} batchSize=${BATCH_SIZE} ` +
-      `validate=${RUN_VALIDATE_TX} pin=${PIN_BLOCK ?? '(live)'}`,
-  );
-
-  const hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
-  const rawContract = hathorFederationContract.hathorFederationContract; // public field, used only for pinned reads
-
-  const maxSignaturesEnv = process.env.HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES;
-  if (!maxSignaturesEnv) {
-    throw new Error('HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES not set in federator/.env');
-  }
-  logger.info(`Threshold HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES=${maxSignaturesEnv}`);
-
-  // ---- STEP 1: manual, chunked, read-only log scan (no LogsReader, no handleEvent) ----
+// ---- STEP 1: manual, chunked, read-only log scan (no LogsReader, no handleEvent) ----
+async function scanEvents(
+  hathorFederationContract: IHathorFederationV1,
+  fromBlock: number,
+  toBlock: number,
+  batchSize: number,
+  logger: LogWrapper,
+): Promise<Map<string, EventInfo>> {
   const byTxId = new Map<string, EventInfo>();
-  for (let cur = FROM_BLOCK; cur <= TO_BLOCK; cur += BATCH_SIZE) {
-    const to = Math.min(cur + BATCH_SIZE - 1, TO_BLOCK);
+  for (let cur = fromBlock; cur <= toBlock; cur += batchSize) {
+    const to = Math.min(cur + batchSize - 1, toBlock);
     logger.info(`Scanning allEvents ${cur}-${to}`);
     const events = await hathorFederationContract.getPastEvents('allEvents', { fromBlock: cur, toBlock: to });
     for (const ev of events) {
@@ -125,170 +130,243 @@ async function main() {
     }
   }
   logger.info(`Discovered ${byTxId.size} distinct transactionId(s) in range.`);
+  return byTxId;
+}
 
-  // Helper: read either via the typed wrapper (live) or via the raw contract pinned to PIN_BLOCK.
-  const readCall = async (fn: 'isProcessed' | 'isSigned' | 'isProposed' | 'getSignatureCount', callArgs: any[]) => {
-    if (PIN_BLOCK === undefined) {
+// Read either via the typed wrapper (live) or via the raw contract pinned to pinBlock.
+function buildReadCall(
+  hathorFederationContract: IHathorFederationV1,
+  rawContract: any,
+  pinBlock: number | undefined,
+  logger: LogWrapper,
+): ReadCall {
+  return async (fn, callArgs) => {
+    if (pinBlock === undefined) {
       return (hathorFederationContract as any)[fn](...callArgs);
     }
     try {
-      return await rawContract.methods[fn](...callArgs).call({}, PIN_BLOCK);
+      return await rawContract.methods[fn](...callArgs).call({}, pinBlock);
     } catch (err) {
       logger.warn(
-        `Pinned read of ${fn} @block ${PIN_BLOCK} failed (likely non-archive RPC), falling back to live: ${err}`,
+        `Pinned read of ${fn} @block ${pinBlock} failed (likely non-archive RPC), falling back to live: ${err}`,
       );
       return (hathorFederationContract as any)[fn](...callArgs);
     }
   };
+}
 
-  // Optional broker wiring, built once, only if --validate was passed.
-  let evmBroker: EvmBroker | undefined;
-  let hathorBroker: HathorBroker | undefined;
-  if (RUN_VALIDATE_TX) {
-    // Same readiness check Main.start() does before touching the wallet (HathorWallet.ts:45-62)
-    // — makes the local headless wallet load/sync the 'multi' wallet from its seed if it hasn't
-    // already. This is local wallet-server bookkeeping only: no Hathor transaction is created or
-    // broadcast by this call.
-    const wallet = HathorWallet.getInstance(config, logger);
-    const [ready] = await wallet.areWalletsReady();
-    logger.info(`Local multisig wallet ready=${ready}`);
+// Optional broker wiring, built once, only if --validate was passed.
+async function buildValidationBrokers(
+  config: ConfigData,
+  logger: LogWrapper,
+): Promise<{ evmBroker: EvmBroker; hathorBroker: HathorBroker }> {
+  // Same readiness check Main.start() does before touching the wallet (HathorWallet.ts:45-62)
+  // — makes the local headless wallet load/sync the 'multi' wallet from its seed if it hasn't
+  // already. This is local wallet-server bookkeeping only: no Hathor transaction is created or
+  // broadcast by this call.
+  const wallet = HathorWallet.getInstance(config, logger);
+  const [ready] = await wallet.areWalletsReady();
+  logger.info(`Local multisig wallet ready=${ready}`);
 
-    const register = new Registry();
-    const metricRegister = new MetricRegister(register, 'replay_push_proposal');
-    const bridgeFactory = new BridgeFactory();
-    const federationFactory = new FederationFactory();
-    const allowTokensContract = (await new AllowTokensFactory().createInstance(config.mainchain)) as IAllowTokensV1;
-    evmBroker = new EvmBroker(config, logger, bridgeFactory, federationFactory, metricRegister);
-    hathorBroker = new HathorBroker(
-      config,
-      logger,
-      bridgeFactory,
-      federationFactory,
-      metricRegister,
-      allowTokensContract,
+  const register = new Registry();
+  const metricRegister = new MetricRegister(register, 'replay_push_proposal');
+  const bridgeFactory = new BridgeFactory();
+  const federationFactory = new FederationFactory();
+  const allowTokensContract = (await new AllowTokensFactory().createInstance(config.mainchain)) as IAllowTokensV1;
+  const evmBroker = new EvmBroker(config, logger, bridgeFactory, federationFactory, metricRegister);
+  const hathorBroker = new HathorBroker(
+    config,
+    logger,
+    bridgeFactory,
+    federationFactory,
+    metricRegister,
+    allowTokensContract,
+  );
+  return { evmBroker, hathorBroker };
+}
+
+// getSignaturesFromArray (Broker.ts:456-465) re-reads the count itself — replicate that exactly.
+async function collectSignatures(
+  transactionId: string,
+  ctx: ReplayContext,
+): Promise<{ signatures: string[]; slice: string[] }> {
+  const { hathorFederationContract, rawContract, pinBlock, maxSignaturesEnv, readCall } = ctx;
+  const freshCount = await readCall('getSignatureCount', [transactionId]);
+  const signatures: string[] = [];
+  for (let i = 0; i < freshCount; i++) {
+    const sig =
+      pinBlock === undefined
+        ? await hathorFederationContract.transactionSignatures(transactionId, i)
+        : await rawContract.methods.transactionSignatures(transactionId, i).call({}, pinBlock);
+    signatures.push(sig as unknown as string);
+  }
+  const slice = signatures.slice(0, Number.parseInt(maxSignaturesEnv));
+  return { signatures, slice };
+}
+
+// Cross-check using the SAME logic pushProposal now uses (selectCompleteSignatures,
+// src/lib/utils.ts): does each of the naive slice(0,maxSignatures) signers actually cover
+// every input index the decoded tx requires? A signer missing coverage for one of the tx's
+// inputs is exactly the shape of error that manifests on Hathor's side as "Signatures are
+// incompatible with redeemScript".
+function logSignatureCoverage(signatures: string[], slice: string[], inputCount: number, ctx: ReplayContext): void {
+  const { logger, maxSignaturesEnv } = ctx;
+  const requiredIndices = Array.from({ length: inputCount }, (_, i) => i);
+  logger.info(`Decoded tx requires signatures covering input indices: [${requiredIndices.join(', ')}]`);
+
+  for (const entry of slice) {
+    const { pubkey, indices } = parseSignatureEntry(entry);
+    const missing = requiredIndices.filter((idx) => !indices.includes(idx));
+    if (missing.length > 0) {
+      logger.warn(
+        `[BEFORE FIX] naive slice(0,${maxSignaturesEnv}): signer ${pubkey} only covers input indices ` +
+          `[${indices.join(', ')}], MISSING [${missing.join(', ')}] — this is exactly what produces Hathor's ` +
+          `"Signatures are incompatible with redeemScript" rejection.`,
+      );
+    } else {
+      logger.info(`[BEFORE FIX] naive slice(0,${maxSignaturesEnv}): signer ${pubkey} covers all inputs.`);
+    }
+  }
+
+  const fixedSelection = selectCompleteSignatures(signatures, inputCount).slice(0, Number.parseInt(maxSignaturesEnv));
+  logger.info(
+    `[AFTER FIX] selectCompleteSignatures(...).slice(0,${maxSignaturesEnv}) -> ` +
+      `${fixedSelection.length} signer(s) would be sent: ` +
+      `${JSON.stringify(fixedSelection.map((e) => parseSignatureEntry(e).pubkey))}`,
+  );
+  if (fixedSelection.length < Number.parseInt(maxSignaturesEnv)) {
+    logger.warn(
+      `[AFTER FIX] Not enough complete signatures yet (${fixedSelection.length}/${maxSignaturesEnv}) — ` +
+        `the fixed pushProposal would wait instead of pushing, matching its new early-return behavior.`,
+    );
+  }
+}
+
+// ---- STEP 3 (optional, --validate): safe validateTx reproduction ----
+async function runValidateTxDiagnostics(
+  info: EventInfo,
+  txHex: string,
+  signatures: string[],
+  slice: string[],
+  ctx: ReplayContext,
+): Promise<void> {
+  const { config, logger, brokers } = ctx;
+
+  // Raw wallet/decode call first — same endpoint Broker#decodeTxHex uses (read-only, never
+  // pushes), but logged here with the FULL response body instead of decodeTxHex's own
+  // `${response.status} - ${response.data}` (which stringifies an object to "[object Object]").
+  try {
+    const decodeResponse = await HathorWallet.getInstance(config, logger).requestWallet<DecodeResponse>(
+      true,
+      'multi',
+      'wallet/decode',
+      { txHex },
+    );
+    logger.info(`wallet/decode -> status=${decodeResponse.status} body=${JSON.stringify(decodeResponse.data)}`);
+
+    const inputCount = decodeResponse.data?.tx?.inputs?.length;
+    if (decodeResponse.data?.success && typeof inputCount === 'number') {
+      logSignatureCoverage(signatures, slice, inputCount, ctx);
+    }
+  } catch (err) {
+    logger.error(`wallet/decode call itself failed: ${err}`);
+  }
+
+  const broker: Broker = info.transactionType === TransactionTypes.MELT ? brokers!.hathorBroker : brokers!.evmBroker;
+  try {
+    const valid = await broker.validateTx(txHex, info.transactionHash, info.transactionId);
+    logger.info(`validateTx(...) -> ${valid}`);
+  } catch (err) {
+    logger.error(`validateTx threw (this itself may be the real rejection reason): ${err}`);
+  }
+}
+
+// ---- STEP 2: replicate pushProposal's decision logic for one transactionId (all safe reads) ----
+async function replayTransaction(info: EventInfo, ctx: ReplayContext): Promise<void> {
+  const { readCall, logger, maxSignaturesEnv, hathorFederationContract, brokers } = ctx;
+  logger.info(`\n=== transactionId ${info.transactionId} (event ${info.eventName} @block ${info.blockNumber}) ===`);
+
+  const isProcessed = await readCall('isProcessed', [info.transactionId]);
+  const isSigned = await readCall('isSigned', [info.transactionId, process.env.FEDERATOR_ADDRESS]);
+  const isProposed = await readCall('isProposed', [info.transactionId]);
+  const arrayLength = await readCall('getSignatureCount', [info.transactionId]);
+
+  logger.info(`isProcessed=${isProcessed} isSigned(FEDERATOR_ADDRESS)=${isSigned} isProposed=${isProposed}`);
+  logger.info(
+    `getSignatureCount=${arrayLength} (threshold=${maxSignaturesEnv}) -> gate ${
+      arrayLength < maxSignaturesEnv
+        ? 'pushProposal would RETURN early (below threshold)'
+        : 'pushProposal would PROCEED'
+    }`,
+  );
+
+  if (arrayLength < maxSignaturesEnv) {
+    return;
+  }
+
+  const { signatures, slice } = await collectSignatures(info.transactionId, ctx);
+  logger.info(`getSignaturesFromArray -> ${signatures.length} signatures: ${JSON.stringify(signatures)}`);
+  logger.info(
+    `pushProposal's signatures.slice(0, ${maxSignaturesEnv}) -> ${slice.length} would be sent: ${JSON.stringify(
+      slice,
+    )}`,
+  );
+
+  if (signatures.length > slice.length) {
+    logger.warn(
+      `On-chain array had ${signatures.length} signatures but slice(0,${maxSignaturesEnv}) caps what ` +
+        `pushProposal would actually send at ${slice.length}. This means pushProposal's own code cannot ` +
+        `structurally emit more than the configured threshold in a single call — if 5 signatures really ` +
+        `reached the wallet, the discrepancy is NOT a naive "sent all 5" bug in this function. Worth checking: ` +
+        `(a) whether the array ORDER changed between the count check and this read (race/reordering), and ` +
+        `(b) whether a different federator's own pushProposal call, with a different local view of the array, ` +
+        `is what actually pushed.`,
     );
   }
 
-  // ---- STEP 2: replicate pushProposal's decision logic per transactionId (all safe reads) ----
+  const txHex = await hathorFederationContract.transactionHex(info.transactionId);
+  logger.info(`transactionHex length=${txHex.length}`);
+
+  if (brokers) {
+    await runValidateTxDiagnostics(info, txHex, signatures, slice, ctx);
+  }
+}
+
+async function main() {
+  const config = Config.getInstance();
+  const logger = buildLocalLogger();
+
+  logger.info(
+    `Replay (READ-ONLY) fromBlock=${FROM_BLOCK} toBlock=${TO_BLOCK} batchSize=${BATCH_SIZE} ` +
+      `validate=${RUN_VALIDATE_TX} pin=${PIN_BLOCK ?? '(live)'}`,
+  );
+
+  const hathorFederationContract = new HathorFederationFactory().createInstance() as IHathorFederationV1;
+  const rawContract = hathorFederationContract.hathorFederationContract; // public field, used only for pinned reads
+
+  const maxSignaturesEnv = process.env.HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES;
+  if (!maxSignaturesEnv) {
+    throw new Error('HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES not set in federator/.env');
+  }
+  logger.info(`Threshold HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES=${maxSignaturesEnv}`);
+
+  const byTxId = await scanEvents(hathorFederationContract, FROM_BLOCK, TO_BLOCK, BATCH_SIZE, logger);
+  const readCall = buildReadCall(hathorFederationContract, rawContract, PIN_BLOCK, logger);
+  const brokers = RUN_VALIDATE_TX ? await buildValidationBrokers(config, logger) : undefined;
+
+  const ctx: ReplayContext = {
+    config,
+    hathorFederationContract,
+    rawContract,
+    pinBlock: PIN_BLOCK,
+    maxSignaturesEnv,
+    logger,
+    readCall,
+    brokers,
+  };
+
   for (const info of byTxId.values()) {
-    logger.info(`\n=== transactionId ${info.transactionId} (event ${info.eventName} @block ${info.blockNumber}) ===`);
-
-    const isProcessed = await readCall('isProcessed', [info.transactionId]);
-    const isSigned = await readCall('isSigned', [info.transactionId, process.env.FEDERATOR_ADDRESS]);
-    const isProposed = await readCall('isProposed', [info.transactionId]);
-    const arrayLength = await readCall('getSignatureCount', [info.transactionId]);
-
-    logger.info(`isProcessed=${isProcessed} isSigned(FEDERATOR_ADDRESS)=${isSigned} isProposed=${isProposed}`);
-    logger.info(
-      `getSignatureCount=${arrayLength} (threshold=${maxSignaturesEnv}) -> gate ${
-        arrayLength < maxSignaturesEnv
-          ? 'pushProposal would RETURN early (below threshold)'
-          : 'pushProposal would PROCEED'
-      }`,
-    );
-
-    if (arrayLength < maxSignaturesEnv) {
-      continue;
-    }
-
-    // getSignaturesFromArray (Broker.ts:456-465) re-reads the count itself — replicate that exactly.
-    const freshCount = await readCall('getSignatureCount', [info.transactionId]);
-    const signatures: string[] = [];
-    for (let i = 0; i < freshCount; i++) {
-      const sig =
-        PIN_BLOCK === undefined
-          ? await hathorFederationContract.transactionSignatures(info.transactionId, i)
-          : await rawContract.methods.transactionSignatures(info.transactionId, i).call({}, PIN_BLOCK);
-      signatures.push(sig as unknown as string);
-    }
-    const slice = signatures.slice(0, parseInt(maxSignaturesEnv));
-
-    logger.info(`getSignaturesFromArray -> ${signatures.length} signatures: ${JSON.stringify(signatures)}`);
-    logger.info(
-      `pushProposal's signatures.slice(0, ${maxSignaturesEnv}) -> ${slice.length} would be sent: ${JSON.stringify(
-        slice,
-      )}`,
-    );
-
-    if (signatures.length > slice.length) {
-      logger.warn(
-        `On-chain array had ${signatures.length} signatures but slice(0,${maxSignaturesEnv}) caps what ` +
-          `pushProposal would actually send at ${slice.length}. This means pushProposal's own code cannot ` +
-          `structurally emit more than the configured threshold in a single call — if 5 signatures really ` +
-          `reached the wallet, the discrepancy is NOT a naive "sent all 5" bug in this function. Worth checking: ` +
-          `(a) whether the array ORDER changed between the count check and this read (race/reordering), and ` +
-          `(b) whether a different federator's own pushProposal call, with a different local view of the array, ` +
-          `is what actually pushed.`,
-      );
-    }
-
-    const txHex = await hathorFederationContract.transactionHex(info.transactionId);
-    logger.info(`transactionHex length=${txHex.length}`);
-
-    // ---- STEP 3 (optional, --validate): safe validateTx reproduction ----
-    if (RUN_VALIDATE_TX) {
-      // Raw wallet/decode call first — same endpoint Broker#decodeTxHex uses (read-only,
-      // never pushes), but logged here with the FULL response body instead of
-      // decodeTxHex's own `${response.status} - ${response.data}` (which stringifies an
-      // object to the useless "[object Object]").
-      try {
-        const decodeResponse = await HathorWallet.getInstance(config, logger).requestWallet<DecodeResponse>(
-          true,
-          'multi',
-          'wallet/decode',
-          { txHex },
-        );
-        logger.info(`wallet/decode -> status=${decodeResponse.status} body=${JSON.stringify(decodeResponse.data)}`);
-
-        // Cross-check using the SAME logic pushProposal now uses (selectCompleteSignatures,
-        // src/lib/utils.ts): does each of the naive slice(0,maxSignatures) signers actually
-        // cover every input index the decoded tx requires? A signer missing coverage for one of
-        // the tx's inputs is exactly the shape of error that manifests on Hathor's side as
-        // "Signatures are incompatible with redeemScript".
-        const inputCount = decodeResponse.data?.tx?.inputs?.length;
-        if (decodeResponse.data?.success && typeof inputCount === 'number') {
-          const requiredIndices = Array.from({ length: inputCount }, (_, i) => i);
-          logger.info(`Decoded tx requires signatures covering input indices: [${requiredIndices.join(', ')}]`);
-
-          for (const entry of slice) {
-            const { pubkey, indices } = parseSignatureEntry(entry);
-            const missing = requiredIndices.filter((idx) => !indices.includes(idx));
-            if (missing.length > 0) {
-              logger.warn(
-                `[BEFORE FIX] naive slice(0,${maxSignaturesEnv}): signer ${pubkey} only covers input indices ` +
-                  `[${indices.join(', ')}], MISSING [${missing.join(', ')}] — this is exactly what produces Hathor's ` +
-                  `"Signatures are incompatible with redeemScript" rejection.`,
-              );
-            } else {
-              logger.info(`[BEFORE FIX] naive slice(0,${maxSignaturesEnv}): signer ${pubkey} covers all inputs.`);
-            }
-          }
-
-          const fixedSelection = selectCompleteSignatures(signatures, inputCount).slice(0, parseInt(maxSignaturesEnv));
-          logger.info(
-            `[AFTER FIX] selectCompleteSignatures(...).slice(0,${maxSignaturesEnv}) -> ` +
-              `${fixedSelection.length} signer(s) would be sent: ` +
-              `${JSON.stringify(fixedSelection.map((e) => parseSignatureEntry(e).pubkey))}`,
-          );
-          if (fixedSelection.length < parseInt(maxSignaturesEnv)) {
-            logger.warn(
-              `[AFTER FIX] Not enough complete signatures yet (${fixedSelection.length}/${maxSignaturesEnv}) — ` +
-                `the fixed pushProposal would wait instead of pushing, matching its new early-return behavior.`,
-            );
-          }
-        }
-      } catch (err) {
-        logger.error(`wallet/decode call itself failed: ${err}`);
-      }
-
-      const broker: Broker = info.transactionType === TransactionTypes.MELT ? hathorBroker! : evmBroker!;
-      try {
-        const valid = await broker.validateTx(txHex, info.transactionHash, info.transactionId);
-        logger.info(`validateTx(...) -> ${valid}`);
-      } catch (err) {
-        logger.error(`validateTx threw (this itself may be the real rejection reason): ${err}`);
-      }
-    }
+    await replayTransaction(info, ctx);
   }
 
   logger.info('\nDone. No wallet sign-and-push call and no on-chain write were made by this script.');

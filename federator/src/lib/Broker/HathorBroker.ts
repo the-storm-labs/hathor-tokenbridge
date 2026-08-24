@@ -11,7 +11,7 @@ import MetricRegister from '../../utils/MetricRegister';
 import { convertToEvmDecimals } from '../utils';
 
 export class HathorBroker extends Broker {
-  private allowTokensContract: IAllowTokensV1;
+  private readonly allowTokensContract: IAllowTokensV1;
   private bridge: IBridgeV4;
 
   constructor(
