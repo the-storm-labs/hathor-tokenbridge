@@ -6,6 +6,7 @@ import { FederationFactory } from '../src/contracts/FederationFactory';
 import TransactionSender from '../src/lib/TransactionSender';
 import MetricRegister from '../src/utils/MetricRegister';
 import { HathorTx } from '../src/types/HathorTx';
+import { EvmBroker } from '../src/lib/Broker/EvmBroker';
 
 jest.mock('@google-cloud/pubsub');
 jest.mock('amqplib');
@@ -29,28 +30,30 @@ describe('HathorService', () => {
     };
 
     mockConfig = {
-      sidechain: [{
-        eventQueueType: 'pubsub',
-        pubsubProjectId: 'test-project',
-        multisigOrder: 1
-      }]
+      sidechain: [
+        {
+          eventQueueType: 'pubsub',
+          pubsubProjectId: 'test-project',
+          multisigOrder: 1,
+        },
+      ],
     } as ConfigData;
 
     mockBridgeFactory = {
-      createInstance: jest.fn()
+      createInstance: jest.fn(),
     } as any;
 
     mockFederationFactory = {
-      createInstance: jest.fn()
+      createInstance: jest.fn(),
     } as any;
 
     mockTransactionSender = {
-      send: jest.fn()
+      send: jest.fn(),
     } as any;
 
     mockMetricRegister = {
       increment: jest.fn(),
-      timing: jest.fn()
+      timing: jest.fn(),
     } as any;
 
     hathorService = new HathorService(
@@ -77,7 +80,7 @@ describe('HathorService', () => {
       const error = '';
       expect(hathorService['isNonRetriableError'](error)).toBe(false);
     });
-    
+
     it('should return false for null error message', () => {
       const error = null;
       expect(hathorService['isNonRetriableError'](error)).toBe(false);
@@ -86,7 +89,6 @@ describe('HathorService', () => {
       const error = 1234;
       expect(hathorService['isNonRetriableError'](error)).toBe(false);
     });
-
   });
 
   describe('parseHathorLogs', () => {
@@ -114,8 +116,8 @@ describe('HathorService', () => {
         type: 'wallet:new-tx',
         data: {
           outputs: [],
-          inputs: []
-        }
+          inputs: [],
+        },
       };
 
       const result = await hathorService['parseHathorLogs'](event);
@@ -126,24 +128,11 @@ describe('HathorService', () => {
   describe('sendTokensToHathor', () => {
     it('should successfully send tokens to Hathor', async () => {
       const sendTokensSpy = jest.fn().mockResolvedValue(true);
-      jest.spyOn(require('../src/lib/Broker/EvmBroker').EvmBroker.prototype, 'sendTokens')
-        .mockImplementation(sendTokensSpy);
+      jest.spyOn(EvmBroker.prototype, 'sendTokens').mockImplementation(sendTokensSpy);
 
-      await hathorService.sendTokensToHathor(
-        '0x123',
-        '0x456',
-        '100',
-        '0x789',
-        'txHash'
-      );
+      await hathorService.sendTokensToHathor('0x123', '0x456', '100', '0x789', 'txHash');
 
-      expect(sendTokensSpy).toHaveBeenCalledWith(
-        '0x123',
-        '0x456',
-        '100',
-        '0x789',
-        'txHash'
-      );
+      expect(sendTokensSpy).toHaveBeenCalledWith('0x123', '0x456', '100', '0x789', 'txHash');
     });
   });
 
@@ -152,27 +141,31 @@ describe('HathorService', () => {
       const mockData = {
         tx_id: 'test-id',
         timestamp: '123456',
-        outputs: [{
-          script: 'script1',
-          token: 'token1',
-          value: 100,
-          decoded: {
-            type: 'type1',
-            address: 'addr1',
-            timelock: 0
+        outputs: [
+          {
+            script: 'script1',
+            token: 'token1',
+            value: 100,
+            decoded: {
+              type: 'type1',
+              address: 'addr1',
+              timelock: 0,
+            },
+            spent_by: 'tx1',
           },
-          spent_by: 'tx1'
-        }],
-        inputs: [{
-          script: 'script2',
-          token: 'token2',
-          value: 200,
-          decoded: {
-            type: 'type2',
-            address: 'addr2',
-            timelock: 0
-          }
-        }]
+        ],
+        inputs: [
+          {
+            script: 'script2',
+            token: 'token2',
+            value: 200,
+            decoded: {
+              type: 'type2',
+              address: 'addr2',
+              timelock: 0,
+            },
+          },
+        ],
       };
 
       const result = hathorService.castDataToTx(mockData);
