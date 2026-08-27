@@ -4,16 +4,19 @@
 //
 // Required env vars (put these in this federator's environments/<name>/<file>.env, same
 // place FEDERATOR_KEY etc. already live):
-//   GRAFANA_CLOUD_PROMETHEUS_URL   e.g. https://prometheus-prod-XX-prod-xx-x.grafana.net/api/prom/push
-//   GRAFANA_CLOUD_PROMETHEUS_USER  the numeric Prometheus instance ID for your Grafana Cloud stack
-//   GRAFANA_CLOUD_LOKI_URL         e.g. https://logs-prod-XXX.grafana.net/loki/api/v1/push
-//   GRAFANA_CLOUD_LOKI_USER        the numeric Loki instance ID for your Grafana Cloud stack
-//   GRAFANA_CLOUD_API_KEY          a Cloud Access Policy token scoped to metrics:write + logs:write
-//                                  (Grafana Cloud -> your stack -> "Connections" page has all five
-//                                  values ready to copy; the Loki ones are the exact same
-//                                  credentials the old promtail-config_fed0N.yaml already used)
-//   HATHOR_MULTISIG_ORDER          already set for every federator - reused here to label which
-//                                  instance a given metric/log line came from
+//   GRAFANA_CLOUD_PROMETHEUS_URL       e.g. https://prometheus-prod-XX-prod-xx-x.grafana.net/api/prom/push
+//   GRAFANA_CLOUD_PROMETHEUS_USER      the numeric Prometheus instance ID for your Grafana Cloud stack
+//   GRAFANA_CLOUD_PROMETHEUS_API_KEY   Cloud Access Policy token scoped to metrics:write
+//   GRAFANA_CLOUD_LOKI_URL             e.g. https://logs-prod-XXX.grafana.net/loki/api/v1/push
+//   GRAFANA_CLOUD_LOKI_USER            the numeric Loki instance ID for your Grafana Cloud stack
+//   GRAFANA_CLOUD_LOKI_API_KEY         Cloud Access Policy token scoped to logs:write
+//                                      (deliberately two separate tokens, not one shared
+//                                      metrics+logs token: production already had two
+//                                      narrowly-scoped Cloud Access Policies in use, one per
+//                                      signal, from the old prometheus.yml/promtail-config_fed0N.yaml
+//                                      - reused as-is instead of minting a new merged-scope token)
+//   HATHOR_MULTISIG_ORDER              already set for every federator - reused here to label which
+//                                      instance a given metric/log line came from
 //
 // Validated against the real `grafana/alloy` binary (v1.19.0) with `alloy validate` and a live
 // `alloy run` (component graph evaluates, all 4 components report healthy, remote_write attempts
@@ -37,7 +40,7 @@ prometheus.remote_write "grafana_cloud" {
 
 		basic_auth {
 			username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
-			password = sys.env("GRAFANA_CLOUD_API_KEY")
+			password = sys.env("GRAFANA_CLOUD_PROMETHEUS_API_KEY")
 		}
 	}
 
@@ -47,12 +50,18 @@ prometheus.remote_write "grafana_cloud" {
 }
 
 // ---- logs: same file the old promtail-config_fed0N.yaml tailed ----
-loki.source.file "federator" {
-	targets = [{
+// loki.source.file's own __path__ is a literal path, not a glob - local.file_match does the
+// glob discovery (and periodic re-scan for rotated/new files) and feeds concrete file targets in.
+local.file_match "federator" {
+	path_targets = [{
 		__address__ = "hathor-federator:5000",
 		__path__    = "/var/log/*.log",
 		job         = "federator-0" + sys.env("HATHOR_MULTISIG_ORDER"),
 	}]
+}
+
+loki.source.file "federator" {
+	targets    = local.file_match.federator.targets
 	forward_to = [loki.write.grafana_cloud.receiver]
 }
 
@@ -62,7 +71,7 @@ loki.write "grafana_cloud" {
 
 		basic_auth {
 			username = sys.env("GRAFANA_CLOUD_LOKI_USER")
-			password = sys.env("GRAFANA_CLOUD_API_KEY")
+			password = sys.env("GRAFANA_CLOUD_LOKI_API_KEY")
 		}
 	}
 
