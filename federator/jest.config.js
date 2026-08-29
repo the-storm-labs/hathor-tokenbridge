@@ -23,6 +23,18 @@ module.exports = {
       transform: {
         '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.app.json' }],
       },
+      // Coverage is only meaningful against the code, not the tests or their fixtures.
+      collectCoverageFrom: ['app/**/*.ts', '!app/**/*.test.ts', '!app/**/testSupport/**'],
+      // collectCoverageFrom decides which files are *added* to the report; a file a test actually
+      // imports is instrumented regardless and needs this to stay out of it.
+      coveragePathIgnorePatterns: ['/node_modules/', '/testSupport/'],
+      // Set at what the tree currently achieves, so a drop is a failure rather than a trend. The
+      // branch bar sits below 100 because a handful of defensive fallbacks - a destructuring
+      // default, a `?? '<unknown>'` in an error message - are not reachable from a test worth
+      // writing. Raise these as the remaining phases land.
+      coverageThreshold: {
+        global: { statements: 100, functions: 100, lines: 100, branches: 95 },
+      },
     },
   ],
 };

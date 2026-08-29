@@ -26,7 +26,8 @@
     "test:legacy": "jest --selectProjects legacy",
     "typecheck:app": "tsc -p tsconfig.app.json --noEmit",
     "build:app": "tsc -p tsconfig.app.build.json",
-    "lint:app": "eslint app --ext .ts"
+    "lint:app": "eslint app --ext .ts",
+    "test:app:coverage": "jest --selectProjects app --coverage"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^6.0.1",
