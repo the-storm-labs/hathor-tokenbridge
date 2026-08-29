@@ -15,9 +15,15 @@ export type Wallet = {
 export class HathorWallet {
   private static wallet: HathorWallet;
 
+  // Mirrors WalletState in @hathor/wallet-lib, which is what the headless wallet reports back
+  // through GET wallet/status. All six values are handled explicitly below - a status this class
+  // does not recognize must never fall through silently, see isReady.
+  private readonly WALLET_STATUS_CLOSED = 0;
   private readonly WALLET_STATUS_CONNECTING = 1;
   private readonly WALLET_STATUS_SYNCING = 2;
   private readonly WALLET_STATUS_READY = 3;
+  private readonly WALLET_STATUS_ERROR = 4;
+  private readonly WALLET_STATUS_PROCESSING = 5;
 
   public readonly logger: LogWrapper;
   public readonly chainConfig: ConfigChain;
@@ -119,17 +125,38 @@ export class HathorWallet {
         this.setWalletReady(multisig ? 'multisig' : 'single');
         return true;
       }
-      if ([this.WALLET_STATUS_CONNECTING, this.WALLET_STATUS_SYNCING].includes(response.data.statusCode)) {
+      // Transient states the wallet passes through on its way to READY. PROCESSING in particular
+      // is easy to miss: the wallet reaches it after syncing history, while it processes what it
+      // just downloaded, and it is a state this check can legitimately land on during a restart.
+      if (
+        [this.WALLET_STATUS_CONNECTING, this.WALLET_STATUS_SYNCING, this.WALLET_STATUS_PROCESSING].includes(
+          response.data.statusCode,
+        )
+      ) {
         this.logger.info(`${id} wallet is ${response.data.statusMessage ?? response.data.message}.`);
         await this.delay(this.baseDelay * retry);
         return this.isReady(multisig, ++retry);
       }
-      if (!response.data.success && response.data.statusMessage === '') {
-        this.logger.info(`${id} wallet looks stopped.`);
+      // The wallet is not running (never started, stopped, or errored out). Starting it is
+      // idempotent, so this is also the recovery path for a wallet that died mid-sync.
+      if (
+        [this.WALLET_STATUS_CLOSED, this.WALLET_STATUS_ERROR].includes(response.data.statusCode) ||
+        (!response.data.success && response.data.statusMessage === '')
+      ) {
+        this.logger.info(`${id} wallet looks stopped or errored (statusCode ${response.data.statusCode}).`);
         await this.start(multisig);
         await this.delay(this.baseDelay * retry);
         return this.isReady(multisig, ++retry);
       }
+      // Any status this class does not know about. Falling through here used to return undefined,
+      // which main.ts read as "not ready" and then waited forever on a 'wallets-ready' event that
+      // only this method can emit - the federator would hang at boot with no error. Retrying is
+      // the safe reading of an unknown state: it is either transient or the retry budget ends it.
+      this.logger.warn(
+        `${id} wallet reported an unrecognized statusCode ${response.data.statusCode}; retrying.`,
+      );
+      await this.delay(this.baseDelay * retry);
+      return this.isReady(multisig, ++retry);
     } catch (error) {
       throw Error(`Fail to get status of ${id} wallet: ${error}`);
     }
