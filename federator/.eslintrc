@@ -23,6 +23,11 @@
   // enforced by the linter rather than by discipline. The dependency rule: domain knows nothing;
   // ports know only domain; application knows domain + ports; infra implements ports; only
   // composition is allowed to wire infra into the rest.
+  //
+  // NOTE: @typescript-eslint/parser is pinned at v4 here, which predates inline type modifiers in
+  // named imports (`import { type Foo } from 'x'`). Such a file fails to PARSE, and a file that
+  // does not parse is not linted at all - boundary rules included. Use a separate `import type`
+  // line until the parser is upgraded.
   "overrides": [
     {
       "files": ["app/**/*.ts"],
@@ -38,6 +43,8 @@
       "rules": {
         "no-console": "error",
         "@typescript-eslint/no-explicit-any": "error",
+        // A parameter kept only to satisfy an interface is named with a leading underscore.
+        "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
         "import/no-restricted-paths": ["error", {
           "basePath": "./app",
           "zones": [

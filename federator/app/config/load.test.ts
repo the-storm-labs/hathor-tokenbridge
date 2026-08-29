@@ -79,12 +79,19 @@ describe('loadConfig', () => {
 
   it('does not read process.env', () => {
     // The whole point of taking `env` as an argument: a stray real variable must not leak in.
-    const before = { ...process.env };
+    // Restore by deleting the key, never by reassigning process.env - that swaps Node's native
+    // env object for a plain one and breaks env access for the rest of the worker.
+    const had = Object.prototype.hasOwnProperty.call(process.env, 'EVM_NAME');
+    const previous = process.env.EVM_NAME;
     process.env.EVM_NAME = 'should-be-ignored';
     try {
       expect(loadConfig(validEnv()).evm.name).toBe('arbitrum');
     } finally {
-      process.env = before;
+      if (had) {
+        process.env.EVM_NAME = previous;
+      } else {
+        delete process.env.EVM_NAME;
+      }
     }
   });
 

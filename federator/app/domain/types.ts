@@ -22,6 +22,8 @@ export interface TxInput {
   readonly decoded: DecodedScript;
   readonly txId?: string | undefined;
   readonly index?: number | undefined;
+  /** Whether the spent output belonged to our own wallet. Only known for decoded proposals. */
+  readonly mine?: boolean | undefined;
 }
 
 export interface TxOutput {
