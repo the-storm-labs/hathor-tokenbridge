@@ -17,18 +17,25 @@ They are:
 - HEADLESS_API_KEY: this is your wallet key. It's best to generate a new uuid, so the comunication with the federator and wallet will be secured by it;
 - HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS: this is the multisig pubkeys. The members of the multisig will exchange this information beforand
 
-### Observability (optional)
+### Observability
 
-Metrics and logs are shipped to Grafana Cloud by the `alloy` service (see `alloy/config.alloy`
-for what each component does). If you don't set the five `GRAFANA_CLOUD_*` variables in your
-`.env`, `hathor-federator`, `hathor-wallet` and `rabbitmq` still run fine on their own - `alloy`
-will just fail to authenticate and retry in the background. To wire it up, grab the five values
-from your Grafana Cloud stack's "Connections" page (the Loki ones are a set of push credentials
-you may already have from a previous promtail-based setup) and set:
-- GRAFANA_CLOUD_PROMETHEUS_URL / GRAFANA_CLOUD_PROMETHEUS_USER
-- GRAFANA_CLOUD_LOKI_URL / GRAFANA_CLOUD_LOKI_USER
-- GRAFANA_CLOUD_API_KEY (a Cloud Access Policy token scoped to `metrics:write` + `logs:write`)
+By default (`docker-compose.yml`), metrics and logs are handled locally by `prometheus` +
+`promtail`, same as before - no extra setup needed.
+
+There's also an **optional** alternative, `docker-compose.alloy.yml`, which swaps those two for
+a single Grafana Alloy agent shipping metrics+logs straight to Grafana Cloud (see
+`alloy/config.alloy` for what each component does). Alloy is heavier on CPU/RAM than
+prometheus+promtail, so this isn't the repo default and nobody needs to migrate to it - use it
+only if you specifically want your federator's metrics/logs centralized in Grafana Cloud. To use
+it, set the five `GRAFANA_CLOUD_*` variables in your `.env` (grab them from your Grafana Cloud
+stack's "Connections" page - the Loki ones are a set of push credentials you may already have
+from a previous promtail-based setup):
+- GRAFANA_CLOUD_PROMETHEUS_URL / GRAFANA_CLOUD_PROMETHEUS_USER / GRAFANA_CLOUD_PROMETHEUS_API_KEY
+  (Cloud Access Policy token scoped to `metrics:write`)
+- GRAFANA_CLOUD_LOKI_URL / GRAFANA_CLOUD_LOKI_USER / GRAFANA_CLOUD_LOKI_API_KEY
+  (Cloud Access Policy token scoped to `logs:write`)
 
 ### Deploy the containers
 
-- That's it. Deploy the containers with docker-compose up
+- Default (prometheus + promtail): `docker compose up -d`
+- Alloy instead (see above): `docker compose -f docker-compose.alloy.yml up -d`
