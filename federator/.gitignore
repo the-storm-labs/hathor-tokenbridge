@@ -26,3 +26,4 @@ etherscan.key
 package-lock.json
 **/package-lock.json
 **/**.log**
+/built-app

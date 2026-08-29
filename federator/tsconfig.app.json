@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "outDir": "./built-app",
+    "rootDir": "./app",
+
+    // ES2022 (not the es6 of tsconfig.json): bigint literals and BigInt statics are a hard
+    // prerequisite here - @hathor/wallet-lib 4.x types every output value as bigint.
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "declaration": false,
+    "sourceMap": true
+  },
+  "include": ["./app/**/*"],
+  "exclude": ["node_modules", "built", "built-app"]
+}
