@@ -47,7 +47,19 @@ services:
       - ./init-rabbitmq.sh:/init-rabbitmq.sh
 
   hathor-wallet:
-    image: toggera/hathor-wallet-rabbitmq:preview.0.0.2
+    # Official upstream image (headless 0.41.0 / wallet-lib 4.0.0), replacing the in-house fork
+    # toggera/hathor-wallet-rabbitmq:preview.0.0.2 - built Oct/2024 from a branch of a fork whose
+    # public master stopped in Aug/2024, on headless 0.31.0 / wallet-lib 1.14.0.
+    image: hathornetwork/hathor-wallet-headless:v0.41.0-rabbitmq
+    # Bypass LavaMoat, which the official image sets as its ENTRYPOINT. LavaMoat sandboxes each
+    # dependency in its own SES compartment - good supply-chain hardening, but the sandbox makes
+    # bitcore-lib/bn.js elliptic-curve math roughly 50-100x slower. That only matters at
+    # participants x addresses scale: syncing federator #1's 4-of-6 multisig (396 addresses) took
+    # 1183s under LavaMoat versus 10-22s without it, with the HTTP API unresponsive throughout.
+    # `node dist/index.js` is the project's own `npm start`, so this is a supported way to run it,
+    # and it matches how the previous image ran (it never had LavaMoat). Keep dumb-init as PID 1
+    # for signal forwarding. Revisit once LavaMoat's policy exempts the crypto hot path.
+    entrypoint: ["dumb-init", "node", "dist/index.js"]
     container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
     restart: unless-stopped
     depends_on:

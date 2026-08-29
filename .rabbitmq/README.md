@@ -35,6 +35,23 @@ from a previous promtail-based setup):
 - GRAFANA_CLOUD_LOKI_URL / GRAFANA_CLOUD_LOKI_USER / GRAFANA_CLOUD_LOKI_API_KEY
   (Cloud Access Policy token scoped to `logs:write`)
 
+### About the wallet image
+
+`hathor-wallet` runs the official `hathornetwork/hathor-wallet-headless:v0.41.0-rabbitmq`, with its
+entrypoint overridden to `node dist/index.js`.
+
+The override skips LavaMoat, which the official image runs by default. LavaMoat is supply-chain
+hardening: it isolates each dependency in its own SES compartment so a compromised transitive
+package can't reach the environment, the filesystem or the network. The cost is that it slows
+bitcore-lib/bn.js elliptic-curve math by roughly 50-100x, which only becomes visible on a multisig
+wallet with many addresses - the more participants and the more addresses, the worse. On
+federator #1 (4-of-6, 396 addresses) the wallet took 1183s to reach `Ready` under LavaMoat, with its
+HTTP API timing out the whole time, versus 10-22s without it. `node dist/index.js` is this project's
+own `npm start`, so it's a supported way to run the wallet.
+
+If your federator's multisig is small, you can drop the `entrypoint` line and keep the hardening.
+The proper fix is upstream: a LavaMoat policy that exempts the crypto hot path.
+
 ### Deploy the containers
 
 - Default (prometheus + promtail): `docker compose up -d`
