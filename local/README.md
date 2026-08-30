@@ -31,6 +31,14 @@ reached. Mine on a timer:
 Every non-obvious flag is commented in the compose file - the published `--localnet` preset does not
 start as shipped, and transactions are rejected without `--fix-invalid-timestamp`.
 
+**Set `HATHOR_PUSH_TIMEOUT_MS` high here** (30 minutes is comfortable). The wallet library does not
+poll the miner on a fixed schedule: it asks again after half the mining time the tx-mining-service
+estimates. That estimate is meaningless locally, because the service cannot measure a hashrate when
+blocks are solved in a single hash, and it comes back in the hundreds of seconds for work that
+finishes in three. Leave the production default in place and every push is abandoned before its
+first status check. Nothing here makes the estimate honest - more miner threads do not help, since
+the measured hashrate stays at zero.
+
 ## What this is for
 
 The round trip: lock USDC on the fork, watch the federator mint on Hathor, send it back, watch it
