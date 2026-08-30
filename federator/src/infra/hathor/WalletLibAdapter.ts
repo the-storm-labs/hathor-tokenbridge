@@ -102,7 +102,7 @@ export interface WalletLibAdapterConfig {
 export interface LibWalletDriver {
   create(config: WalletLibAdapterConfig, logger: LoggerPort): { wallet: LibWallet; network: Network };
   /** Broadcasts an assembled transaction, returning it once it has been pushed. */
-  push(wallet: LibWallet, transaction: unknown, pin: string): Promise<{ hash?: string | null }>;
+  push(wallet: LibWallet, transaction: unknown, pin: string, logger: LoggerPort): Promise<{ hash?: string | null }>;
   /** The height of the best block, as the fullnode reports it. */
   bestBlockHeight(): Promise<number>;
 }
@@ -463,7 +463,7 @@ export class WalletLibAdapter implements HathorWalletPort {
       const tx = await wallet.assemblePartialTransaction(txHex, [...signatures]);
       tx.prepareToSend(transactionUtils.getWeightConstantsFromStorage(wallet.storage));
 
-      const pushed = await this.withPushTimeout(this.driver.push(wallet, tx, this.pin));
+      const pushed = await this.withPushTimeout(this.driver.push(wallet, tx, this.pin, this.logger));
 
       const hash = pushed.hash;
       if (!hash) {

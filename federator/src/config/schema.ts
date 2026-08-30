@@ -130,6 +130,18 @@ export const envSchema = z.object({
   HATHOR_MIN_CONFIRMATIONS: nonNegativeIntFromEnv('HATHOR_MIN_CONFIRMATIONS'),
 
   /**
+   * How long to wait for a broadcast, in MILLISECONDS, before giving up on it and retrying.
+   *
+   * Tunable because the library does not poll the miner on a fixed schedule: it asks again after
+   * half the mining time the tx-mining-service estimates, so this has to sit above that estimate
+   * or every push is abandoned before its first status check. On a real network the estimate is
+   * seconds and the default is ample. On a local network it is meaningless - the service cannot
+   * measure a hashrate when blocks are solved in one hash - and the estimate comes back in the
+   * hundreds of seconds for work that finishes in three, which is what this exists to absorb.
+   */
+  HATHOR_PUSH_TIMEOUT_MS: positiveIntFromEnv('HATHOR_PUSH_TIMEOUT_MS').default('300000'),
+
+  /**
    * Renamed from HATHOR_INPUT_BLOCK_TTL, and the unit is now in the name on purpose. The value
    * goes straight into setTimeout, so it has always been milliseconds - but the shipped
    * .env.example said `1`, i.e. one millisecond, which is no lock at all. Renaming forces the

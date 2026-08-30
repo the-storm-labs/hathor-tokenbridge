@@ -132,6 +132,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       },
       gapLimit: e.HATHOR_GAP_LIMIT,
       minConfirmations: e.HATHOR_MIN_CONFIRMATIONS,
+      pushTimeoutMs: e.HATHOR_PUSH_TIMEOUT_MS,
       inputLockTtlMs: e.HATHOR_INPUT_LOCK_TTL_MS,
       fromTimestamp: e.HATHOR_FROM_TIMESTAMP,
       headless,

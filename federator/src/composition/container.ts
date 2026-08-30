@@ -84,6 +84,7 @@ export function buildFederator(config: AppConfig): Federator {
           fullnodeUrl: config.hathor.fullnodeUrl,
           txMiningUrl: config.hathor.txMiningUrl,
           gapLimit: config.hathor.gapLimit,
+          pushTimeoutMs: config.hathor.pushTimeoutMs,
         },
         new Log4jsLogger('WALLET_LIB'),
       );

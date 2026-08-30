@@ -61,6 +61,8 @@ export interface HathorConfig {
   /** Address-scan gap limit. The lever that decides how much history a sync walks. */
   readonly gapLimit: number;
   readonly minConfirmations: number;
+  /** How long to wait for a broadcast before retrying it, in MILLISECONDS. See schema.ts. */
+  readonly pushTimeoutMs: number;
   /**
    * How long a UTXO stays marked as selected-as-input, in MILLISECONDS - the value is handed
    * straight to setTimeout. See schema.ts for why this carries an explicit unit in its name.

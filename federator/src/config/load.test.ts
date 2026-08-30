@@ -104,12 +104,16 @@ describe('loadConfig', () => {
       expect(runtime.retries).toBe(3);
       expect(runtime.requireHttps).toBe(true);
       expect(hathor.gapLimit).toBe(20);
+      expect(hathor.pushTimeoutMs).toBe(300_000);
       expect(evm.blockTimeMs).toBe(15000);
     });
 
     it('lets an explicit value win over the default', () => {
-      const config = loadConfig(validEnv({ HATHOR_GAP_LIMIT: '40', POLLING_INTERVAL_MS: '60000' }));
+      const config = loadConfig(
+        validEnv({ HATHOR_GAP_LIMIT: '40', POLLING_INTERVAL_MS: '60000', HATHOR_PUSH_TIMEOUT_MS: '900000' }),
+      );
       expect(config.hathor.gapLimit).toBe(40);
+      expect(config.hathor.pushTimeoutMs).toBe(900_000);
       expect(config.runtime.pollingIntervalMs).toBe(60000);
     });
   });

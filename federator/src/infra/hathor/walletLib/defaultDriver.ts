@@ -61,12 +61,22 @@ export const defaultLibWalletDriver: LibWalletDriver = {
     return { wallet, network };
   },
 
-  async push(wallet, transaction, pin) {
+  async push(wallet, transaction, pin, logger) {
     const send = new SendTransaction({
       storage: wallet.storage,
       transaction: transaction as never,
       pin,
     });
+
+    // A push has two halves that fail very differently - proof of work at the tx-mining-service,
+    // then the broadcast to the fullnode - and from the outside they are one opaque await. When one
+    // of them stalls, knowing which is the whole diagnosis, so the library's own progress events are
+    // logged rather than left on the floor.
+    send.on('send-tx-start', () => logger.debug('[wallet-lib] broadcasting the assembled transaction.'));
+    send.on('send-tx-success', () => logger.debug('[wallet-lib] the fullnode accepted the transaction.'));
+    send.on('send-error', (message: unknown) => logger.warn(`[wallet-lib] send failed: ${String(message)}`));
+    send.on('unexpected-error', (message: unknown) => logger.warn(`[wallet-lib] unexpected: ${String(message)}`));
+
     return send.runFromMining();
   },
 
