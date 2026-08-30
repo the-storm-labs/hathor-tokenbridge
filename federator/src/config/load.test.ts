@@ -4,6 +4,9 @@ import { ConfigError, loadConfig } from './load';
  * A complete, valid environment. Every test starts from this and perturbs exactly one thing, so a
  * failure names the variable it is about.
  */
+// A throwaway key, and it has to be a real one: the config cross-checks FEDERATOR_ADDRESS
+// against the address derived from it. Public the moment it was committed, so it must never
+// hold anything or be a member of any federation - it is neither.
 const KEY = '0x08141073f8a519b93255153c334438bb9cd998eb9b51f9723cc07931655c90df';
 const ADDRESS_FOR_KEY = '0xC7E2506A8Aa65F35C7A524Aef399fa731aF1780d';
 

@@ -40,6 +40,7 @@ const ENV: NodeJS.ProcessEnv = {
   HATHOR_INPUT_LOCK_TTL_MS: '1800000',
   HATHOR_FROM_TIMESTAMP: '1733509177',
 
+  // Throwaway; see the note in config/load.test.ts.
   FEDERATOR_KEY: '0x08141073f8a519b93255153c334438bb9cd998eb9b51f9723cc07931655c90df',
   STORAGE_PATH: '/tmp/federator-container-test',
 };
