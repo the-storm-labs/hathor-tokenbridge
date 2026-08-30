@@ -1,6 +1,0 @@
-{
-  // Build-only view of the app tree: same compiler options, minus the colocated tests.
-  // tsconfig.app.json deliberately includes *.test.ts so `tsc --noEmit` type-checks them too.
-  "extends": "./tsconfig.app.json",
-  "exclude": ["node_modules", "built", "built-app", "app/**/*.test.ts", "app/**/*.contract.ts"]
-}

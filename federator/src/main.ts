@@ -1,189 +1,99 @@
-import { Config } from './lib/config';
-import Scheduler from './services/Scheduler';
-import Federator from './lib/FederatorHTR';
-import { Endpoint } from './lib/Endpoints';
-import { ConfigChain } from './lib/configChain';
-import { LogWrapper } from './lib/logWrapper';
-import {
-  Logs,
-  LOGGER_CATEGORY_FEDERATOR,
-  LOGGER_CATEGORY_FEDERATOR_MAIN,
-  LOGGER_CATEGORY_FEDERATOR_SIDE,
-  LOGGER_CATEGORY_ENDPOINT,
-} from './lib/logs';
-import HathorService from './lib/HathorService';
-import { BridgeFactory } from './contracts/BridgeFactory';
-import { FederationFactory } from './contracts/FederationFactory';
-import { HathorWallet } from './lib/HathorWallet';
-import TransactionSender from './lib/TransactionSender';
-import HathorMultisigManager from './lib/HathorMultisigManager';
-import FederatorHTR from './lib/FederatorHTR';
-import Web3 from 'web3';
-import { HathorHistorySinc } from './lib/HathorHistorySync';
-import { Registry } from 'prom-client';
-import MetricRegister from './utils/MetricRegister';
-import { AllowTokensFactory, IAllowTokensV1 } from './contracts';
+import dotenv from 'dotenv';
 
-export class Main {
-  logger: LogWrapper;
-  endpoint: any;
-  rskFederator: FederatorHTR;
-  hathorFederation: HathorMultisigManager;
-  config: Config;
-  heartBeatScheduler: Scheduler;
-  federatorScheduler: Scheduler;
-  register: Registry;
-  metricRegister: MetricRegister;
+import { buildFederator } from './composition/container';
+import { ConfigError, loadConfig } from './config/load';
+import { Log4jsLogger, configureLogging, federatorLogging, shutdownLogging } from './infra/logging/Log4jsLogger';
 
-  constructor() {
-    this.logger = Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR);
-    this.config = Config.getInstance();
-    this.register = new Registry();
-    this.register.setDefaultLabels({
-      instance_address: process.env.FEDERATOR_ADDRESS,
-    });
-    this.metricRegister = new MetricRegister(this.register, `federator_${this.config.mainchain.multisigOrder}`);
-    this.endpoint = new Endpoint(
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_ENDPOINT),
-      this.config.endpointsPort,
-      this.register,
-    );
-    this.endpoint.init();
+/**
+ * The federator's entry point.
+ *
+ * Boot order matters and is explicit: configuration, then logging, then the wallet, and only then
+ * the schedulers. The readers depend on a wallet that can answer, and starting them first means a
+ * first run that fails for no reason other than being early.
+ *
+ * Nothing here ends a RUNNING federator. The process owns a MemoryStore that is rebuilt from
+ * scratch on every start, so exiting is expensive, and a scheduled run failing is not a reason to
+ * pay for it - the Scheduler absorbs those. What does end the process is a failure to boot at all,
+ * which is a configuration problem a restart will not fix, and a signal - and in both of those the
+ * exit is explicit, because a third-party import-time timer would otherwise keep it alive.
+ */
+async function main(): Promise<void> {
+  dotenv.config();
 
-    this.rskFederator = new Federator(
-      this.config,
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_MAIN),
-      this.metricRegister,
-    );
-
-    this.hathorFederation = new HathorMultisigManager(
-      this.config,
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_SIDE),
-      this.metricRegister,
-    );
+  let config;
+  try {
+    config = loadConfig(process.env);
+  } catch (error) {
+    // Logging is not configured yet, and a configuration error has to reach the operator whatever
+    // state the rest of the process is in.
+    if (error instanceof ConfigError) {
+      process.stderr.write(`${error.message}\n`);
+    } else {
+      process.stderr.write(`Failed to read configuration: ${String(error)}\n`);
+    }
+    // Exit rather than returning: importing wallet-lib starts a self-renewing timer at module
+    // load, so the event loop stays alive and the process would hang here forever instead of
+    // reporting a configuration error and stopping. See the shutdown path for the same reason.
+    process.exit(1);
   }
 
-  async start() {
-    const wallet = HathorWallet.getInstance(this.config, this.logger);
-    const [ready, walletEmmiter] = await wallet.areWalletsReady();
+  configureLogging(federatorLogging({ file: config.runtime.logFile, level: config.runtime.logLevel }));
+  const logger = new Log4jsLogger('MAIN');
 
-    if (ready) {
-      this.logger.info('No need to wait, the wallets are ready, lets go.');
-      this.listenToHathorTransactions();
-      this.scheduleFederatorProcesses();
-      this.scheduleHathorFederationProcess();
+  logger.info(
+    `Starting federator ${config.federator.address} at multisig order ${config.hathor.multisig.order}, ` +
+      `bridging ${config.evm.name} (${config.evm.chainId}) and ${config.hathor.name}.`,
+  );
+
+  const federator = buildFederator(config);
+
+  await federator.health.start();
+
+  // The wallet first: a cold start rebuilds the whole Hathor history, and the readers have nothing
+  // useful to do until it can answer.
+  await federator.hathorService.start();
+
+  for (const scheduler of federator.schedulers) {
+    scheduler.start();
+  }
+
+  logger.info('Federator is running.');
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) {
       return;
     }
+    shuttingDown = true;
 
-    this.logger.info('It seems the wallets are not ready, lets wait for the event');
-    walletEmmiter.on('wallets-ready', async () => {
-      this.logger.info('Event emmited, we can start the wallet');
-      this.listenToHathorTransactions();
-      this.scheduleFederatorProcesses();
-      this.scheduleHathorFederationProcess();
-    });
+    logger.info(`Received ${signal}; shutting down.`);
+    // Stop scheduling before stopping the wallet: a run halfway through a proposal still needs it.
+    await Promise.all(federator.schedulers.map((scheduler) => scheduler.stop()));
+    await federator.hathorService.stop();
+    await federator.health.stop();
+    await shutdownLogging();
 
-    this.logger.info(`From main.ts, we have ${walletEmmiter.listenerCount('wallets-ready')} listeners`);
+    // Explicit, and only once shutdown has finished. @hathor/wallet-lib schedules a self-renewing
+    // timer when it is imported, which nothing in its public surface clears - so a federator that
+    // merely stopped its own work would still never exit, and every `docker stop` would end in a
+    // SIGKILL after the grace period.
+    process.exit(0);
+  };
 
-    // TODO uncoment this after tests
-    // this.scheduleHeartbeatProcesses();
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => void shutdown(signal));
   }
 
-  async runFederator() {
-    try {
-      // TODO uncoment this after tests
-      // await this.heartbeat.readLogs();
-      await this.runErcRskFederator();
-    } catch (err) {
-      this.logger.error('Unhandled Error on main.run()', err);
-      process.exit(1);
-    }
-  }
-
-  async runErcRskFederator() {
-    this.logger.info('RSK Host', this.config.mainchain.host);
-    await this.rskFederator.runAll();
-  }
-
-  async runErcOtherChainFederator(sideChainConfig: ConfigChain) {
-    const sideFederator = new Federator(
-      {
-        ...this.config,
-        mainchain: sideChainConfig,
-        sidechain: [this.config.mainchain],
-      },
-      Logs.getInstance().getLogger(LOGGER_CATEGORY_FEDERATOR_SIDE),
-      this.metricRegister,
-    );
-
-    this.logger.info('Side Host', sideChainConfig.host);
-    await sideFederator.runAll();
-  }
-
-  async listenToHathorTransactions() {
-    const client = new Web3(this.config.mainchain.host);
-    const allowTokensFactory = new AllowTokensFactory();
-    const allowTokensContract = await allowTokensFactory.createInstance(this.config.mainchain) as IAllowTokensV1;  
-    const service = new HathorService(
-      this.config,
-      this.logger,
-      new BridgeFactory(),
-      new FederationFactory(),
-      new TransactionSender(client, this.logger, this.config),
-      this.metricRegister,
-      allowTokensContract
-    );
-    const sync = new HathorHistorySinc(this.config, this.logger, service);
-    await sync.processHistory();
-    service.listenToEventQueue();
-  }
-
-  async scheduleHathorFederationProcess() {
-    const federatorPollingInterval = this.config.runEvery * 1000 * 60; // Minutes
-    this.federatorScheduler = new Scheduler(federatorPollingInterval, this.logger, {
-      run: async () => {
-        try {
-          await this.hathorFederation.runAll();
-        } catch (err) {
-          this.logger.error('Unhandled Error on runFederator()', err);
-          process.exit(1);
-        }
-      },
-    });
-
-    this.federatorScheduler.start().catch((err) => {
-      this.logger.error('Unhandled Error on federatorScheduler.start()', err);
-    });
-  }
-
-  async scheduleFederatorProcesses() {
-    const federatorPollingInterval = this.config.runEvery * 1000 * 60; // Minutes
-    this.federatorScheduler = new Scheduler(federatorPollingInterval, this.logger, {
-      run: async () => {
-        try {
-          await this.runFederator();
-        } catch (err) {
-          this.logger.error('Unhandled Error on runFederator()', err);
-          process.exit(1);
-        }
-      },
-    });
-
-    this.federatorScheduler.start().catch((err) => {
-      this.logger.error('Unhandled Error on federatorScheduler.start()', err);
-    });
-  }
+  // A rejection nothing handled is a bug, not a reason to discard a synced wallet. Report it and
+  // keep running; the alternative is a resync every time an RPC call is dropped.
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled promise rejection. The federator stays up.', reason);
+  });
 }
 
-const main = new Main();
-main.start();
-
-async function exitHandler() {
+void main().catch((error) => {
+  process.stderr.write(`Federator failed to start: ${String(error)}\n`);
+  // Explicit for the same reason as above: wallet-lib's import-time timer keeps the event loop
+  // alive, so setting an exit code alone leaves a failed boot hanging instead of reporting it.
   process.exit(1);
-}
-// catches ctrl+c event
-process.on('SIGINT', exitHandler);
-
-// catches "kill pid" (for example: nodemon restart)
-process.on('SIGUSR1', exitHandler);
-process.on('SIGUSR2', exitHandler);
+});

@@ -1,107 +1,80 @@
-# OPTIONAL alternative to docker-compose.yml's default prometheus+promtail pair: swaps them for
-# a single Grafana Alloy agent shipping metrics+logs straight to Grafana Cloud instead of running
-# a local Prometheus/Loki-client. Alloy is heavier (more CPU/RAM) than prometheus+promtail, so
-# it's opt-in, not the repo default - nobody has to migrate their federator to use it.
+# The federator, with Grafana Alloy instead of prometheus + promtail.
 #
-# Usage: docker compose -f docker-compose.alloy.yml up -d   (instead of the plain docker-compose.yml)
-# Needs the GRAFANA_CLOUD_* variables from .env.example set; see alloy/config.alloy and README.md.
+# This is docker-compose.yml with the monitoring pair swapped. Alloy is opt-in; it does not replace
+# the default.
+#
+# What went away when the wallet moved in-process, and why:
+#
+#   rabbitmq        carried exactly one message type, wallet:new-tx, across a process boundary
+#   init-rabbitmq   existed only to wait for rabbitmq
+#   hathor-wallet   the wallet now runs inside the federator process
+#
+# What that costs: the multisig seed moves into the federator. It used to hold only an API key for
+# the wallet container. That changes the blast radius of a federator compromise and is the one part
+# of this migration that alters the bridge's risk profile.
+#
+# The federator process must not be restarted casually. Wallet storage is in memory, so every start
+# rebuilds the entire Hathor history - minutes, not seconds. A reader failing does NOT restart it.
+
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: hathor_rabbitmq_${HATHOR_MULTISIG_ORDER}
-    restart: unless-stopped
-    ports:
-      - "56${HATHOR_MULTISIG_ORDER}2:5672"
-      - "156${HATHOR_MULTISIG_ORDER}2:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - ./rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
-      - ./rabbitmq_definitions.json:/etc/rabbitmq/definitions.json:ro
-  
-  init-rabbitmq:
-    image: alpine:3.12
-    container_name: init_rabbitmq_container_${HATHOR_MULTISIG_ORDER}
-    restart: unless-stopped
-    depends_on:
-      - rabbitmq
-    entrypoint: |
-      /bin/sh -c "
-      apk add --no-cache curl;
-      until curl -s -u guest:guest http://rabbitmq:15672/api/healthchecks/node | grep -q 'ok'; do
-        echo 'Waiting for RabbitMQ...'
-        sleep 2
-      done
-      echo 'RabbitMQ is up and running.'
-      touch /tmp/initialized
-      while true; do sleep 30; done
-      "
-    healthcheck:
-      test: ["CMD-SHELL", "[ -f /tmp/initialized ] || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    volumes:
-      - ./init-rabbitmq.sh:/init-rabbitmq.sh
-
-  hathor-wallet:
-    image: toggera/hathor-wallet-rabbitmq:preview.0.0.2
-    container_name: hathor_wallet_container_${HATHOR_MULTISIG_ORDER}
-    restart: unless-stopped
-    depends_on:
-      init-rabbitmq:
-        condition: service_healthy
-    ports:
-      - "800${HATHOR_MULTISIG_ORDER}:8000"
-    environment:
-      HEADLESS_SEED_DEFAULT: ${HEADLESS_SEED_DEFAULT}
-      HEADLESS_API_KEY: ${HEADLESS_API_KEY}
-      HEADLESS_NETWORK: ${HEADLESS_NETWORK}
-      HEADLESS_SERVER: ${HEADLESS_SERVER}
-      HEADLESS_MULTISIG_SEED_DEFAULT_MAX_SIGNATURES: ${HEADLESS_MULTISIG_SEED_DEFAULT_MAX_SIGNATURES}
-      HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES: ${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}
-      HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS: ${HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS}
-      HEADLESS_TX_MINING_URL: ${HEADLESS_TX_MINING_URL}
-      HEADLESS_ENABLED_PLUGINS: rabbitmq debug
-      HEADLESS_PLUGIN_DEBUG_LONG: all
-      HEADLESS_PLUGIN_RABBITMQ_QUEUE: main_queue
-      HEADLESS_PLUGIN_RABBITMQ_URL: amqp://rabbitmq
-
   hathor-federator:
     image: toggera/hathor-tokenbridge:5477fbaa7c613d291e9f6252af69eae28d861f4e
     container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
     restart: unless-stopped
-    depends_on:
-      - hathor-wallet
+    # Long enough for a cold start to finish rebuilding history before Docker gives up on a stop.
+    stop_grace_period: 60s
     ports:
       - "500${HATHOR_MULTISIG_ORDER}:5000"
     volumes:
       - federator_db:/app/db
       - federator_db:/var/log
     environment:
-      HTR_CONFIG: '{"name":"${HATHOR_NAME}","chainId":${HATHOR_CHAIN_ID},"fromBlock":${HATHOR_FROM_BLOCK},"walletUrl":"${HATHOR_WALLET_URL}","walletKey":"${HEADLESS_API_KEY}","singleWalletId":"${HATHOR_SINGLE_WALLET_ID}","singleSeedKey":"${HATHOR_SINGLE_SEED_KEY}","multisigWalletId":"${HATHOR_MULTISIG_WALLET_ID}","multisigSeedKey":"${HATHOR_MULTISIG_SEED_KEY}","multisigRequiredSignatures":${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES},"multisigOrder":${HATHOR_MULTISIG_ORDER},"minimumConfirmations":${HATHOR_MINIMUM_CONFIRMATIONS},"eventQueueType":"rabbitmq"}'
-      EVM_CONFIG: '{"name":"${EVM_NETWORK}","bridge":"${BRIDGE_ADDRESS}","federation":"${FEDERATION_ADDRESS}","multiSig":"${EVM_MULTISIG_ADDRESS}","allowTokens":"${ALLOW_TOKENS_ADDRESS}","chainId":${EVM_CHAIN_ID},"testToken":"${TEST_TOKEN}","host":"${EVM_HOST}","fromBlock":${FROM_BLOCK},"multisigOrder":${HATHOR_MULTISIG_ORDER}}'
-      ETHERSCAN_KEY: '${ETHERSCAN_KEY}'
-      HATHOR_STATE_CONTRACT_HOST_URL: ${HATHOR_STATE_CONTRACT_HOST_URL}
-      HATHOR_STATE_CONTRACT_ADDR: ${HATHOR_STATE_CONTRACT_ADDR}
-      FEDERATION_CHAIN_ID: ${FEDERATION_CHAIN_ID}
-      FEDERATION_FROM_BLOCK: ${FEDERATION_FROM_BLOCK}
-      FEDERATION_CONFIRMATION_BLOCKS: ${FEDERATION_CONFIRMATION_BLOCKS}
-      HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES: ${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}
-      FEDERATOR_KEY: ${FEDERATOR_KEY}
-      FEDERATOR_ADDRESS: ${FEDERATOR_ADDRESS}
-      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
-      WALLET_URL: ${HATHOR_WALLET_URL}
-      HEADLESS_API_KEY: ${HEADLESS_API_KEY}
-      HATHOR_LAST_TIMESTAMP: ${HATHOR_LAST_TIMESTAMP}
-      HATHOR_INPUT_BLOCK_TTL: ${HATHOR_INPUT_BLOCK_TTL}
+      # ---- EVM chain: Bridge / Federation / AllowTokens ----
+      EVM_NAME: "${EVM_NETWORK}"
+      EVM_CHAIN_ID: "${EVM_CHAIN_ID}"
+      EVM_HOST: "${EVM_HOST}"
+      EVM_BRIDGE_ADDRESS: "${BRIDGE_ADDRESS}"
+      EVM_FEDERATION_ADDRESS: "${FEDERATION_ADDRESS}"
+      EVM_ALLOW_TOKENS_ADDRESS: "${ALLOW_TOKENS_ADDRESS}"
+      EVM_FROM_BLOCK: "${FROM_BLOCK}"
 
-  # Single agent that scrapes this instance's /metrics and tails its log file, pushing both
-  # to Grafana Cloud. Replaces the old prometheus + promtail pair (see .rabbitmq/alloy/config.alloy
-  # for the full rationale and required env vars) - no port needs to be published for this
-  # service, it only ever makes outbound connections.
+      # ---- State chain: the HathorFederation coordination contract ----
+      STATE_CHAIN_ID: "${FEDERATION_CHAIN_ID}"
+      STATE_CHAIN_HOST: "${HATHOR_STATE_CONTRACT_HOST_URL}"
+      STATE_CONTRACT_ADDRESS: "${HATHOR_STATE_CONTRACT_ADDR}"
+      STATE_FROM_BLOCK: "${FEDERATION_FROM_BLOCK}"
+      STATE_CONFIRMATION_BLOCKS: "${FEDERATION_CONFIRMATION_BLOCKS}"
+
+      # ---- Hathor ----
+      HATHOR_NAME: "${HATHOR_NAME}"
+      HATHOR_CHAIN_ID: "${HATHOR_CHAIN_ID}"
+      HATHOR_NETWORK: "${HEADLESS_NETWORK}"
+      HATHOR_FULLNODE_URL: "${HEADLESS_SERVER}"
+      HATHOR_TX_MINING_URL: "${HEADLESS_TX_MINING_URL}"
+      # The seed that used to live on the wallet container. See the note at the top of this file.
+      HATHOR_SEED: "${HEADLESS_SEED_DEFAULT}"
+      HATHOR_MULTISIG_PUBKEYS: "${HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS}"
+      HATHOR_NUM_SIGNATURES: "${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}"
+      HATHOR_MULTISIG_ORDER: "${HATHOR_MULTISIG_ORDER}"
+      HATHOR_MIN_CONFIRMATIONS: "${HATHOR_MINIMUM_CONFIRMATIONS}"
+      # Milliseconds, and it goes straight into a timer. The old HATHOR_INPUT_BLOCK_TTL example of
+      # `1` meant one millisecond, which is no input lock at all.
+      HATHOR_INPUT_LOCK_TTL_MS: "${HATHOR_INPUT_LOCK_TTL_MS:-1800000}"
+      HATHOR_FROM_TIMESTAMP: "${HATHOR_LAST_TIMESTAMP}"
+
+      # ---- Rollout switch ----
+      # Set these two to run this whole tree against the wallet container you already have, before
+      # moving onto the embedded library. Leave them unset for wallet-lib. /status reports which.
+      HATHOR_HEADLESS_URL: "${HATHOR_HEADLESS_URL:-}"
+      HATHOR_HEADLESS_API_KEY: "${HATHOR_HEADLESS_API_KEY:-}"
+
+      # ---- Federator identity and runtime ----
+      FEDERATOR_KEY: "${FEDERATOR_KEY}"
+      # Optional: checked against the address derived from the key, never trusted on its own.
+      FEDERATOR_ADDRESS: "${FEDERATOR_ADDRESS:-}"
+      STORAGE_PATH: /app/db
+      LOG_FILE: /var/log/federator.log
+
   alloy:
     image: grafana/alloy:v1.19.0
     container_name: hathor_alloy_${HATHOR_MULTISIG_ORDER}

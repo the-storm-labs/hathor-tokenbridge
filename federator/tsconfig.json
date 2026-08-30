@@ -1,13 +1,30 @@
 {
   "compilerOptions": {
     "outDir": "./built",
-    "allowJs": true,
-    "target": "es6",
+
+    // ES2022, not es6: wallet-lib 4.x types every output value as bigint, and bigint literals do
+    // not compile below ES2020.
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "commonjs",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
     "moduleResolution": "node",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "declaration": false,
+    "sourceMap": true
   },
-  "exclude": ["node_modules"],
-  "include": ["./src/**/*", "./src/main.ts"]
+  // No rootDir: the contract ABIs live in ../bridge/abi, outside src/, and pinning the root here
+  // would reject them.
+  "include": ["./src/**/*"],
+  "exclude": ["node_modules", "built"]
 }

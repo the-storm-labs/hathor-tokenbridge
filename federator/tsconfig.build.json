@@ -1,0 +1,6 @@
+{
+  // Build-only view: the same options minus the colocated tests. tsconfig.json deliberately
+  // includes *.test.ts so `tsc --noEmit` type-checks them too.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "built", "src/**/*.test.ts", "src/**/*.contract.ts"]
+}

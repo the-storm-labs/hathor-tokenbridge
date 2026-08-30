@@ -12,32 +12,20 @@
     "prettier"
   ],
   "rules": {
-    "no-console": 1,       // Means warning
+    "no-console": "error",
     "prettier/prettier": ["error", {
       "endOfLine": "auto"
     }],
-    "@typescript-eslint/explicit-module-boundary-types": "off", // avoid things for any type, it should be removed after migrating to tsnode
-    "@typescript-eslint/no-explicit-any": "off" // avoid things for any type
+    "@typescript-eslint/explicit-module-boundary-types": "off"
   },
   "overrides": [
     {
-      // The legacy src/ tree is frozen until the rearchitecture lands, so its lint signal is kept
-      // exactly as it was before the eslint 7 -> 8 / typescript-eslint 4 -> 8 upgrade. v8 promotes
-      // no-unused-vars from warn to error and detects more cases; letting that through would turn
-      // 8 pre-existing errors into 26 in code nobody is going to touch.
+      // Layering is enforced by the linter rather than by discipline. The dependency rule: domain
+      // knows nothing; ports know only domain; application knows domain + ports; infra implements
+      // ports; only composition is allowed to wire infra into the rest.
       "files": ["src/**/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-unused-vars": "warn"
-      }
-    },
-    {
-      // The new app/ tree is held to stricter rules than the legacy src/ tree, and its layering is
-      // enforced by the linter rather than by discipline. The dependency rule: domain knows
-      // nothing; ports know only domain; application knows domain + ports; infra implements ports;
-      // only composition is allowed to wire infra into the rest.
-      "files": ["app/**/*.ts"],
       "plugins": ["@typescript-eslint", "prettier", "import"],
-      // Without a resolver that knows about .ts, eslint-plugin-import cannot resolve intra-app
+      // Without a resolver that knows about .ts, eslint-plugin-import cannot resolve intra-tree
       // imports to absolute paths and no-restricted-paths silently skips them - the rule loads,
       // reports nothing, and the boundaries go unenforced.
       "settings": {
@@ -54,7 +42,7 @@
         // A parameter kept only to satisfy an interface is named with a leading underscore.
         "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
         "import/no-restricted-paths": ["error", {
-          "basePath": "./app",
+          "basePath": "./src",
           "zones": [
             { "target": "./domain", "from": "./config",      "message": "domain must stay pure: no configuration." },
             { "target": "./domain", "from": "./ports",       "message": "domain must not know about ports." },
