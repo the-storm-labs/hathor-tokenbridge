@@ -76,6 +76,16 @@ export interface WalletLibAdapterConfig {
   readonly gapLimit: number;
   /** How long to wait for the initial sync before giving up. */
   readonly startTimeoutMs?: number;
+  /**
+   * How long to wait for a broadcast before giving up on it. Defaults to five minutes.
+   *
+   * The library's push resolves only when the tx-mining-service answers, and waits forever if it
+   * never does - a restart of that service mid-flight is enough. Because the schedulers skip a run
+   * that is still going, one unbounded push silently stops the federation reader for good while
+   * the process keeps serving metrics and reading the other chain, which is the worst shape a
+   * stall can take: invisible. A bounded wait turns it into a failed run that the next one retries.
+   */
+  readonly pushTimeoutMs?: number;
   /** Filled in by the adapter, not by the caller - see the pin/password fields on the class. */
   readonly pin?: string;
   readonly password?: string;
@@ -453,7 +463,7 @@ export class WalletLibAdapter implements HathorWalletPort {
       const tx = await wallet.assemblePartialTransaction(txHex, [...signatures]);
       tx.prepareToSend(transactionUtils.getWeightConstantsFromStorage(wallet.storage));
 
-      const pushed = await this.driver.push(wallet, tx, this.pin);
+      const pushed = await this.withPushTimeout(this.driver.push(wallet, tx, this.pin));
 
       const hash = pushed.hash;
       if (!hash) {
@@ -461,6 +471,39 @@ export class WalletLibAdapter implements HathorWalletPort {
       }
       return hash;
     });
+  }
+
+  /**
+   * Bounds a broadcast so a silent tx-mining-service cannot wedge the caller forever.
+   *
+   * The timer loses the race on the happy path and is cleared either way, so a resolved push never
+   * leaves a pending timer holding the process open. The push itself is left running rather than
+   * cancelled - the library offers no cancellation, and the transaction may well land regardless.
+   * That is why the message says the outcome is unknown: the retry has to be safe against it
+   * having succeeded, which it is, because a proposal already processed is recognised as such.
+   */
+  private async withPushTimeout<T>(push: Promise<T>): Promise<T> {
+    const timeoutMs = this.config.pushTimeoutMs ?? 300_000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const expiry = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new WalletOperationError(
+              `The transaction was not confirmed as broadcast within ${timeoutMs}ms. Whether it ` +
+                'reached the network is unknown; it will be retried.',
+            ),
+          ),
+        timeoutMs,
+      );
+    });
+
+    try {
+      return await Promise.race([push, expiry]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async lockProposalInputs(txHex: string, ttlMs: number): Promise<void> {

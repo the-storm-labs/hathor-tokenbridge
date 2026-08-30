@@ -276,6 +276,22 @@ describe('WalletLibAdapter signAndPush', () => {
     expect(hash).toBe('pushed-hash');
   });
 
+  it('gives up on a broadcast that never answers, rather than waiting forever', async () => {
+    // The library's push resolves only when the tx-mining-service answers, and waits forever if it
+    // never does. Because the schedulers skip a run that is still going, one unbounded push stops
+    // the federation reader for good while the process keeps serving metrics - a stall with no
+    // symptom. Bounded, it becomes a failed run that the next one retries.
+    const stub = new StubLibWallet();
+    const logger = new RecordingLogger();
+    const adapter = new WalletLibAdapter({ ...CONFIG, pushTimeoutMs: 20 }, logger, {
+      ...stubWalletDriver(stub),
+      push: () => new Promise(() => undefined),
+    });
+    await adapter.start();
+
+    await expect(adapter.signAndPush('beef', ['sigA'])).rejects.toThrow(/not confirmed as broadcast within 20ms/);
+  });
+
   it('fails loudly when the pushed transaction comes back without a hash', async () => {
     const { adapter, stub } = build();
     await adapter.start();
