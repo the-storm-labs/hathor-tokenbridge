@@ -8,6 +8,7 @@ import type {
   WalletStatus,
 } from '../../ports/HathorWalletPort';
 import { WalletOperationError } from '../../ports/HathorWalletPort';
+import type { LoggerPort } from '../../ports/LoggerPort';
 import type { HttpClient, HttpResponse } from './HttpClient';
 import { mapTx } from './headlessMapping';
 import type {
@@ -61,13 +62,15 @@ const defaultSleep: Sleeper = (ms) => new Promise((resolve) => setTimeout(resolv
 
 export class HeadlessWalletAdapter implements HathorWalletPort {
   private readonly http: HttpClient;
+  private readonly logger: LoggerPort;
   private readonly options: Required<Pick<HeadlessAdapterOptions, 'readinessAttempts' | 'readinessDelayMs'>> &
     HeadlessAdapterOptions;
   private readonly sleep: Sleeper;
   private readonly addressCache = new Map<number, string>();
 
-  constructor(http: HttpClient, options: HeadlessAdapterOptions, sleep: Sleeper = defaultSleep) {
+  constructor(http: HttpClient, options: HeadlessAdapterOptions, logger: LoggerPort, sleep: Sleeper = defaultSleep) {
     this.http = http;
+    this.logger = logger;
     this.options = {
       readinessAttempts: 5,
       readinessDelayMs: 10_000,
@@ -142,6 +145,15 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
         multisig: this.options.multisig,
       },
     });
+
+    // The port defines start as idempotent, and the headless keeps wallets alive across federator
+    // restarts - so "already started" is the outcome the caller wanted, not a failure. Treating it
+    // as one made start() throw against any headless that was already running.
+    if (response.data?.errorCode === 'WALLET_ALREADY_STARTED') {
+      this.logger.debug(`Wallet ${this.options.walletId} was already running.`);
+      return;
+    }
+
     this.assertOk(response, 'start');
   }
 
@@ -153,10 +165,21 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
     });
 
     const code = response.data?.statusCode;
-    const state = code === undefined ? undefined : HEADLESS_STATUS[code];
+
+    if (code === undefined) {
+      // A wallet that was never started answers with no statusCode at all - the body is
+      // `{"success":false,"message":"Invalid wallet id parameter.","statusMessage":""}`. Reading
+      // that as `unknown` makes the readiness loop poll forever without ever starting the wallet,
+      // which is precisely what it did until a live run against a fresh headless caught it.
+      // `closed` is the state that triggers a start, and starting is idempotent.
+      if (response.data?.success === false) {
+        return { state: 'closed', raw: response.data?.message ?? 'no statusCode' };
+      }
+      return { state: 'unknown', raw: 'no statusCode' };
+    }
 
     return {
-      state: state ?? 'unknown',
+      state: HEADLESS_STATUS[code] ?? 'unknown',
       raw: response.data?.statusMessage ?? code,
     };
   }

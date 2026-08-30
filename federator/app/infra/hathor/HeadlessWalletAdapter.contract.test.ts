@@ -1,6 +1,7 @@
 import { AxiosHttpClient } from './AxiosHttpClient';
 import { HeadlessWalletAdapter } from './HeadlessWalletAdapter';
 import { describeHathorWalletContract } from '../../ports/HathorWalletPort.contract';
+import { RecordingLogger } from '../../ports/testSupport/fakes';
 
 /**
  * Runs the shared HathorWalletPort contract against a real headless wallet.
@@ -31,11 +32,15 @@ if (url && apiKey && foreignAddress) {
       decodableTxHex: process.env.HEADLESS_CONTRACT_TX_HEX,
     },
     async () =>
-      new HeadlessWalletAdapter(new AxiosHttpClient(url, { 'x-api-key': apiKey }), {
-        walletId: process.env.HEADLESS_CONTRACT_WALLET_ID ?? 'multi',
-        seedKey: process.env.HEADLESS_CONTRACT_SEED_KEY ?? 'default',
-        multisig: process.env.HEADLESS_CONTRACT_MULTISIG !== 'false',
-      }),
+      new HeadlessWalletAdapter(
+        new AxiosHttpClient(url, { 'x-api-key': apiKey }),
+        {
+          walletId: process.env.HEADLESS_CONTRACT_WALLET_ID ?? 'multi',
+          seedKey: process.env.HEADLESS_CONTRACT_SEED_KEY ?? 'default',
+          multisig: process.env.HEADLESS_CONTRACT_MULTISIG !== 'false',
+        },
+        new RecordingLogger(),
+      ),
   );
 } else {
   // A file with no tests fails the run, and a silent skip is how a suite quietly stops covering

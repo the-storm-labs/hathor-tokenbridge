@@ -12,12 +12,20 @@ import type { LibWalletDriver, WalletLibAdapterConfig } from '../WalletLibAdapte
  */
 export class StubLibWallet {
   public state = 3; // READY
-  /** A real Storage over a real MemoryStore, so the library's own helpers work on it. */
-  public storage = new Storage(new MemoryStore());
+  /**
+   * A real Storage over a real MemoryStore, so the library's own helpers work on it - with
+   * `txHistory` overridden to serve this stub's history, which is the path the adapter reads.
+   * Overriding rather than replacing keeps everything else (weight constants, for one) genuine.
+   */
+  public storage = Object.assign(new Storage(new MemoryStore()), {
+    txHistory: async function* (this: StubLibWallet) {
+      yield* this.history as never[];
+    }.bind(this),
+  });
 
   public addresses = new Map<number, string>([[0, 'wXonH2U9Bys5EcYsFspZyBVqeTVQ3Htf4Q']]);
-  public ownAddresses = new Set<string>(['wXonH2U9Bys5EcYsFspZyBVqeTVQ3Htf4Q']);
   public history: unknown[] = [];
+  public ownAddresses = new Set<string>(['wXonH2U9Bys5EcYsFspZyBVqeTVQ3Htf4Q']);
   public txs = new Map<string, unknown>();
   public fullTxs = new Map<string, { meta?: { height?: number | null } }>();
 

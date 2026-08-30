@@ -333,6 +333,26 @@ describe('WalletLibAdapter decodeTxHex', () => {
     ).rejects.toThrow(/which this wallet does not know/);
   });
 
+  it('reports script types in the fullnode vocabulary, not the parser own', async () => {
+    // parseScript says `p2sh`; the fullnode, and therefore transaction history, says `MultiSig`.
+    // The domain filters on `MultiSig`, so an untranslated decode would find no funds in a
+    // proposal while history showed them - the adapter contradicting itself.
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.ownAddresses.add(MULTISIG_ADDRESS);
+
+    const decoded = await adapter.decodeTxHex(realTxHex([{ address: MULTISIG_ADDRESS, value: 5n }], []));
+    expect(decoded.outputs[0]?.decoded.type).toBe('MultiSig');
+  });
+
+  it('translates a plain address output too', async () => {
+    const { adapter } = build();
+    await adapter.start();
+
+    const decoded = await adapter.decodeTxHex(realTxHex([{ address: RECEIVER_ADDRESS, value: 5n }], []));
+    expect(decoded.outputs[0]?.decoded.type).toBe('P2PKH');
+  });
+
   it('marks which outputs are ours', async () => {
     const { adapter, stub } = build();
     await adapter.start();

@@ -43,6 +43,27 @@ import { SendTxLock } from './walletLib/sendTxLock';
 
 const READY_POLL_INTERVAL_MS = 1_000;
 
+/**
+ * The library's script parser and the fullnode name the same script differently: `parseScript`
+ * reports `p2sh` where the fullnode - and therefore transaction history - reports `MultiSig`.
+ *
+ * Everything above the port speaks the fullnode's vocabulary; `readBridgedToken` filters on
+ * `MultiSig` specifically. Left untranslated, this adapter would contradict itself - history
+ * saying `MultiSig` and decode saying `p2sh` for the very same output - and the bridge would find
+ * no funds in a decoded proposal. Caught by comparing the two adapters against one testnet wallet.
+ */
+const SCRIPT_TYPE_TO_FULLNODE: Record<string, string> = {
+  p2sh: 'MultiSig',
+  p2pkh: 'P2PKH',
+};
+
+function normaliseScriptType(type: string | undefined): string | undefined {
+  if (type === undefined) {
+    return undefined;
+  }
+  return SCRIPT_TYPE_TO_FULLNODE[type.toLowerCase()] ?? type;
+}
+
 export interface WalletLibAdapterConfig {
   readonly seed: string;
   readonly multisig: {
@@ -198,9 +219,27 @@ export class WalletLibAdapter implements HathorWalletPort {
 
   // ---- reading -------------------------------------------------------------------------------
 
+  /**
+   * Full transaction history, newest first.
+   *
+   * Read straight off the wallet's storage rather than through `getTxHistory()`, which truncates
+   * twice and silently: it defaults to `count: 15`, and it filters by `token_id`, defaulting to
+   * HTR - so a bridge that cares about custom tokens would have seen a handful of the wrong
+   * transactions. Running the two adapters side by side against the same testnet wallet is what
+   * exposed it: the headless reported 81 transactions where this returned 15.
+   *
+   * `storage.txHistory()` iterates everything, unfiltered and unpaged, and already yields whole
+   * transactions - so it also avoids a `getTx()` per row.
+   */
   async getHistory(): Promise<HistoryEntry[]> {
-    const history = await this.require().getTxHistory();
-    return history.map((tx) => mapHistoryTx(tx as never)).sort((a, b) => b.timestamp - a.timestamp);
+    const { wallet } = this.requireStarted();
+
+    const entries: HistoryEntry[] = [];
+    for await (const tx of wallet.storage.txHistory()) {
+      entries.push(mapHistoryTx(tx));
+    }
+
+    return entries.sort((a, b) => b.timestamp - a.timestamp);
   }
 
   async getTransaction(txId: string): Promise<DecodedTx | undefined> {
@@ -309,7 +348,7 @@ export class WalletLibAdapter implements HathorWalletPort {
       }
 
       return {
-        type: parsed.getType?.(),
+        type: normaliseScriptType(parsed.getType?.()),
         address: parsed.address?.base58,
         timelock: parsed.timelock ?? null,
       };

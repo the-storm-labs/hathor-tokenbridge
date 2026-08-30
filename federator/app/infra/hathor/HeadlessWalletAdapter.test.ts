@@ -1,6 +1,7 @@
 import { WalletOperationError } from '../../ports/HathorWalletPort';
 import type { HeadlessAdapterOptions } from './HeadlessWalletAdapter';
 import { HeadlessWalletAdapter } from './HeadlessWalletAdapter';
+import { RecordingLogger } from '../../ports/testSupport/fakes';
 import { StubHttpClient, ok } from './testSupport/StubHttpClient';
 
 const OPTIONS: HeadlessAdapterOptions = {
@@ -18,7 +19,8 @@ function recordingSleeper() {
 
 function adapterWith(http: StubHttpClient, overrides: Partial<HeadlessAdapterOptions> = {}) {
   const { waits, sleep } = recordingSleeper();
-  return { adapter: new HeadlessWalletAdapter(http, { ...OPTIONS, ...overrides }, sleep), waits };
+  const logger = new RecordingLogger();
+  return { adapter: new HeadlessWalletAdapter(http, { ...OPTIONS, ...overrides }, logger, sleep), waits, logger };
 }
 
 const status = (statusCode: number, statusMessage = '') => ok({ success: true, statusCode, statusMessage });
@@ -73,6 +75,54 @@ describe('HeadlessWalletAdapter readiness', () => {
       seedKey: 'default',
       multisig: true,
     });
+  });
+
+  it('starts a wallet that was never started, which reports no statusCode at all', async () => {
+    // The real body from a fresh headless is
+    // {"success":false,"message":"Invalid wallet id parameter.","statusMessage":""} - no
+    // statusCode. Treating that as an unknown state makes the loop poll forever without ever
+    // starting the wallet. Found by running the shared contract suite against a live headless;
+    // every unit test until then had fed it a statusCode.
+    const http = new StubHttpClient()
+      .onSequence('GET', 'wallet/status', [
+        ok({ success: false, message: 'Invalid wallet id parameter.', statusMessage: '' }),
+        status(3),
+      ])
+      .on('POST', 'start', ok({ success: true }));
+    const { adapter } = adapterWith(http);
+
+    await expect(adapter.start()).resolves.toBeUndefined();
+    expect(http.requestsTo('POST', 'start')).toHaveLength(1);
+  });
+
+  it('does not restart on a missing statusCode that is not an explicit failure', async () => {
+    const http = new StubHttpClient().onSequence('GET', 'wallet/status', [ok({}), status(3)]);
+    const { adapter } = adapterWith(http);
+
+    await adapter.start();
+    expect(http.requestsTo('POST', 'start')).toHaveLength(0);
+  });
+
+  it('treats an already-running wallet as started, not as a failure', async () => {
+    // The headless keeps wallets alive across federator restarts, and the port defines start as
+    // idempotent. Treating WALLET_ALREADY_STARTED as an error made start() throw against any
+    // headless that was already running - found against a live one.
+    const http = new StubHttpClient().onSequence('GET', 'wallet/status', [status(0), status(3)]).on('POST', 'start', {
+      status: 200,
+      data: { success: false, message: 'Failed to start wallet', errorCode: 'WALLET_ALREADY_STARTED' },
+    });
+    const { adapter } = adapterWith(http);
+
+    await expect(adapter.start()).resolves.toBeUndefined();
+  });
+
+  it('still fails on a start error that is not "already started"', async () => {
+    const http = new StubHttpClient()
+      .on('GET', 'wallet/status', status(0))
+      .on('POST', 'start', ok({ success: false, error: 'bad seed', errorCode: 'INVALID_SEED' }));
+    const { adapter } = adapterWith(http);
+
+    await expect(adapter.start()).rejects.toThrow(WalletOperationError);
   });
 
   it('retries an unrecognised status instead of resolving to nothing', async () => {
