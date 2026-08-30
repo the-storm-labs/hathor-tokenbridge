@@ -1,0 +1,73 @@
+# A Hathor network on your machine - the analogue of `anvil` for the EVM side.
+#
+#   docker compose -f local/docker-compose.yml up -d
+#
+# Three containers, because Hathor is a proof-of-work DAG and anvil's "mine instantly, for free"
+# has no direct equivalent:
+#
+#   node      the fullnode, on a privatenet with its own genesis
+#   mining    tx-mining-service: a stratum server that also does the PoW for TRANSACTIONS
+#   miner     cpuminer, connected to that stratum - it produces blocks AND solves transactions
+#
+# The genesis wallet seed is published in hathor-localnet.yml, the same way anvil prints its
+# pre-funded keys. Mining rewards here go to MINER_ADDRESS instead.
+#
+# Four things had to be discovered the hard way; each is a flag or a line below.
+services:
+  node:
+    image: hathornetwork/hathor-core:v0.71.0
+    container_name: htr-node
+    ports: ["8080:8080"]
+    volumes:
+      # hathor-localnet.yml is the image's own localnet preset with ONE line removed:
+      # `ENABLE_NANO_CONTRACTS: 'enabled'`. As published, `--localnet` refuses to start with
+      # "Feature Activation is configured for feature NANO_CONTRACTS but it's unused".
+      - ./hathor-localnet.yml:/etc/hathor/localnet.yml:ro
+    environment:
+      HATHOR_CONFIG_YAML: /etc/hathor/localnet.yml
+    command:
+      - run_node
+      - --status
+      - "8080"
+      # An in-memory chain, wiped on restart. The equivalent of anvil's default.
+      - --temp-data
+      # Needed for address history queries, which is how a wallet syncs.
+      - --wallet-index
+      - --allow-mining-without-peers
+      # test-mode-block-weight is what makes blocks instant. The preset already sets
+      # MIN_TX_WEIGHT: 1, but that governs transactions only - blocks would still be at weight 21
+      # and take tens of seconds each. Both test-mode flags require unsafe mode.
+      - --unsafe-mode
+      - privatenet
+      - --test-mode-tx-weight
+      - --test-mode-block-weight
+
+  mining:
+    image: hathornetwork/tx-mining-service:v0.24.0
+    container_name: htr-mining
+    depends_on: [node]
+    ports: ["8081:8000"]
+    command:
+      - --api-port
+      - "8000"
+      - --stratum-port
+      - "8034"
+      # privatenet shares testnet's address version bytes, so the testnet config is the right one.
+      - --testnet
+      - --address
+      - ${MINER_ADDRESS}
+      # Without this, every transaction is rejected with a TimestampError: Hathor requires a
+      # transaction's timestamp to be strictly greater than its parents', and at weight 1 blocks
+      # arrive inside the same second, so a transaction keeps landing on a parent that shares its
+      # timestamp. Harmless here, and not something a real network runs into.
+      - --fix-invalid-timestamp
+      - http://node:8080
+
+  miner:
+    image: hathornetwork/cpuminer:latest
+    container_name: htr-miner
+    depends_on: [mining]
+    # cpuminer, not hathor-core's own run_stratum_miner: that one times out on the
+    # `client.get_version` handshake against this stratum server and never mines anything, while
+    # still reporting itself as subscribed.
+    command: ["-a", "sha256d", "-o", "stratum+tcp://mining:8034", "-u", "${MINER_ADDRESS}", "-p", "x", "-t", "2"]

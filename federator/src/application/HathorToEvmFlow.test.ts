@@ -194,6 +194,33 @@ describe('HathorToEvmFlow: deciding whether to act', () => {
     expect(federation.submitted).toEqual([]);
   });
 
+  it('ignores its own mint, which pays two tokens back to the multisig', async () => {
+    // The mint this federator performs returns HTR change and the token authorities to the
+    // multisig, so it carries two tokens and cannot be read as a bridge request. That is a
+    // verdict, not a failure: it must be shrugged off as done, not raised as an error that
+    // promises a retry it can never satisfy.
+    const { flow, wallet, federation, logger } = await build();
+    wallet.confirmations.set(TX_ID, 10);
+
+    const mint = incomingTx();
+    const outputs = [
+      ...mint.outputs,
+      {
+        value: 42n,
+        tokenData: 0,
+        script: '',
+        token: '00',
+        decoded: { type: 'MultiSig', address: MULTISIG, timelock: null },
+        spentBy: null,
+      },
+    ];
+
+    expect(await deliver(flow, wallet, { ...mint, outputs })).toBe(true);
+    expect(federation.submitted).toEqual([]);
+    expect(logger.at('error')).toBe('');
+    expect(logger.at('info')).toMatch(/not a bridge request/);
+  });
+
   it('ignores a transaction carrying no EVM destination', async () => {
     const { flow, wallet, federation, logger } = await build();
     wallet.confirmations.set(TX_ID, 10);

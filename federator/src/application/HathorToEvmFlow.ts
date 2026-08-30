@@ -1,4 +1,5 @@
 import { BRIDGE_NORMALISED_DECIMALS, toEvmAmount } from '../domain/amounts';
+import { InvalidTransactionError } from '../domain/errors';
 import { deriveEvmOriginIdentity } from '../domain/hathorOrigin';
 import { readDestination } from '../domain/bridgePayload';
 import { readBridgedToken } from '../domain/tokenData';
@@ -70,7 +71,24 @@ export class HathorToEvmFlow {
 
     // Read the funds as they were recorded, spent or not: by the time history is replayed the
     // outputs may already have been consumed by the melt this very flow created.
-    const token = readBridgedToken(tx.inputs, tx.outputs, { requireUnspent: false });
+    //
+    // An unreadable transaction is not a failure here, it is a verdict: this is a scan of
+    // everything the multisig touches, and most of that is not a bridge request. The federator's
+    // own mints are the clearest case - they pay HTR change and the token authorities back to the
+    // multisig, so they carry two tokens and readBridgedToken rejects them. That rejection is
+    // right for validating a proposal, where ambiguity must be refused loudly, and wrong here,
+    // where it is just another "not for us". Letting it escape would log an error and promise a
+    // retry for something that can never become valid.
+    let token: ReturnType<typeof readBridgedToken>;
+    try {
+      token = readBridgedToken(tx.inputs, tx.outputs, { requireUnspent: false });
+    } catch (error) {
+      if (error instanceof InvalidTransactionError) {
+        logger.info(`Transaction ${tx.txId} is not a bridge request: ${error.message}`);
+        return true;
+      }
+      throw error;
+    }
     if (!token) {
       logger.info(`Transaction ${tx.txId} moves no custom token into the multisig; nothing to do.`);
       return true;
