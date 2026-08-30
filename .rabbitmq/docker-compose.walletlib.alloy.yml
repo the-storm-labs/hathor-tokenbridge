@@ -1,0 +1,113 @@
+# The wallet-lib federator, with Grafana Alloy instead of prometheus + promtail.
+#
+# This is docker-compose.walletlib.yml with the monitoring pair swapped, kept in step with the way
+# docker-compose.alloy.yml relates to docker-compose.yml. Alloy is opt-in; it does not replace the
+# default.
+#
+# Opt-in, and deliberately a separate file rather than a change to docker-compose.yml. The existing
+# stack keeps working untouched, so switching is `-f docker-compose.walletlib.yml` and rolling back
+# is switching the file name - no rebuild, since the image carries both trees.
+#
+#   docker compose -f docker-compose.walletlib.yml --env-file <your.env> up -d
+#
+# What is gone compared with docker-compose.yml, and why:
+#
+#   rabbitmq        carried exactly one message type, wallet:new-tx, across a process boundary
+#   init-rabbitmq   existed only to wait for rabbitmq
+#   hathor-wallet   the wallet now runs inside the federator process
+#
+# What that costs: the multisig seed moves into the federator. It used to hold only an API key for
+# the wallet container. That changes the blast radius of a federator compromise and is the one part
+# of this migration that alters the bridge's risk profile.
+#
+# The federator process must not be restarted casually. Wallet storage is in memory, so every start
+# rebuilds the entire Hathor history - minutes, not seconds. A reader failing does NOT restart it.
+
+services:
+  hathor-federator:
+    image: toggera/hathor-tokenbridge:5477fbaa7c613d291e9f6252af69eae28d861f4e
+    container_name: hathor_tokenbridge_${HATHOR_MULTISIG_ORDER}
+    restart: unless-stopped
+    # The image builds both trees; this is what selects the wallet-lib one.
+    working_dir: /app/federator/built-app/federator
+    command: ["node", "./app/main.js"]
+    # Long enough for a cold start to finish rebuilding history before Docker gives up on a stop.
+    stop_grace_period: 60s
+    ports:
+      - "500${HATHOR_MULTISIG_ORDER}:5000"
+    volumes:
+      - federator_db:/app/db
+      - federator_db:/var/log
+    environment:
+      # ---- EVM chain: Bridge / Federation / AllowTokens ----
+      EVM_NAME: "${EVM_NETWORK}"
+      EVM_CHAIN_ID: "${EVM_CHAIN_ID}"
+      EVM_HOST: "${EVM_HOST}"
+      EVM_BRIDGE_ADDRESS: "${BRIDGE_ADDRESS}"
+      EVM_FEDERATION_ADDRESS: "${FEDERATION_ADDRESS}"
+      EVM_ALLOW_TOKENS_ADDRESS: "${ALLOW_TOKENS_ADDRESS}"
+      EVM_FROM_BLOCK: "${FROM_BLOCK}"
+
+      # ---- State chain: the HathorFederation coordination contract ----
+      STATE_CHAIN_ID: "${FEDERATION_CHAIN_ID}"
+      STATE_CHAIN_HOST: "${HATHOR_STATE_CONTRACT_HOST_URL}"
+      STATE_CONTRACT_ADDRESS: "${HATHOR_STATE_CONTRACT_ADDR}"
+      STATE_FROM_BLOCK: "${FEDERATION_FROM_BLOCK}"
+      STATE_CONFIRMATION_BLOCKS: "${FEDERATION_CONFIRMATION_BLOCKS}"
+
+      # ---- Hathor ----
+      HATHOR_NAME: "${HATHOR_NAME}"
+      HATHOR_CHAIN_ID: "${HATHOR_CHAIN_ID}"
+      HATHOR_NETWORK: "${HEADLESS_NETWORK}"
+      HATHOR_FULLNODE_URL: "${HEADLESS_SERVER}"
+      HATHOR_TX_MINING_URL: "${HEADLESS_TX_MINING_URL}"
+      # The seed that used to live on the wallet container. See the note at the top of this file.
+      HATHOR_SEED: "${HEADLESS_SEED_DEFAULT}"
+      HATHOR_MULTISIG_PUBKEYS: "${HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS}"
+      HATHOR_NUM_SIGNATURES: "${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}"
+      HATHOR_MULTISIG_ORDER: "${HATHOR_MULTISIG_ORDER}"
+      HATHOR_MIN_CONFIRMATIONS: "${HATHOR_MINIMUM_CONFIRMATIONS}"
+      # Milliseconds, and it goes straight into a timer. The old HATHOR_INPUT_BLOCK_TTL example of
+      # `1` meant one millisecond, which is no input lock at all.
+      HATHOR_INPUT_LOCK_TTL_MS: "${HATHOR_INPUT_LOCK_TTL_MS:-1800000}"
+      HATHOR_FROM_TIMESTAMP: "${HATHOR_LAST_TIMESTAMP}"
+
+      # ---- Rollout switch ----
+      # Set these two to run this whole tree against the wallet container you already have, before
+      # moving onto the embedded library. Leave them unset for wallet-lib. /status reports which.
+      HATHOR_HEADLESS_URL: "${HATHOR_HEADLESS_URL:-}"
+      HATHOR_HEADLESS_API_KEY: "${HATHOR_HEADLESS_API_KEY:-}"
+
+      # ---- Federator identity and runtime ----
+      FEDERATOR_KEY: "${FEDERATOR_KEY}"
+      # Optional: checked against the address derived from the key, never trusted on its own.
+      FEDERATOR_ADDRESS: "${FEDERATOR_ADDRESS:-}"
+      STORAGE_PATH: /app/db
+      LOG_FILE: /var/log/federator.log
+
+  alloy:
+    image: grafana/alloy:v1.19.0
+    container_name: hathor_alloy_${HATHOR_MULTISIG_ORDER}
+    restart: unless-stopped
+    depends_on:
+      - hathor-federator
+    volumes:
+      - ./alloy/:/etc/alloy/
+      - federator_db:/var/log
+      - alloy_data:/var/lib/alloy/data
+    environment:
+      GRAFANA_CLOUD_PROMETHEUS_URL: ${GRAFANA_CLOUD_PROMETHEUS_URL}
+      GRAFANA_CLOUD_PROMETHEUS_USER: ${GRAFANA_CLOUD_PROMETHEUS_USER}
+      GRAFANA_CLOUD_PROMETHEUS_API_KEY: ${GRAFANA_CLOUD_PROMETHEUS_API_KEY}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER}
+      GRAFANA_CLOUD_LOKI_API_KEY: ${GRAFANA_CLOUD_LOKI_API_KEY}
+      HATHOR_MULTISIG_ORDER: ${HATHOR_MULTISIG_ORDER}
+
+volumes:
+  federator_db:
+    name: hathor_federator_db_${HATHOR_MULTISIG_ORDER}
+    driver: local
+  alloy_data:
+    name: hathor_alloy_data_${HATHOR_MULTISIG_ORDER}
+    driver: local

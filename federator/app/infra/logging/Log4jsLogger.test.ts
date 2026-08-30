@@ -1,4 +1,4 @@
-import { Log4jsLogger, configureLogging, shutdownLogging } from './Log4jsLogger';
+import { Log4jsLogger, configureLogging, federatorLogging, shutdownLogging } from './Log4jsLogger';
 
 /**
  * Captures what actually reaches an appender. Asserting through log4js rather than by spying on
@@ -24,6 +24,27 @@ beforeAll(() => {
 
 afterAll(async () => {
   await shutdownLogging();
+});
+
+describe('federatorLogging', () => {
+  it('writes to the configured file rather than a hardcoded path', () => {
+    // The path used to be fixed at /var/log/federator.log - a volume inside the container and
+    // unwritable anywhere else, so the federator could not run outside Docker at all and failed
+    // at boot rather than falling back.
+    const config = federatorLogging({ file: '/tmp/somewhere/else.log', level: 'info' });
+    expect(config.appenders.file).toMatchObject({ type: 'file', filename: '/tmp/somewhere/else.log' });
+  });
+
+  it('logs to both the file and the console', () => {
+    // The file is what the log scraper reads; the console is what `docker logs` shows.
+    const config = federatorLogging({ file: '/tmp/x.log', level: 'warn' });
+    expect(config.categories.default).toEqual({ appenders: ['file', 'console'], level: 'warn' });
+  });
+
+  it('rotates, so a long-running federator does not fill its volume', () => {
+    const config = federatorLogging({ file: '/tmp/x.log', level: 'info' });
+    expect(config.appenders.file).toMatchObject({ maxLogSize: 10_485_760, backups: 3, compress: true });
+  });
 });
 
 describe('Log4jsLogger', () => {

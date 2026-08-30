@@ -13,6 +13,38 @@ export function configureLogging(config: log4js.Configuration): void {
   log4js.configure(config);
 }
 
+export interface LoggingOptions {
+  /**
+   * Where the log file goes. The path was hardcoded to /var/log/federator.log, which is a mounted
+   * volume inside the container and unwritable anywhere else - so the federator could not be run
+   * outside Docker at all, and failed at boot rather than falling back.
+   */
+  readonly file: string;
+  readonly level: string;
+}
+
+/**
+ * The federator's logging setup: a rotating file for the log scraper, and the console for
+ * `docker logs`. Built here rather than read from a JSON file, so the path can come from the
+ * environment like everything else.
+ */
+export function federatorLogging(options: LoggingOptions): log4js.Configuration {
+  return {
+    appenders: {
+      file: {
+        type: 'file',
+        filename: options.file,
+        maxLogSize: 10_485_760,
+        backups: 3,
+        compress: true,
+        keepFileExt: true,
+      },
+      console: { type: 'console' },
+    },
+    categories: { default: { appenders: ['file', 'console'], level: options.level } },
+  };
+}
+
 export class Log4jsLogger implements LoggerPort {
   private readonly logger: log4js.Logger;
 

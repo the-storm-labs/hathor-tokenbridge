@@ -39,3 +39,67 @@ from a previous promtail-based setup):
 
 - Default (prometheus + promtail): `docker compose up -d`
 - Alloy instead (see above): `docker compose -f docker-compose.alloy.yml up -d`
+
+### The wallet-lib federator (opt-in)
+
+`docker-compose.walletlib.yml` runs the same image against the rearchitected federator, which
+embeds `@hathor/wallet-lib` instead of talking to a separate wallet container over HTTP. Three
+containers disappear:
+
+| | default stack | wallet-lib stack |
+| --- | --- | --- |
+| with prometheus + promtail | 6 containers | 3 |
+| with alloy | 5 containers | 2 |
+
+`rabbitmq` and `init-rabbitmq` are gone because the queue carried exactly one message type,
+`wallet:new-tx`, across a process boundary that no longer exists. `hathor-wallet` is gone because
+the wallet runs inside the federator.
+
+The image builds both trees, so switching stacks - or rolling back - is a compose file, not a
+rebuild:
+
+    docker compose -f docker-compose.walletlib.yml --env-file <your.env> up -d       # or
+    docker compose -f docker-compose.walletlib.alloy.yml --env-file <your.env> up -d
+
+#### Three things to know before switching
+
+**The multisig seed moves into the federator.** It used to hold only an API key for the wallet
+container. This changes the blast radius of a federator compromise, and it is the one part of this
+migration that alters the bridge's risk profile.
+
+**Rename the block cursor files on the volume.** A name the new federator does not recognise reads
+as "never ran", which means re-scanning the chain from `FROM_BLOCK`. On `hathor_federator_db_<n>`:
+
+    lastBlock_fhtr_<mainChainId>_31.txt  ->  cursor_evm-bridge.txt
+    lastBlock_hmm_<mainChainId>_31.txt   ->  cursor_hathor-federation.txt
+
+`lastHathorTimestamp.txt` keeps its name and carries over untouched - it always sat on top of the
+wallet's history rather than inside it.
+
+**Restarting is expensive now.** Wallet storage is in memory, so every start rebuilds the entire
+Hathor history - minutes, not seconds. The federator is built to absorb that: a reader failing is
+logged, counted and retried rather than ending the process. Do not add a health check that
+restarts on a slow start.
+
+#### Rolling out gradually
+
+Coordination is on-chain, so a federator on the new stack coexists with federators on the old one.
+Two switches, in this order:
+
+1. Set `HATHOR_HEADLESS_URL` and `HATHOR_HEADLESS_API_KEY` and keep the wallet container running
+   from the old compose. The new federator then runs end to end against the wallet you already
+   have, so the only thing being tested is the rewrite.
+2. Unset them. The federator switches to the embedded library, and the wallet container can go.
+
+`GET /status` on port `500<order>` reports which adapter is in use, the wallet's state, and each
+scheduler's consecutive-failure count.
+
+#### Configuration
+
+The variable names changed - flat, validated values instead of two JSON blobs. The compose files
+above map the existing `.env` names onto the new ones, so an existing `.env` works unchanged. The
+full old -> new mapping, including what was removed and why, is in
+`federator/app/config/CONFIG_MIGRATION.md`.
+
+A missing or malformed variable now fails at boot, by name, instead of surfacing as `undefined`
+somewhere downstream.

@@ -155,6 +155,10 @@ export const envSchema = z.object({
   REQUIRE_HTTPS: boolFromEnv('REQUIRE_HTTPS').default('true'),
   ETHERSCAN_KEY: optionalText,
   EXPLORER_URL: optionalText,
+
+  /** Where the log file goes. The default is the path the container mounts and the scraper reads. */
+  LOG_FILE: z.string().trim().min(1).default('/var/log/federator.log'),
+  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('trace'),
 });
 
 export type ParsedEnv = z.infer<typeof envSchema>;

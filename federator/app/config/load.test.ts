@@ -206,6 +206,24 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('logging', () => {
+    it('defaults to the path the container mounts and the scraper reads', () => {
+      const { runtime } = loadConfig(validEnv());
+      expect(runtime.logFile).toBe('/var/log/federator.log');
+      expect(runtime.logLevel).toBe('trace');
+    });
+
+    it('can be pointed somewhere writable, which is what running outside Docker needs', () => {
+      const config = loadConfig(validEnv({ LOG_FILE: '/tmp/federator.log', LOG_LEVEL: 'info' }));
+      expect(config.runtime.logFile).toBe('/tmp/federator.log');
+      expect(config.runtime.logLevel).toBe('info');
+    });
+
+    it('rejects a log level it does not know', () => {
+      expect(issuesFrom(validEnv({ LOG_LEVEL: 'verbose' })).join('\n')).toMatch(/LOG_LEVEL/);
+    });
+  });
+
   describe('transitional headless configuration', () => {
     it('is absent by default', () => {
       expect(loadConfig(validEnv()).hathor.headless).toBeUndefined();

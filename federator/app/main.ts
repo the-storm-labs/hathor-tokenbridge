@@ -2,8 +2,7 @@ import dotenv from 'dotenv';
 
 import { buildFederator } from './composition/container';
 import { ConfigError, loadConfig } from './config/load';
-import { Log4jsLogger, configureLogging, shutdownLogging } from './infra/logging/Log4jsLogger';
-import logConfig from '../config/log-config.json';
+import { Log4jsLogger, configureLogging, federatorLogging, shutdownLogging } from './infra/logging/Log4jsLogger';
 
 /**
  * The federator's entry point.
@@ -12,10 +11,11 @@ import logConfig from '../config/log-config.json';
  * the schedulers. The readers depend on a wallet that can answer, and starting them first means a
  * first run that fails for no reason other than being early.
  *
- * Nothing here calls process.exit on a running federator. The process owns a MemoryStore that is
- * rebuilt from scratch on every start, so exiting is expensive, and a scheduled run failing is not
- * a reason to pay for it - the Scheduler absorbs those. What does end the process is a failure to
- * boot at all, which is a configuration problem a restart will not fix, and a signal.
+ * Nothing here ends a RUNNING federator. The process owns a MemoryStore that is rebuilt from
+ * scratch on every start, so exiting is expensive, and a scheduled run failing is not a reason to
+ * pay for it - the Scheduler absorbs those. What does end the process is a failure to boot at all,
+ * which is a configuration problem a restart will not fix, and a signal - and in both of those the
+ * exit is explicit, because a third-party import-time timer would otherwise keep it alive.
  */
 async function main(): Promise<void> {
   dotenv.config();
@@ -31,11 +31,13 @@ async function main(): Promise<void> {
     } else {
       process.stderr.write(`Failed to read configuration: ${String(error)}\n`);
     }
-    process.exitCode = 1;
-    return;
+    // Exit rather than returning: importing wallet-lib starts a self-renewing timer at module
+    // load, so the event loop stays alive and the process would hang here forever instead of
+    // reporting a configuration error and stopping. See the shutdown path for the same reason.
+    process.exit(1);
   }
 
-  configureLogging(logConfig);
+  configureLogging(federatorLogging({ file: config.runtime.logFile, level: config.runtime.logLevel }));
   const logger = new Log4jsLogger('MAIN');
 
   logger.info(
@@ -70,7 +72,12 @@ async function main(): Promise<void> {
     await federator.hathorService.stop();
     await federator.health.stop();
     await shutdownLogging();
-    process.exitCode = 0;
+
+    // Explicit, and only once shutdown has finished. @hathor/wallet-lib schedules a self-renewing
+    // timer when it is imported, which nothing in its public surface clears - so a federator that
+    // merely stopped its own work would still never exit, and every `docker stop` would end in a
+    // SIGKILL after the grace period.
+    process.exit(0);
   };
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -86,5 +93,7 @@ async function main(): Promise<void> {
 
 void main().catch((error) => {
   process.stderr.write(`Federator failed to start: ${String(error)}\n`);
-  process.exitCode = 1;
+  // Explicit for the same reason as above: wallet-lib's import-time timer keeps the event loop
+  // alive, so setting an exit code alone leaves a failed boot hanging instead of reporting it.
+  process.exit(1);
 });

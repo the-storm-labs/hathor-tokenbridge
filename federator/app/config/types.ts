@@ -89,6 +89,8 @@ export interface RuntimeConfig {
   readonly requireHttps: boolean;
   readonly etherscanApiKey?: string | undefined;
   readonly explorerUrl?: string | undefined;
+  readonly logFile: string;
+  readonly logLevel: string;
 }
 
 export interface AppConfig {

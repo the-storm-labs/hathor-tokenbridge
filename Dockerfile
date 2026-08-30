@@ -16,8 +16,15 @@ COPY --chown=node:node ./bridge/abi ./bridge/abi/
 COPY --chown=node:node ./federator/ ./federator/
 
 WORKDIR ./federator
+# Two trees are built while the rearchitecture is in flight:
+#   built/federator/src/main.js       the current federator, which is what CMD runs
+#   built-app/federator/app/main.js   the wallet-lib federator, selected by overriding `command:`
+#                                     in docker-compose.walletlib.yml
+# Building both from one image means the same artefact can run either, so switching stacks - or
+# rolling back - is a compose change rather than a rebuild.
 RUN (cd ./config/ && cp config.sample.js config.js) && \
-    npx tsc --build
+    npx tsc --build && \
+    npx tsc -p tsconfig.app.build.json
 
 WORKDIR ./built/federator
 

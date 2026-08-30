@@ -148,6 +148,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       requireHttps: e.REQUIRE_HTTPS,
       etherscanApiKey: e.ETHERSCAN_KEY,
       explorerUrl: e.EXPLORER_URL,
+      logFile: e.LOG_FILE,
+      logLevel: e.LOG_LEVEL,
     },
   };
 }
