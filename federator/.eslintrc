@@ -19,17 +19,22 @@
     "@typescript-eslint/explicit-module-boundary-types": "off", // avoid things for any type, it should be removed after migrating to tsnode
     "@typescript-eslint/no-explicit-any": "off" // avoid things for any type
   },
-  // The new app/ tree is held to stricter rules than the legacy src/ tree, and its layering is
-  // enforced by the linter rather than by discipline. The dependency rule: domain knows nothing;
-  // ports know only domain; application knows domain + ports; infra implements ports; only
-  // composition is allowed to wire infra into the rest.
-  //
-  // NOTE: @typescript-eslint/parser is pinned at v4 here, which predates inline type modifiers in
-  // named imports (`import { type Foo } from 'x'`). Such a file fails to PARSE, and a file that
-  // does not parse is not linted at all - boundary rules included. Use a separate `import type`
-  // line until the parser is upgraded.
   "overrides": [
     {
+      // The legacy src/ tree is frozen until the rearchitecture lands, so its lint signal is kept
+      // exactly as it was before the eslint 7 -> 8 / typescript-eslint 4 -> 8 upgrade. v8 promotes
+      // no-unused-vars from warn to error and detects more cases; letting that through would turn
+      // 8 pre-existing errors into 26 in code nobody is going to touch.
+      "files": ["src/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "warn"
+      }
+    },
+    {
+      // The new app/ tree is held to stricter rules than the legacy src/ tree, and its layering is
+      // enforced by the linter rather than by discipline. The dependency rule: domain knows
+      // nothing; ports know only domain; application knows domain + ports; infra implements ports;
+      // only composition is allowed to wire infra into the rest.
       "files": ["app/**/*.ts"],
       "plugins": ["@typescript-eslint", "prettier", "import"],
       // Without a resolver that knows about .ts, eslint-plugin-import cannot resolve intra-app
@@ -43,6 +48,9 @@
       "rules": {
         "no-console": "error",
         "@typescript-eslint/no-explicit-any": "error",
+        // Moved out of `recommended` in typescript-eslint v8, so it has to be asked for by name.
+        // Worth keeping here: it caught real assertions hiding fixture mistakes in tests.
+        "@typescript-eslint/no-non-null-assertion": "error",
         // A parameter kept only to satisfy an interface is named with a leading underscore.
         "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
         "import/no-restricted-paths": ["error", {

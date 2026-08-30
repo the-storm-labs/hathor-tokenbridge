@@ -14,7 +14,7 @@
  * only from inside the hook means a file that never used the library never creates a timer at all.
  */
 afterAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose - see the comment above
   const { stopGLLBackgroundTask } = require('@hathor/wallet-lib/lib/sync/gll') as {
     stopGLLBackgroundTask: () => void;
   };

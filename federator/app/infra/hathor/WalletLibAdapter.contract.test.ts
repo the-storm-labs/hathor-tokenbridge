@@ -38,7 +38,7 @@ if (seed && pubkeys && foreignAddress) {
       decodableTxHex: process.env.WALLETLIB_CONTRACT_TX_HEX,
     },
     async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose - see the comment above
       const { WalletLibAdapter } = require('./WalletLibAdapter') as typeof import('./WalletLibAdapter');
       return new WalletLibAdapter(
         {

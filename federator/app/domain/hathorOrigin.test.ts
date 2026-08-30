@@ -1,3 +1,5 @@
+import { toChecksumAddress } from 'web3-utils';
+
 import { HATHOR_SYNTHETIC_LOG_INDEX, deriveEvmOriginIdentity } from './hathorOrigin';
 
 const ADDRESS = 'WjTMMX5Rs8oinnpRQfyMuxFYYaPWEPSRPm';
@@ -11,7 +13,9 @@ describe('deriveEvmOriginIdentity', () => {
   it('produces a checksummed 20-byte address from a Hathor address', () => {
     const { sender } = deriveEvmOriginIdentity(ADDRESS, TX_ID);
     expect(sender).toMatch(/^0x[0-9a-fA-F]{40}$/);
-    expect(sender).toBe(toChecksummed(sender));
+    // Round-trip through web3's own checksum, so the assertion tests the value rather than
+    // the spelling this test happens to use.
+    expect(sender).toBe(toChecksumAddress(sender));
   });
 
   it('produces a 32-byte hash to stand in for the block and transaction hashes', () => {
@@ -30,10 +34,3 @@ describe('deriveEvmOriginIdentity', () => {
     expect(HATHOR_SYNTHETIC_LOG_INDEX).toBe(129);
   });
 });
-
-/** Round-trips through web3's checksum so the assertion tests the value, not the spelling. */
-function toChecksummed(address: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { toChecksumAddress } = require('web3-utils') as { toChecksumAddress: (a: string) => string };
-  return toChecksumAddress(address);
-}

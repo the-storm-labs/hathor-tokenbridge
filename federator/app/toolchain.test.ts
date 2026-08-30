@@ -12,13 +12,13 @@ describe('app toolchain', () => {
   });
 
   it('resolves @hathor/wallet-lib at the version the migration was planned against', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- this test is about what the installed package exposes at runtime
     const { version } = require('@hathor/wallet-lib/package.json') as { version: string };
     expect(version).toBe('4.1.0');
   });
 
   it('exposes the wallet-lib entry points the adapter will build on', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- this test is about what the installed package exposes at runtime
     const lib = require('@hathor/wallet-lib');
     expect(typeof lib.HathorWallet).toBe('function');
     expect(typeof lib.SendTransaction).toBe('function');
