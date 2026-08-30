@@ -50,6 +50,9 @@ export function toTransfer(values: Record<string, unknown>, onProblem: EncodingP
   const transactionType = Number(values.transactionType ?? 0) as TransactionType;
   const rawToken = String(values.originalTokenAddress ?? '');
 
+  const rawHash = String(values.transactionHash ?? '');
+  const evmHash = rawHash === '' || rawHash.startsWith('0x') ? rawHash : `0x${rawHash}`;
+
   let originalTokenAddress: string;
   if (transactionType === TransactionType.MELT) {
     originalTokenAddress = stripPrefix(rawToken);
@@ -65,7 +68,11 @@ export function toTransfer(values: Record<string, unknown>, onProblem: EncodingP
   return {
     transactionId: String(values.transactionId ?? ''),
     originalTokenAddress,
-    transactionHash: stripPrefix(values.transactionHash),
+    // Same asymmetry as the token above, and for the same reason. A MELT's transactionHash is a
+    // Hathor transaction id, which carries no 0x; for a MINT or TRANSFER it is an EVM transaction
+    // hash, and stripping the prefix makes it unusable for an eth_getTransaction lookup - which is
+    // how the proposal validator finds the Cross event that justifies the transfer.
+    transactionHash: transactionType === TransactionType.MELT ? stripPrefix(values.transactionHash) : evmHash,
     value: BigInt(String(values.value ?? '0')),
     sender: String(values.sender ?? ''),
     receiver: String(values.receiver ?? ''),

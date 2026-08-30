@@ -1,4 +1,4 @@
-import { toEvmAmount, toHathorAmount } from './amounts';
+import { BRIDGE_NORMALISED_DECIMALS, toBridgeUnit, toEvmAmount, toHathorAmount } from './amounts';
 import { AmountConversionError } from './errors';
 
 describe('toHathorAmount', () => {
@@ -93,5 +93,40 @@ describe('toEvmAmount', () => {
     expect(toEvmAmount(700n, 0)).toBe(7n);
     expect(toEvmAmount(750n, 1)).toBe(75n);
     expect(toEvmAmount(799n, 0)).toBe(7n);
+  });
+});
+
+describe('toBridgeUnit', () => {
+  it('scales a 6-decimal token up to the bridge internal unit', () => {
+    // 10 USDC. The AllowTokens limits are stored in this unit, and the release path divides a
+    // voted amount back down by 10^(18-decimals) - so anything compared against a limit, or voted
+    // on, has to be expressed here first.
+    expect(toBridgeUnit(10_000_000n, 6)).toBe(10n * 10n ** 18n);
+  });
+
+  it('leaves an 18-decimal token alone, which is why the bug hid', () => {
+    expect(toBridgeUnit(10n * 10n ** 18n, 18)).toBe(10n * 10n ** 18n);
+  });
+
+  it('is a factor of a million out for USDC if the token decimals are used instead', () => {
+    const naive = 10_000_000n; // what comparing the raw Cross amount against the limits does
+    expect(toBridgeUnit(10_000_000n, 6) / naive).toBe(10n ** 12n);
+  });
+
+  it('keeps amounts below a hundredth of a token, unlike a round trip through Hathor', () => {
+    // Routing through Hathor's two decimals would floor this to zero and then throw.
+    expect(toBridgeUnit(50n, 18)).toBe(50n);
+    expect(toBridgeUnit(1n, 18)).toBe(1n);
+  });
+
+  it('scales down for a token with more decimals than the bridge unit', () => {
+    expect(toBridgeUnit(10n ** 20n, 20)).toBe(10n ** 18n);
+  });
+
+  it('normalises to 18 decimals, whatever the token', () => {
+    expect(BRIDGE_NORMALISED_DECIMALS).toBe(18);
+    for (const decimals of [2, 6, 8, 18]) {
+      expect(toBridgeUnit(5n * 10n ** BigInt(decimals), decimals)).toBe(5n * 10n ** 18n);
+    }
   });
 });

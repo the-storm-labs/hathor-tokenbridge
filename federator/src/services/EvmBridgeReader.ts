@@ -1,4 +1,5 @@
 import type { EvmToHathorFlow } from '../application/EvmToHathorFlow';
+import { toBridgeUnit } from '../domain/amounts';
 import type { AllowTokensPort, BridgePort, CrossEvent } from '../ports/BridgePort';
 import type { CursorStorePort } from '../ports/CursorStorePort';
 import type { EvmChainPort } from '../ports/EvmChainPort';
@@ -129,8 +130,17 @@ export class EvmBridgeReader implements SchedulerJob {
       return;
     }
 
-    if (shallow && !this.isDeepEnough(event, currentBlock, confirmations, limits)) {
-      return;
+    if (shallow) {
+      // The limits are stored in the bridge's 18-decimal unit while the Cross event carries the
+      // token's own decimals, so the two have to be brought to the same scale before they can be
+      // compared. Skipping that reads every USDC amount as a million times smaller than it is, and
+      // a large transfer would then clear on the shallow confirmation depth instead of the deep
+      // one. The previous federator compared them raw.
+      const decimals = await bridge.getEvmTokenDecimals(mapping.evmToken);
+      const normalisedAmount = toBridgeUnit(event.amount, decimals);
+      if (!this.isDeepEnough(event, normalisedAmount, currentBlock, confirmations, limits)) {
+        return;
+      }
     }
 
     await flow.transfer({
@@ -149,6 +159,8 @@ export class EvmBridgeReader implements SchedulerJob {
    */
   private isDeepEnough(
     event: CrossEvent,
+    /** The event's amount in the bridge's 18-decimal unit, comparable with the limits. */
+    normalisedAmount: bigint,
     currentBlock: number,
     confirmations: { mediumAmountConfirmations: number; largeAmountConfirmations: number },
     limits: { mediumAmount: bigint; largeAmount: bigint },
@@ -156,7 +168,7 @@ export class EvmBridgeReader implements SchedulerJob {
     const { logger } = this.deps;
     const depth = currentBlock - event.blockNumber;
 
-    if (event.amount > limits.largeAmount) {
+    if (normalisedAmount > limits.largeAmount) {
       logger.debug(
         `Transfer ${event.transactionHash} is a large amount with ${depth} confirmations; it needs ` +
           `${confirmations.largeAmountConfirmations}. Leaving it for a later run.`,
@@ -164,7 +176,7 @@ export class EvmBridgeReader implements SchedulerJob {
       return false;
     }
 
-    if (event.amount > limits.mediumAmount && depth < confirmations.mediumAmountConfirmations) {
+    if (normalisedAmount > limits.mediumAmount && depth < confirmations.mediumAmountConfirmations) {
       logger.debug(
         `Transfer ${event.transactionHash} is a medium amount with ${depth} confirmations; it needs ` +
           `${confirmations.mediumAmountConfirmations}. Leaving it for a later run.`,

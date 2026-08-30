@@ -245,6 +245,24 @@ describe('HathorToEvmFlow: a token native to the EVM chain', () => {
     expect(evmFederation.votes).toEqual([]);
   });
 
+  it('votes in the bridge 18-decimal unit even for a 6-decimal token', async () => {
+    // USDC is the production case. The bridge stores limits in 18 decimals and divides a voted
+    // amount by 10^(18-decimals) on release, so voting in the token's own decimals would release
+    // a millionth of the transfer - and would never clear the minimum in the first place.
+    const { flow, bridge, evmFederation } = await build();
+    bridge.decimals.set(EVM_NATIVE.evmToken, 6);
+
+    await flow.settleMeltedTransfer({
+      hathorSenderAddress: SENDER,
+      evmReceiverAddress: DESTINATION,
+      hathorAmount: 150n, // 1.50 on Hathor
+      hathorTokenAddress: EVM_NATIVE.hathorToken,
+      hathorTxId: TX_ID,
+    });
+
+    expect(evmFederation.votes[0]?.amount).toBe(1_500_000_000_000_000_000n);
+  });
+
   it('votes on the EVM side once the melt has settled', async () => {
     const { flow, evmFederation } = await build();
 

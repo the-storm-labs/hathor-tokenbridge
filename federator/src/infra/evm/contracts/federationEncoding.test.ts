@@ -85,6 +85,24 @@ describe('toTransfer', () => {
     );
     expect(transfer.originalTokenAddress).toBe(Web3.utils.toChecksumAddress(TOKEN));
     expect(transfer.value).toBe(1500n);
+  });
+
+  it('keeps the 0x on an EVM transaction hash, which a mint needs for the event lookup', () => {
+    // The proposal validator resolves this hash with eth_getTransaction to find the Cross event
+    // that justifies the transfer. Stripped, the lookup finds nothing and the federator refuses
+    // to sign its own proposal - which is exactly what happened on the first local round trip.
+    const transfer = toTransfer(
+      { ...base, originalTokenAddress: PADDED_TOKEN, transactionType: TransactionType.MINT },
+      noProblem,
+    );
+    expect(transfer.transactionHash).toBe('0xdeadbeef');
+  });
+
+  it('strips it for a melt, whose hash is a Hathor transaction id', () => {
+    const transfer = toTransfer(
+      { ...base, originalTokenAddress: `0x${HATHOR_TOKEN}`, transactionType: TransactionType.MELT },
+      noProblem,
+    );
     expect(transfer.transactionHash).toBe('deadbeef');
   });
 

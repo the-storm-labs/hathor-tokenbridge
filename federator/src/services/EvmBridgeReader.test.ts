@@ -192,6 +192,20 @@ describe('EvmBridgeReader confirmation depth', () => {
     expect(transfers).toEqual([]);
   });
 
+  it('compares a 6-decimal amount against the limits in the bridge own unit', async () => {
+    // 5000 USDC is 5e9 in the token's decimals but 5e21 normalised - above the large threshold.
+    // Comparing raw would read it as tiny and let it through on the shallow depth.
+    const { reader, chain, bridge, allowTokens, transfers, logger } = build();
+    chain.head = 1_000;
+    bridge.decimals.set(TOKEN.evmToken, 6);
+    bridge.crossEvents.push(crossEvent({ blockNumber: 995, amount: 5_000_000_000n }));
+    allowTokens.limits = { allowed: true, min: 0n, mediumAmount: 10n ** 19n, largeAmount: 10n ** 20n };
+
+    await reader.run();
+    expect(transfers).toEqual([]);
+    expect(logger.at('debug')).toMatch(/large amount/);
+  });
+
   it('does not let the shallow pass move the cursor past unsettled blocks', async () => {
     const { reader, cursors } = shallowEvent(50n);
     await reader.run();

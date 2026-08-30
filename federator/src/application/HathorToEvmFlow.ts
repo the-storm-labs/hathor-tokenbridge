@@ -1,4 +1,4 @@
-import { toEvmAmount } from '../domain/amounts';
+import { BRIDGE_NORMALISED_DECIMALS, toEvmAmount } from '../domain/amounts';
 import { deriveEvmOriginIdentity } from '../domain/hathorOrigin';
 import { readDestination } from '../domain/bridgePayload';
 import { readBridgedToken } from '../domain/tokenData';
@@ -211,8 +211,17 @@ export class HathorToEvmFlow {
     };
   }
 
-  private async toEvmAmount(hathorAmount: bigint, mapping: TokenMapping): Promise<bigint> {
-    const decimals = await this.deps.bridge.getEvmTokenDecimals(mapping.evmToken);
-    return toEvmAmount(hathorAmount, decimals);
+  /**
+   * Converts a Hathor amount into the bridge's internal unit - 18 decimals, always, regardless of
+   * what the token itself uses.
+   *
+   * Both things this feeds speak that unit: the AllowTokens limits are stored in it, and the
+   * release path divides a voted amount by `10^(18 - tokenDecimals)` to get back to the token's
+   * own scale. Using the token's decimals here instead would vote 10^(18-decimals) too little -
+   * a factor of a million for USDC - and would compare every amount against a limit a million
+   * times larger, so nothing would ever clear the minimum.
+   */
+  private async toEvmAmount(hathorAmount: bigint, _mapping: TokenMapping): Promise<bigint> {
+    return toEvmAmount(hathorAmount, BRIDGE_NORMALISED_DECIMALS);
   }
 }

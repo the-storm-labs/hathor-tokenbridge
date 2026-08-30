@@ -69,3 +69,34 @@ export function toEvmAmount(hathorAmount: bigint, tokenDecimals: number): bigint
   const { factor, hathorHasFewerDecimals } = scaleFactor(tokenDecimals);
   return hathorHasFewerDecimals ? hathorAmount * factor : hathorAmount / factor;
 }
+
+/**
+ * The number of decimals the bridge normalises every amount to internally.
+ *
+ * This is a property of the bridge contracts, not of any token. `receiveTokensTo` scales the
+ * amount up to 18 decimals before checking it against the AllowTokens limits, and the release path
+ * divides a voted amount back down by `10^(18 - tokenDecimals)`. So limits are expressed in this
+ * unit, and so must any amount voted on.
+ *
+ * The `Cross` event, confusingly, carries the amount in the TOKEN'S own decimals - it emits
+ * `amountMinusFees`, not `formattedAmount`. Reading one as the other is off by a factor of
+ * 10^(18-decimals): for USDC, a million.
+ */
+export const BRIDGE_NORMALISED_DECIMALS = 18;
+
+/**
+ * Scales a token-denominated amount into the bridge's internal 18-decimal unit.
+ *
+ * Scales directly, mirroring `amount.mul(10**(18-decimals))` in the contract. Routing it through
+ * Hathor's two decimals instead would lose everything below 0.01 of a token - which for an
+ * 18-decimal token is almost the whole amount.
+ */
+export function toBridgeUnit(tokenAmount: bigint, tokenDecimals: number): bigint {
+  if (!Number.isInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 77) {
+    throw new AmountConversionError(`Token decimals must be an integer in [0, 77], got ${tokenDecimals}.`);
+  }
+  if (tokenDecimals > BRIDGE_NORMALISED_DECIMALS) {
+    return tokenAmount / 10n ** BigInt(tokenDecimals - BRIDGE_NORMALISED_DECIMALS);
+  }
+  return tokenAmount * 10n ** BigInt(BRIDGE_NORMALISED_DECIMALS - tokenDecimals);
+}
