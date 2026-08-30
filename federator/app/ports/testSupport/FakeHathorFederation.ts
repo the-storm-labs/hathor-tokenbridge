@@ -1,3 +1,4 @@
+import type { FederationEvent } from '../../domain/federationEvents';
 import type { HathorFederationPort, ProposalIdentity, SubmitResult } from '../HathorFederationPort';
 
 /**
@@ -46,6 +47,20 @@ export class FakeHathorFederation implements HathorFederationPort {
 
   async getSignatures(): Promise<string[]> {
     return [...this.signatures];
+  }
+
+  /** Events the contract has emitted, keyed by the block they were emitted in. */
+  public readonly events: Array<{ block: number; event: FederationEvent }> = [];
+
+  async getEvents(
+    fromBlock: number,
+    toBlock: number,
+    kinds?: readonly FederationEvent['kind'][],
+  ): Promise<FederationEvent[]> {
+    return this.events
+      .filter((entry) => entry.block >= fromBlock && entry.block <= toBlock)
+      .filter((entry) => !kinds || kinds.includes(entry.event.kind))
+      .map((entry) => entry.event);
   }
 
   private result(kind: 'proposal' | 'signature' | 'outcome'): SubmitResult {

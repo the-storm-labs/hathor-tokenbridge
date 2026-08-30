@@ -6,8 +6,3 @@ export interface ClockPort {
   now(): number;
   sleep(ms: number): Promise<void>;
 }
-
-export const systemClock: ClockPort = {
-  now: () => Date.now(),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};

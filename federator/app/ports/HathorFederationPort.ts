@@ -1,3 +1,4 @@
+import type { FederationEvent } from '../domain/federationEvents';
 import type { TransactionType } from '../domain/transactionTypes';
 
 /**
@@ -51,6 +52,14 @@ export interface HathorFederationPort {
 
   /** Every signature collected so far, in the order the contract stores them. */
   getSignatures(transactionId: string): Promise<string[]>;
+
+  /**
+   * Events the contract emitted in a block range, in the order it emitted them.
+   *
+   * `kinds` narrows the read, which the reader uses to make one pass over lock events before the
+   * general pass - proposals have to be known locally before anything acts on them.
+   */
+  getEvents(fromBlock: number, toBlock: number, kinds?: readonly FederationEvent['kind'][]): Promise<FederationEvent[]>;
 
   submitProposal(identity: ProposalIdentity, txHex: string): Promise<SubmitResult>;
   submitSignature(identity: ProposalIdentity, signature: string): Promise<SubmitResult>;

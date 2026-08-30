@@ -9,6 +9,36 @@
  * Both collapse back into one project in the final phase, when src/ is replaced by app/.
  */
 module.exports = {
+  // Coverage options live at the ROOT, not inside a project. Jest silently ignores
+  // coverageThreshold in a project config - it passed at any number, so the bar was decorative
+  // until this was moved out. Verified by setting it to 99 and watching the run fail.
+  //
+  // Coverage is only meaningful against the code, not the tests or their fixtures. *.contract.ts
+  // files are shared test suites, and walletLib/defaultDriver.ts is the boundary where the library
+  // is driven against a real fullnode - a unit test there could only assert that the library was
+  // called the way that file calls it, so it is verified by the live contract suite instead.
+  collectCoverageFrom: [
+    'app/**/*.ts',
+    '!app/**/*.test.ts',
+    '!app/**/*.contract.ts',
+    '!app/**/testSupport/**',
+    '!app/infra/hathor/walletLib/defaultDriver.ts',
+  ],
+  // collectCoverageFrom decides which files are *added* to the report; a file a test actually
+  // imports is instrumented regardless and needs this to stay out of it.
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/testSupport/',
+    '\\.contract\\.ts$',
+    'walletLib/defaultDriver\\.ts$',
+  ],
+  // Set just under what the tree currently achieves, so a drop fails rather than merely showing up
+  // in a trend. The bars sit below 100 because a handful of defensive fallbacks - a destructuring
+  // default, a `?? '<unknown>'` in an error message, an exhaustiveness `never` branch - are not
+  // reachable from a test worth writing.
+  coverageThreshold: {
+    global: { statements: 98, functions: 96, lines: 98, branches: 93 },
+  },
   projects: [
     {
       displayName: 'legacy',
@@ -22,32 +52,6 @@ module.exports = {
       setupFilesAfterEnv: ['<rootDir>/app/testSupport/jest.setup.ts'],
       transform: {
         '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.app.json' }],
-      },
-      // Coverage is only meaningful against the code, not the tests or their fixtures.
-      // *.contract.ts files are shared test suites, not production code - the same category as
-      // testSupport. Their skip branches only run when a live environment is absent, which would
-      // otherwise show up as permanently uncovered lines in production code.
-      collectCoverageFrom: ['app/**/*.ts', '!app/**/*.test.ts', '!app/**/*.contract.ts', '!app/**/testSupport/**'],
-      // collectCoverageFrom decides which files are *added* to the report; a file a test actually
-      // imports is instrumented regardless and needs this to stay out of it.
-      // defaultDriver.ts is the boundary where wallet-lib is driven against a real fullnode.
-      // Every line of it only means anything with a network behind it, so a unit test there could
-      // assert nothing but "the library was called the way this file calls it". What verifies it
-      // is the live HathorWalletPort contract suite. Excluded so the rest of the adapter can be
-      // held to a real bar instead of the whole file being averaged down.
-      coveragePathIgnorePatterns: [
-        '/node_modules/',
-        '/testSupport/',
-        '\\.contract\\.ts$',
-        'walletLib/defaultDriver\\.ts$',
-      ],
-      // Set just under what the tree currently achieves, so a drop fails rather than merely
-      // showing up in a trend. The bars sit below 100 because a handful of defensive fallbacks -
-      // a destructuring default, a `?? '<unknown>'` in an error message, an injected default
-      // argument every test overrides - are not reachable from a test worth writing. Raise these
-      // as the remaining phases land.
-      coverageThreshold: {
-        global: { statements: 98, functions: 96, lines: 98, branches: 94 },
       },
     },
   ],
