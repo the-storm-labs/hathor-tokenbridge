@@ -1,4 +1,4 @@
-import type { DecodedTx } from '../../domain/types';
+import type { DecodedTx, TxInput, TxOutput } from '../../domain/types';
 import type {
   HathorWalletPort,
   HistoryEntry,
@@ -8,6 +8,35 @@ import type {
   WalletStatus,
 } from '../HathorWalletPort';
 import { WalletOperationError } from '../HathorWalletPort';
+
+const AUTHORITY_TOKEN_DATA = 0b1000_0001;
+const MINT_AUTHORITY = 0b0000_0001n;
+const MELT_AUTHORITY = 0b0000_0010n;
+
+const authorityInput = (token: string, value: bigint): TxInput => ({
+  value,
+  tokenData: AUTHORITY_TOKEN_DATA,
+  script: '',
+  token,
+  decoded: { type: 'MultiSig', address: 'HFakeMultisigAddress0', timelock: null },
+});
+
+const addressInput = (token: string, value: bigint, address: string): TxInput => ({
+  value,
+  tokenData: 1,
+  script: '',
+  token,
+  decoded: { type: 'MultiSig', address, timelock: null },
+});
+
+const addressOutput = (token: string, value: bigint, address: string): TxOutput => ({
+  value,
+  tokenData: 1,
+  script: '',
+  token,
+  decoded: { type: 'P2PKH', address, timelock: null },
+  spentBy: null,
+});
 
 /**
  * An in-memory HathorWalletPort for testing everything above the port.
@@ -26,7 +55,11 @@ export class FakeHathorWallet implements HathorWalletPort {
   public readonly addresses: string[] = ['HFakeMultisigAddress0', 'HFakeMultisigAddress1'];
   public history: HistoryEntry[] = [];
   public confirmations = new Map<string, number>();
-  /** Decode results keyed by txHex; a hex with no entry decodes to an empty transaction. */
+  /**
+   * Decode results keyed by txHex. Proposals this wallet builds register their own, modelling a
+   * real wallet that hands back a transaction which actually decodes to what was asked for; a hex
+   * with no entry decodes to an empty transaction.
+   */
   public decoded = new Map<string, DecodedTx>();
   /** Signature this wallet produces, keyed by txHex. */
   public signatures = new Map<string, string>();
@@ -100,19 +133,39 @@ export class FakeHathorWallet implements HathorWalletPort {
   async createMintProposal(request: MintProposalRequest): Promise<string> {
     this.assertReady();
     this.proposals.push({ kind: 'mint', ...request });
-    return `mint-proposal-${this.nextProposalId++}`;
+    const txHex = `mint-proposal-${this.nextProposalId++}`;
+    this.decoded.set(txHex, {
+      inputs: [authorityInput(request.token, MINT_AUTHORITY)],
+      outputs: [addressOutput(request.token, request.amount, request.receiverAddress)],
+    });
+    return txHex;
   }
 
   async createMeltProposal(request: MeltProposalRequest): Promise<string> {
     this.assertReady();
     this.proposals.push({ kind: 'melt', ...request });
-    return `melt-proposal-${this.nextProposalId++}`;
+    const txHex = `melt-proposal-${this.nextProposalId++}`;
+    this.decoded.set(txHex, {
+      inputs: [
+        authorityInput(request.token, MELT_AUTHORITY),
+        addressInput(request.token, request.amount, request.fixedAddress),
+      ],
+      outputs: [],
+    });
+    return txHex;
   }
 
   async createTransferProposal(request: TransferProposalRequest): Promise<string> {
     this.assertReady();
     this.proposals.push({ kind: 'transfer', ...request });
-    return `transfer-proposal-${this.nextProposalId++}`;
+    const txHex = `transfer-proposal-${this.nextProposalId++}`;
+    const total = request.outputs.reduce((sum, output) => sum + output.value, 0n);
+    const token = request.outputs[0]?.token ?? '';
+    this.decoded.set(txHex, {
+      inputs: [addressInput(token, total, request.fixedAddress)],
+      outputs: request.outputs.map((output) => addressOutput(output.token, output.value, output.address)),
+    });
+    return txHex;
   }
 
   async getMySignatures(txHex: string): Promise<string> {
