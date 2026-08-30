@@ -23,6 +23,12 @@ module.exports = {
     '!app/**/*.contract.ts',
     '!app/**/testSupport/**',
     '!app/infra/hathor/walletLib/defaultDriver.ts',
+    // Two more boundaries where a unit test could only restate the file. main.ts is the process
+    // bootstrap - signals, exit codes and boot order, verified by running it. EvmTransactionSender
+    // is gas estimation and signing against a live node; the composition root that builds it is
+    // covered, and what it does is verified against a chain.
+    '!app/main.ts',
+    '!app/infra/evm/EvmTransactionSender.ts',
   ],
   // collectCoverageFrom decides which files are *added* to the report; a file a test actually
   // imports is instrumented regardless and needs this to stay out of it.
@@ -31,13 +37,15 @@ module.exports = {
     '/testSupport/',
     '\\.contract\\.ts$',
     'walletLib/defaultDriver\\.ts$',
+    'app/main\\.ts$',
+    'EvmTransactionSender\\.ts$',
   ],
   // Set just under what the tree currently achieves, so a drop fails rather than merely showing up
   // in a trend. The bars sit below 100 because a handful of defensive fallbacks - a destructuring
   // default, a `?? '<unknown>'` in an error message, an exhaustiveness `never` branch - are not
   // reachable from a test worth writing.
   coverageThreshold: {
-    global: { statements: 98, functions: 96, lines: 98, branches: 93 },
+    global: { statements: 98, functions: 96, lines: 98, branches: 95 },
   },
   projects: [
     {

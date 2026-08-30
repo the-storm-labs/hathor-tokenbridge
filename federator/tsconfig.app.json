@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "outDir": "./built-app",
-    "rootDir": "./app",
+    // No rootDir: the contract ABIs live in ../bridge/abi, outside app/, and pinning the root
+    // here would reject them. The legacy tsconfig does the same.
 
     // ES2022 (not the es6 of tsconfig.json): bigint literals and BigInt statics are a hard
     // prerequisite here - @hathor/wallet-lib 4.x types every output value as bigint.
