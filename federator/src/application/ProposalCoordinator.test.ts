@@ -309,6 +309,44 @@ describe('ProposalCoordinator: pushing', () => {
   });
 });
 
+describe('ProposalCoordinator: in-process de-duplication', () => {
+  // Two schedulers can both call coordinate() for the same transfer within the same process - see
+  // the class doc on `coordinate`. Without a guard, both would read "not yet processed" and both
+  // act, which for a push means both broadcast and Hathor lets only one spend the inputs.
+
+  it('joins an already-in-flight advance instead of repeating propose/sign/push', async () => {
+    const { coordinator, federation, strategy } = await build();
+
+    const [first, second] = await Promise.all([
+      coordinator.coordinate(IDENTITY, strategy),
+      coordinator.coordinate(IDENTITY, strategy),
+    ]);
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    // Only one proposal was ever built and submitted - the second caller joined the first's
+    // promise rather than redoing the step against state that was about to go stale.
+    expect(strategy.build).toHaveBeenCalledTimes(1);
+    expect(federation.submitted).toHaveLength(1);
+  });
+
+  it('advances the same transfer again on a later, separate call once the first has settled', async () => {
+    const { coordinator, federation, strategy, wallet } = await build();
+
+    expect(await coordinator.coordinate(IDENTITY, strategy)).toBe(true);
+    expect(federation.submitted).toHaveLength(1);
+    expect(federation.submitted[0]?.kind).toBe('proposal');
+
+    // Proves the in-flight entry was cleared once the first call settled: a genuinely later call
+    // (the next poll finding the proposal it just made) advances to the next step instead of
+    // being stuck behind a stale entry.
+    wallet.signatures.set(federation.proposedTxHex as string, sig('pubA'));
+    expect(await coordinator.coordinate(IDENTITY, strategy)).toBe(true);
+    expect(federation.submitted).toHaveLength(2);
+    expect(federation.submitted[1]?.kind).toBe('signature');
+  });
+});
+
 describe('ProposalCoordinator: metrics honesty', () => {
   it('does not count a failed proposal as both a success and a failure', async () => {
     // The previous code bumped the success counter before inspecting the receipt.

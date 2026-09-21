@@ -67,6 +67,13 @@ export class ProposalCoordinator {
   private readonly clock: ClockPort;
   private readonly options: Required<ProposalCoordinatorOptions>;
 
+  /**
+   * Advances currently running in this process, keyed by transactionId - see `coordinate`.
+   * Entries remove themselves once settled, so this never grows with the number of transfers ever
+   * seen, only with the number outstanding at any instant.
+   */
+  private readonly inFlight = new Map<string, Promise<boolean>>();
+
   constructor(deps: ProposalCoordinatorDeps) {
     this.wallet = deps.wallet;
     this.federation = deps.federation;
@@ -79,12 +86,42 @@ export class ProposalCoordinator {
   /**
    * Advances one transfer by whatever step the contract state says is outstanding.
    *
+   * Two schedulers can reach this for the same transfer within the same process: the reader that
+   * watches the transfer's own origin keeps re-finding it every poll until its cursor moves past
+   * it, and the reader that watches the HathorFederation coordination contract reacts to this
+   * federator's own proposal or signature exactly as it would to a peer's. Both are legitimate
+   * re-entry points - any event on that contract is an invitation to redo whatever step is
+   * outstanding - but neither knows the other is mid-flight for the SAME transactionId, and the
+   * contract state they both check does not flip to "processed" until after a push actually
+   * settles. Without a guard, both see "signed, not yet processed" and both push, and Hathor lets
+   * only one of them spend the inputs - the loser logs a scary but harmless "already spent" error.
+   * A second caller here joins the first's in-flight promise instead of repeating propose/sign/push
+   * against state that is about to go stale.
+   *
    * @returns whether the transfer is in a good state - false only when a proposal was built but
    *          failed validation, which is a refusal to propose rather than an error.
    */
   async coordinate(identity: ProposalIdentity, strategy: ProposalStrategy): Promise<boolean> {
     const transactionId = await this.federation.getTransactionId(identity);
 
+    const inFlight = this.inFlight.get(transactionId);
+    if (inFlight) {
+      this.logger.debug(`Transfer ${transactionId} is already being advanced in this process; joining that call.`);
+      return inFlight;
+    }
+
+    const run = this.coordinateOnce(identity, transactionId, strategy).finally(() => {
+      this.inFlight.delete(transactionId);
+    });
+    this.inFlight.set(transactionId, run);
+    return run;
+  }
+
+  private async coordinateOnce(
+    identity: ProposalIdentity,
+    transactionId: string,
+    strategy: ProposalStrategy,
+  ): Promise<boolean> {
     if (await this.federation.isProcessed(transactionId)) {
       this.logger.debug(`Transfer ${transactionId} is already processed.`);
       return true;
