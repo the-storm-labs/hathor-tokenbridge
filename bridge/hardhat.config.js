@@ -178,6 +178,21 @@ module.exports = {
       },
       tags: ['staging'],
     },
+    // Same chain as sepolia_arbitrum, under its own name so its deployments land in their own folder
+    // instead of being resolved against the 2024 1-of-1 set. The 2-of-3 federator testnet, see
+    // local/testnet-multi/README.md.
+    sepolia_arbitrum_multi: {
+      live: false,
+      url: 'https://arbitrum-sepolia.infura.io/v3/' + INFURA_PROJECT_ID,
+      network_id: chains.SEPOLIA_ARBITRUM_TEST_NET_CHAIN_ID,
+      token_symbol: 'e',
+      gas: "auto",
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: MNEMONIC,
+      },
+      tags: ['staging'],
+    },
     holesky: {
       live: false,
       url: 'https://holesky.infura.io/v3/' + INFURA_PROJECT_ID,

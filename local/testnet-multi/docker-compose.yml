@@ -1,0 +1,49 @@
+# Three federators, 2-of-3, against Arbitrum Sepolia + Hathor testnet. See README.md.
+#
+# Built from this checkout, not pulled, so a change to the federator is under test the moment it is
+# rebuilt. Each federator gets its own volume: cursors and logs must never be shared, or one
+# federator's progress silently becomes another's.
+
+x-federator: &federator
+  build:
+    context: ../..
+  image: hathor-tokenbridge:testnet-multi
+  restart: unless-stopped
+  # A cold start rebuilds all Hathor history in memory; give a stop time to finish cleanly.
+  stop_grace_period: 60s
+
+services:
+  fed1:
+    <<: *federator
+    container_name: testnet_multi_fed1
+    env_file: [shared.env, fed1.identity.env]
+    environment: &runtime
+      STORAGE_PATH: /app/db
+      LOG_FILE: /var/log/federator.log
+      ENDPOINTS_PORT: "5000"
+    ports: ["5001:5000"]
+    volumes: [fed1_db:/app/db, fed1_log:/var/log]
+
+  fed2:
+    <<: *federator
+    container_name: testnet_multi_fed2
+    env_file: [shared.env, fed2.identity.env]
+    environment: *runtime
+    ports: ["5002:5000"]
+    volumes: [fed2_db:/app/db, fed2_log:/var/log]
+
+  fed3:
+    <<: *federator
+    container_name: testnet_multi_fed3
+    env_file: [shared.env, fed3.identity.env]
+    environment: *runtime
+    ports: ["5003:5000"]
+    volumes: [fed3_db:/app/db, fed3_log:/var/log]
+
+volumes:
+  fed1_db:
+  fed1_log:
+  fed2_db:
+  fed2_log:
+  fed3_db:
+  fed3_log:
