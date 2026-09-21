@@ -62,7 +62,9 @@ async function main(mode) {
     console.log(`HTR balance:        ${balance} (hundredths)`);
     console.log(`multisig address:   ${multisig}`);
     if (mode === 'address') return;
-    if (mode === 'return') return returnToEvm(wallet);
+    // await, not a bare return: the finally below stops the wallet and wipes its storage, and would
+    // otherwise run while the send is still in flight.
+    if (mode === 'return') return await returnToEvm(wallet);
 
     let uid = process.env.HUSDC_UID;
     if (uid) {
