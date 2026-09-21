@@ -183,7 +183,8 @@ module.exports = {
     // local/testnet-multi/README.md.
     sepolia_arbitrum_multi: {
       live: false,
-      url: 'https://arbitrum-sepolia.infura.io/v3/' + INFURA_PROJECT_ID,
+      // Not Infura-bound: the public endpoint is enough to deploy; set ARB_SEPOLIA_RPC to use another.
+      url: process.env.ARB_SEPOLIA_RPC || 'https://sepolia-rollup.arbitrum.io/rpc',
       network_id: chains.SEPOLIA_ARBITRUM_TEST_NET_CHAIN_ID,
       token_symbol: 'e',
       gas: "auto",

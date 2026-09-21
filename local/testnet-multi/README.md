@@ -34,19 +34,23 @@ anything else: they are testnet-only, but losing one strands whatever the multis
 
 ## Setup
 
-### 1. What you have to supply
+### 1. Keys and funds
 
-- **The deployer mnemonic**, as `bridge/mnemonic.key` and `../hathor-federation/mnemonic.key`. The
-  deployer is index 0, and it owns everything through a 1-of-1 MultiSig.
-- **An Infura project id**, as `infura.key` in both repos. Both networks build the Infura URL from it.
-- **Arbitrum Sepolia ETH:**
-  - on the deployer. It needs **more than 1.1 ETH of balance** only because
-    `../hathor-federation/hardhat.config.js` pins `gasPrice: 160 gwei` with `gas: 6700000`: the
-    balance has to cover gasLimit × gasPrice up front, even though Arbitrum only charges the base
-    fee. Either fund it, or lower that gasPrice locally for the deploy.
-  - a little on each of the three federator addresses in `public.json`. They pay for votes,
-    proposals and signatures.
-- **Testnet HTR**, just over 100 HTR, sent to `WSU3yq3f7r31JsiPHe1jPwE5zVv3BQCxnS`.
+- **Deployer**: `0x0041ed2AF1754655cA220eC44eda020a52A14aeD`. It is index 0 of a mnemonic generated
+  with `cast wallet new-mnemonic`, stored as `bridge/mnemonic.key` and
+  `../hathor-federation/mnemonic.key` (both gitignored). It owns everything through a 1-of-1 MultiSig.
+- **RPC.** Neither network used here needs Infura: `sepolia_arbitrum_multi` (bridge) and
+  `arbitrum_sepolia_multi` (hathor-federation) default to the public
+  `https://sepolia-rollup.arbitrum.io/rpc`. Set `ARB_SEPOLIA_RPC` to use another endpoint.
+- **Arbitrum Sepolia ETH.** It came from Sepolia through the Arbitrum Inbox
+  (`0xaAe29B0366299461418F5324a79Afc425BE5ae21`, `depositEth()`). Arrival takes ~10-15 min, and the
+  ETH lands at the same address on L2. From there it is split between the deployer and the three
+  federators. On Arbitrum Sepolia the whole deploy costs a few thousandths of an ETH.
+  `arbitrum_sepolia_multi` exists in hathor-federation for exactly this reason: the old
+  `arbitrum_sepolia` there pins `gasPrice: 160 gwei` with `gas: 6700000`, which demands ~1.07 ETH of
+  balance up front.
+- **Testnet HTR** for the bootstrap wallet. It came from the old 1-of-1 testnet multisig
+  (`wYr7GUqHFDCan2WBN1f6JPJYUWPtpVhb22`), which holds plenty.
 
 ### 2. EVM contracts
 
@@ -66,7 +70,7 @@ The setup script is idempotent. It:
 
 From `../hathor-federation`, with the deployer address filled into a copy of the params file:
 
-    npx hardhat ignition deploy ignition/modules/Federation.js --network arbitrum_sepolia \
+    npx hardhat ignition deploy ignition/modules/Federation.js --network arbitrum_sepolia_multi \
       --parameters <path>/hathor-federation.params.json --deployment-id testnet-multi
 
 **`--deployment-id` is required.** `ignition/deployments/chain-421614` already holds the earlier
@@ -82,7 +86,12 @@ From this directory:
     NODE_PATH=../../federator/node_modules node hathor-bootstrap.js run
 
 This creates hUSDC with its mint and melt authorities at the multisig, and sends 100 HTR to the
-multisig for the 1% mint deposit. Then map the token on the bridge, from `bridge/`:
+multisig for the 1% mint deposit.
+
+**Done on 2026-09-21.** hUSDC uid: `00a83f5072386920b3ee4e843f71e2f1c1c9545b96346af0df32bf332605a2d0`.
+The multisig holds its MINT and MELT authorities plus 100 HTR (tx `00f304f7…`).
+
+Then map the token on the bridge, from `bridge/`:
 
     HATHOR_TOKEN_UID=<uid> npx hardhat run ./hardhat/script/setupTestnetMulti.js --network sepolia_arbitrum_multi
 

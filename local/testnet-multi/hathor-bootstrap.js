@@ -83,6 +83,13 @@ async function main(mode) {
       });
       uid = tx.hash;
       console.log(`hUSDC created, uid: ${uid}`);
+      // The creation spent the whole HTR UTXO; its change only becomes spendable once the wallet
+      // has seen its own transaction come back over the websocket. Sending before that fails with
+      // "Insufficient amount of tokens".
+      for (let i = 0; (await htrBalance(wallet)) < HTR_TO_MULTISIG; i++) {
+        if (i > 120) throw new Error('the token creation change never became spendable');
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
 
     const funding = await wallet.sendTransaction(multisig, HTR_TO_MULTISIG, { pinCode: 'bootstrap' });
