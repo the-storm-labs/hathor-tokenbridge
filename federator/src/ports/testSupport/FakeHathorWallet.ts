@@ -1,5 +1,6 @@
 import type { DecodedTx, TxInput, TxOutput } from '../../domain/types';
 import type {
+  AuthorityKind,
   HathorWalletPort,
   HistoryEntry,
   MeltProposalRequest,
@@ -20,6 +21,24 @@ const authorityInput = (token: string, value: bigint): TxInput => ({
   token,
   decoded: { type: 'MultiSig', address: 'HFakeMultisigAddress0', timelock: null },
 });
+
+/**
+ * An authority output as the wallet-lib builds it: to the given address, bit field as value. It
+ * always goes to the proposal's fixedAddress, one of this wallet's own, so it decodes as `mine`.
+ */
+const authorityOutput = (token: string, value: bigint, address: string): TxOutput => ({
+  value,
+  tokenData: AUTHORITY_TOKEN_DATA,
+  script: '',
+  token,
+  decoded: { type: 'MultiSig', address, timelock: null },
+  spentBy: null,
+  mine: true,
+});
+
+/** The recreated authority, plus one more when the request asks for it. */
+const authorityOutputs = (token: string, value: bigint, address: string, extra: boolean | undefined) =>
+  Array.from({ length: extra === true ? 2 : 1 }, () => authorityOutput(token, value, address));
 
 const addressInput = (token: string, value: bigint, address: string): TxInput => ({
   value,
@@ -67,6 +86,8 @@ export class FakeHathorWallet implements HathorWalletPort {
   public pushFailure?: string;
   public lockedInputs: Array<{ txHex: string; ttlMs: number }> = [];
   public pushed: Array<{ txHex: string; signatures: readonly string[] }> = [];
+  /** Authorities held, keyed by `token:kind`. Unset means one - what a freshly bridged token has. */
+  public authorityCounts = new Map<string, number>();
   public proposals: Array<
     | ({ kind: 'mint' } & MintProposalRequest)
     | ({ kind: 'melt' } & MeltProposalRequest)
@@ -130,13 +151,21 @@ export class FakeHathorWallet implements HathorWalletPort {
     return this.decoded.get(txHex) ?? { inputs: [], outputs: [] };
   }
 
+  async countAuthorities(token: string, kind: AuthorityKind): Promise<number> {
+    this.assertReady();
+    return this.authorityCounts.get(`${token}:${kind}`) ?? 1;
+  }
+
   async createMintProposal(request: MintProposalRequest): Promise<string> {
     this.assertReady();
     this.proposals.push({ kind: 'mint', ...request });
     const txHex = `mint-proposal-${this.nextProposalId++}`;
     this.decoded.set(txHex, {
       inputs: [authorityInput(request.token, MINT_AUTHORITY)],
-      outputs: [addressOutput(request.token, request.amount, request.receiverAddress)],
+      outputs: [
+        addressOutput(request.token, request.amount, request.receiverAddress),
+        ...authorityOutputs(request.token, MINT_AUTHORITY, request.fixedAddress, request.extraAuthority),
+      ],
     });
     return txHex;
   }
@@ -150,7 +179,7 @@ export class FakeHathorWallet implements HathorWalletPort {
         authorityInput(request.token, MELT_AUTHORITY),
         addressInput(request.token, request.amount, request.fixedAddress),
       ],
-      outputs: [],
+      outputs: authorityOutputs(request.token, MELT_AUTHORITY, request.fixedAddress, request.extraAuthority),
     });
     return txHex;
   }

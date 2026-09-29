@@ -1,6 +1,14 @@
 import { InvalidTransactionError } from '../errors';
-import { assertNoForeignTokenOutputs, balanceOf, sumByAddressAndToken, transactionEffect } from '../tokenData';
-import type { DecodedTx } from '../types';
+import {
+  assertNoForeignTokenOutputs,
+  balanceOf,
+  isAuthority,
+  isMeltAuthority,
+  isMintAuthority,
+  sumByAddressAndToken,
+  transactionEffect,
+} from '../tokenData';
+import type { DecodedTx, TxOutput } from '../types';
 
 /**
  * Whether a proposed Hathor transaction faithfully represents the cross-chain transfer it claims
@@ -37,8 +45,63 @@ export interface TransferExpectation {
 }
 
 /**
- * A mint proposal must hold the mint authority, create tokens rather than move or destroy them,
- * and create exactly the amount that was locked on the EVM side.
+ * Most authority outputs a mint or melt may carry: the one it recreates, plus the one the
+ * authority pool (HATHOR_AUTHORITY_POOL_TARGET) adds.
+ */
+export const MAX_AUTHORITY_OUTPUTS = 2;
+
+/**
+ * Every authority output of a mint or melt proposal must stay with the multisig, for the token
+ * being operated on, of the kind the proposal spends. `transactionEffect` skips authority outputs
+ * entirely, so without this a proposal could hand the recreated authority - the power to mint or
+ * melt that token forever - to any address, and every federator would sign it.
+ *
+ * Deliberately independent of this federator's own pool setting: a proposer that grows the pool
+ * and one that does not must both be signable, or the setting could not be rolled out one
+ * federator at a time. Zero is refused because the authority would be destroyed; more than
+ * MAX_AUTHORITY_OUTPUTS because it would be inflating the pool past what any proposer builds.
+ */
+function validateAuthorityOutputs(
+  outputs: readonly TxOutput[],
+  token: string,
+  kind: 'mint' | 'melt',
+): ValidationResult {
+  const authorities = outputs.filter((output) => isAuthority(output.tokenData));
+
+  for (const output of authorities) {
+    if (output.token !== token) {
+      return fail(`The proposal creates an authority for token ${output.token}, not ${token}.`);
+    }
+    const grantsMint = isMintAuthority(output.tokenData, output.value);
+    const grantsMelt = isMeltAuthority(output.tokenData, output.value);
+    if (kind === 'mint' ? !grantsMint || grantsMelt : !grantsMelt || grantsMint) {
+      return fail(`The ${kind} proposal creates an authority other than a ${kind} authority for ${token}.`);
+    }
+    if (output.mine !== true) {
+      return fail(
+        `The ${kind} proposal sends a ${kind} authority for ${token} to ${
+          output.decoded.address ?? 'an unknown address'
+        }, ` + 'which is not the multisig.',
+      );
+    }
+  }
+
+  if (authorities.length === 0) {
+    return fail(`The ${kind} proposal does not recreate the ${kind} authority for ${token}.`);
+  }
+  if (authorities.length > MAX_AUTHORITY_OUTPUTS) {
+    return fail(
+      `The ${kind} proposal creates ${authorities.length} ${kind} authorities for ${token}; at most ` +
+        `${MAX_AUTHORITY_OUTPUTS} are allowed.`,
+    );
+  }
+  return ok;
+}
+
+/**
+ * A mint proposal must hold the mint authority, keep every mint authority it creates with the
+ * multisig, create tokens rather than move or destroy them, and create exactly the amount that
+ * was locked on the EVM side.
  */
 export function validateMintProposal(proposal: DecodedTx, expected: MintExpectation): ValidationResult {
   try {
@@ -51,6 +114,11 @@ export function validateMintProposal(proposal: DecodedTx, expected: MintExpectat
 
   if (!effect.canMint.has(expected.token)) {
     return fail(`The multisig does not hold the mint authority for token ${expected.token}.`);
+  }
+
+  const authorities = validateAuthorityOutputs(proposal.outputs, expected.token, 'mint');
+  if (!authorities.valid) {
+    return authorities;
   }
 
   const balance = balanceOf(effect, expected.token);
@@ -67,8 +135,8 @@ export function validateMintProposal(proposal: DecodedTx, expected: MintExpectat
 }
 
 /**
- * A melt proposal must hold the melt authority and destroy exactly the amount that arrived at the
- * multisig on Hathor.
+ * A melt proposal must hold the melt authority, keep every melt authority it creates with the
+ * multisig, and destroy exactly the amount that arrived at the multisig on Hathor.
  *
  * Note the asymmetry with mint and transfer: no foreign-token-output check runs here, because the
  * melt path never had one. Preserved deliberately during extraction rather than quietly widened;
@@ -79,6 +147,11 @@ export function validateMeltProposal(proposal: DecodedTx, expected: MeltExpectat
 
   if (!effect.canMelt.has(expected.token)) {
     return fail(`The multisig does not hold the melt authority for token ${expected.token}.`);
+  }
+
+  const authorities = validateAuthorityOutputs(proposal.outputs, expected.token, 'melt');
+  if (!authorities.valid) {
+    return authorities;
   }
 
   const balance = balanceOf(effect, expected.token);

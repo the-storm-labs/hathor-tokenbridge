@@ -43,9 +43,28 @@ export class StubLibWallet {
 
   /** The hex a prepared proposal reports; set per test. */
   public proposalHex = 'deadbeef';
+  /**
+   * A real, unsigned Transaction for the prepared proposal, when a test needs the adapter to act on
+   * its outputs (the authority pool appends one). Wins over proposalHex.
+   */
+  public proposalTx?: { toHex(): string; outputs: unknown[] };
+  /** Authority utxos per kind, as getMintAuthority/getMeltAuthority return them. */
+  public mintAuthorities: unknown[] = [{}];
+  public meltAuthorities: unknown[] = [{}];
+  public readonly authorityQueries: Array<[string, string, Record<string, unknown>]> = [];
 
   private proposal() {
-    return { toHex: () => this.proposalHex };
+    return this.proposalTx ?? { toHex: () => this.proposalHex };
+  }
+
+  async getMintAuthority(token: string, options: Record<string, unknown>) {
+    this.authorityQueries.push([token, 'mint', options]);
+    return this.mintAuthorities;
+  }
+
+  async getMeltAuthority(token: string, options: Record<string, unknown>) {
+    this.authorityQueries.push([token, 'melt', options]);
+    return this.meltAuthorities;
   }
 
   /**

@@ -248,4 +248,31 @@ describe('loadConfig', () => {
       expect(issues.join('\n')).toMatch(/must be set together/);
     });
   });
+
+  describe('HATHOR_AUTHORITY_POOL_TARGET', () => {
+    it('is off unless set', () => {
+      expect(loadConfig(validEnv()).hathor.authorityPoolTarget).toBe(0);
+    });
+
+    it('reads a target', () => {
+      expect(loadConfig(validEnv({ HATHOR_AUTHORITY_POOL_TARGET: '5' })).hathor.authorityPoolTarget).toBe(5);
+    });
+
+    it('rejects a negative target', () => {
+      expect(issuesFrom(validEnv({ HATHOR_AUTHORITY_POOL_TARGET: '-1' })).join('\n')).toMatch(
+        /HATHOR_AUTHORITY_POOL_TARGET must not be negative/,
+      );
+    });
+
+    it('refuses a target with the headless adapter, which cannot add the output', () => {
+      const issues = issuesFrom(
+        validEnv({
+          HATHOR_HEADLESS_URL: 'http://localhost:8000',
+          HATHOR_HEADLESS_API_KEY: 'k',
+          HATHOR_AUTHORITY_POOL_TARGET: '3',
+        }),
+      );
+      expect(issues.join('\n')).toMatch(/needs the wallet-lib adapter/);
+    });
+  });
 });

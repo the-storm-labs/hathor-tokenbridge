@@ -91,6 +91,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     issues.push('HATHOR_HEADLESS_URL and HATHOR_HEADLESS_API_KEY must be set together, or not at all.');
   }
 
+  // Only the wallet-lib adapter can add the extra authority output; the transitional headless one
+  // cannot, so refuse the combination at boot rather than at the first mint.
+  if (hasHeadlessUrl && e.HATHOR_AUTHORITY_POOL_TARGET > 0) {
+    issues.push('HATHOR_AUTHORITY_POOL_TARGET needs the wallet-lib adapter; unset HATHOR_HEADLESS_URL or set it to 0.');
+  }
+
   if (issues.length > 0) {
     throw new ConfigError(issues);
   }
@@ -135,6 +141,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       pushTimeoutMs: e.HATHOR_PUSH_TIMEOUT_MS,
       inputLockTtlMs: e.HATHOR_INPUT_LOCK_TTL_MS,
       fromTimestamp: e.HATHOR_FROM_TIMESTAMP,
+      authorityPoolTarget: e.HATHOR_AUTHORITY_POOL_TARGET,
       headless,
     },
     federator: {

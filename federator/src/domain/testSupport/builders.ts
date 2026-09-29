@@ -42,6 +42,15 @@ export function meltAuthorityInput(token = 'TOKEN'): TxInput {
   return input({ token, tokenData: AUTHORITY_TOKEN_DATA, value: MELT_AUTHORITY_VALUE });
 }
 
+/** An authority output kept by the multisig - what every real mint or melt recreates. */
+export function mintAuthorityOutput(overrides: Partial<TxOutput> = {}): TxOutput {
+  return output({ tokenData: AUTHORITY_TOKEN_DATA, value: MINT_AUTHORITY_VALUE, mine: true, ...overrides });
+}
+
+export function meltAuthorityOutput(overrides: Partial<TxOutput> = {}): TxOutput {
+  return output({ tokenData: AUTHORITY_TOKEN_DATA, value: MELT_AUTHORITY_VALUE, mine: true, ...overrides });
+}
+
 export function tx(overrides: Partial<DecodedTx> = {}): DecodedTx {
   return { version: 1, isVoided: false, inputs: [], outputs: [], ...overrides };
 }

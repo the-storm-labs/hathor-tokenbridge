@@ -10,6 +10,7 @@ import type { AllowTokensPort, BridgePort, TokenMapping } from '../ports/BridgeP
 import type { ProposalIdentity } from '../ports/HathorFederationPort';
 import type { HathorWalletPort, HistoryEntry } from '../ports/HathorWalletPort';
 import type { LoggerPort } from '../ports/LoggerPort';
+import { shouldGrowAuthorityPool } from './authorityPool';
 import type { EvmVoter } from './EvmVoter';
 import type { ProposalCoordinator, ProposalStrategy } from './ProposalCoordinator';
 
@@ -37,6 +38,8 @@ export interface HathorToEvmFlowDeps {
   /** Confirmations required before acting, multiplied by this federator's order. */
   readonly minConfirmations: number;
   readonly multisigOrder: number;
+  /** HATHOR_AUTHORITY_POOL_TARGET: melt authorities to grow the multisig's pool to; 0 = off. */
+  readonly authorityPoolTarget?: number | undefined;
 }
 
 export class HathorToEvmFlow {
@@ -194,7 +197,7 @@ export class HathorToEvmFlow {
   }
 
   private meltStrategy(hathorTxId: string, mapping: TokenMapping): ProposalStrategy {
-    const { wallet, inputLockTtlMs } = this.deps;
+    const { wallet, logger, inputLockTtlMs, authorityPoolTarget = 0 } = this.deps;
 
     return {
       build: async (identity) =>
@@ -204,6 +207,13 @@ export class HathorToEvmFlow {
           markInputsAsUsed: true,
           inputLockTtlMs,
           fixedAddress: await wallet.getAddressAtIndex(0),
+          extraAuthority: await shouldGrowAuthorityPool(
+            wallet,
+            logger,
+            mapping.hathorToken,
+            'melt',
+            authorityPoolTarget,
+          ),
         }),
 
       validate: async (txHex): Promise<ValidationResult> => {

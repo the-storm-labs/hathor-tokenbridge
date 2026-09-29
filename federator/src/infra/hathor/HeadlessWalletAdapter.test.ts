@@ -272,6 +272,23 @@ describe('HeadlessWalletAdapter proposals', () => {
     fixedAddress: 'HFIXED',
   };
 
+  it('refuses the authority pool, which only the wallet-lib adapter can build', async () => {
+    const http = new StubHttpClient();
+    const { adapter } = adapterWith(http);
+
+    await expect(
+      adapter.createMintProposal({
+        ...proposalOptions,
+        token: 'TOKEN',
+        amount: 500n,
+        receiverAddress: 'HRECV',
+        extraAuthority: true,
+      }),
+    ).rejects.toThrow(/cannot add an extra authority output/);
+    await expect(adapter.countAuthorities('TOKEN', 'melt')).rejects.toThrow(/does not support the authority pool/);
+    expect(http.requestsTo('POST', 'wallet/p2sh/tx-proposal/mint-tokens')).toEqual([]);
+  });
+
   it('pins change and mint authority to the fixed address', async () => {
     const http = new StubHttpClient().on(
       'POST',

@@ -144,6 +144,7 @@ export function buildFederator(config: AppConfig): Federator {
     logger: new Log4jsLogger('EVM_TO_HATHOR'),
     evmChainId: config.evm.chainId,
     inputLockTtlMs: config.hathor.inputLockTtlMs,
+    authorityPoolTarget: config.hathor.authorityPoolTarget,
   });
 
   const hathorToEvm = new HathorToEvmFlow({
@@ -158,6 +159,7 @@ export function buildFederator(config: AppConfig): Federator {
     inputLockTtlMs: config.hathor.inputLockTtlMs,
     minConfirmations: config.hathor.minConfirmations,
     multisigOrder: config.hathor.multisig.order,
+    authorityPoolTarget: config.hathor.authorityPoolTarget,
   });
 
   // ---- services -------------------------------------------------------------------------------

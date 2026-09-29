@@ -57,6 +57,7 @@ services:
       # Milliseconds, and it goes straight into a timer. The old HATHOR_INPUT_BLOCK_TTL example of
       # `1` meant one millisecond, which is no input lock at all.
       HATHOR_INPUT_LOCK_TTL_MS: "${HATHOR_INPUT_LOCK_TTL_MS:-1800000}"
+      HATHOR_AUTHORITY_POOL_TARGET: "${HATHOR_AUTHORITY_POOL_TARGET:-0}"
       HATHOR_FROM_TIMESTAMP: "${HATHOR_LAST_TIMESTAMP}"
 
       # ---- Rollout switch ----

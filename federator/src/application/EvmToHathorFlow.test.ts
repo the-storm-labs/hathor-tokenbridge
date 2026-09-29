@@ -33,7 +33,7 @@ function crossEvent(overrides: Partial<CrossEvent> = {}): CrossEvent {
   };
 }
 
-async function build() {
+async function build(options: { authorityPoolTarget?: number | undefined } = {}) {
   const wallet = new FakeHathorWallet();
   await wallet.start();
   const bridge = new FakeBridge().addMapping(EVM_NATIVE).addMapping(HATHOR_NATIVE);
@@ -57,6 +57,7 @@ async function build() {
     logger,
     evmChainId: EVM_CHAIN_ID,
     inputLockTtlMs: 1_800_000,
+    authorityPoolTarget: options.authorityPoolTarget,
   });
 
   return { flow, wallet, bridge, federation, logger, metrics };
@@ -168,6 +169,15 @@ describe('EvmToHathorFlow', () => {
           token: EVM_NATIVE.hathorToken,
           decoded: { type: 'P2PKH', address: RECEIVER, timelock: null },
         },
+        // The recreated mint authority, kept by the multisig: only the amount is tampered with.
+        {
+          value: 1n,
+          tokenData: 0b1000_0001,
+          script: '',
+          token: EVM_NATIVE.hathorToken,
+          decoded: { type: 'MultiSig', address: 'HFakeMultisigAddress0', timelock: null },
+          mine: true,
+        },
       ],
     });
 
@@ -212,5 +222,39 @@ describe('EvmToHathorFlow', () => {
         transactionHash: TX_HASH,
       }),
     ).rejects.toThrow(/pays 0 .* to HREALRECEIVER/);
+  });
+});
+
+describe('EvmToHathorFlow: the mint authority pool', () => {
+  async function mintOnce(authorityPoolTarget: number | undefined, held?: number) {
+    const context = await build({ authorityPoolTarget });
+    if (held !== undefined) {
+      context.wallet.authorityCounts.set(`${EVM_NATIVE.hathorToken}:mint`, held);
+    }
+    context.bridge.crossEvents.push(crossEvent());
+    await context.flow.transfer({
+      senderAddress: '0xSENDER',
+      receiverAddress: RECEIVER,
+      evmAmount: 1_500_000_000_000_000_000n,
+      evmTokenAddress: EVM_NATIVE.evmToken,
+      transactionHash: TX_HASH,
+    });
+    return context;
+  }
+
+  it('adds no authority when the pool is off', async () => {
+    const { wallet } = await mintOnce(undefined);
+    expect(wallet.proposals[0]).toMatchObject({ kind: 'mint', extraAuthority: false });
+  });
+
+  it('adds one while the multisig holds fewer than the target, and the proposal still validates', async () => {
+    const { wallet, federation } = await mintOnce(3, 1);
+    expect(wallet.proposals[0]).toMatchObject({ kind: 'mint', extraAuthority: true });
+    expect(federation.submitted[0]).toMatchObject({ kind: 'proposal' });
+  });
+
+  it('stops once the pool is full', async () => {
+    const { wallet } = await mintOnce(3, 3);
+    expect(wallet.proposals[0]).toMatchObject({ kind: 'mint', extraAuthority: false });
   });
 });

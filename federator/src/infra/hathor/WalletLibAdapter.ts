@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import {
   HathorWallet as LibWallet,
   Network,
+  Output,
   SendTransaction,
   helpersUtils,
   scriptsUtils,
@@ -11,6 +12,7 @@ import {
 
 import type { DecodedTx, TxInput, TxOutput } from '../../domain/types';
 import type {
+  AuthorityKind,
   HathorWalletPort,
   HistoryEntry,
   MeltProposalRequest,
@@ -371,6 +373,17 @@ export class WalletLibAdapter implements HathorWalletPort {
 
   // ---- proposals -----------------------------------------------------------------------------
 
+  async countAuthorities(token: string, kind: AuthorityKind): Promise<number> {
+    const wallet = this.require();
+    // Not only_available_utxos: an authority locked by an in-flight proposal is still part of the
+    // pool, and counting only the free ones would grow it every time two proposals overlap.
+    const authorities =
+      kind === 'mint'
+        ? await wallet.getMintAuthority(token, { many: true })
+        : await wallet.getMeltAuthority(token, { many: true });
+    return authorities.length;
+  }
+
   async createMintProposal(request: MintProposalRequest): Promise<string> {
     return this.sendLock.run(async () => {
       const tx = await this.require().prepareMintTokensData(request.token, request.amount, {
@@ -382,6 +395,9 @@ export class WalletLibAdapter implements HathorWalletPort {
         startMiningTx: false,
         pinCode: this.pin,
       });
+      if (request.extraAuthority === true) {
+        addAuthorityOutput(tx, 'mint');
+      }
       return this.finishProposal(tx, request.markInputsAsUsed, request.inputLockTtlMs);
     });
   }
@@ -398,6 +414,9 @@ export class WalletLibAdapter implements HathorWalletPort {
         startMiningTx: false,
         pinCode: this.pin,
       });
+      if (request.extraAuthority === true) {
+        addAuthorityOutput(tx, 'melt');
+      }
       return this.finishProposal(tx, request.markInputsAsUsed, request.inputLockTtlMs);
     });
   }
@@ -540,4 +559,18 @@ export class WalletLibAdapter implements HathorWalletPort {
       })();
     });
   }
+}
+
+/**
+ * Adds one more authority to a prepared, still unsigned mint or melt: a copy of the one the library
+ * recreates - same script (the multisig's fixed address), same token index, same authority bits.
+ * The library has no option for more than one; copying its own output, rather than building one,
+ * keeps the serialisation the library's.
+ */
+function addAuthorityOutput(tx: { outputs: Output[] }, kind: AuthorityKind): void {
+  const recreated = tx.outputs.find((output) => (kind === 'mint' ? output.isMint() : output.isMelt()));
+  if (!recreated) {
+    throw new WalletOperationError(`The prepared ${kind} recreates no ${kind} authority to copy.`);
+  }
+  tx.outputs.push(new Output(recreated.value, recreated.script, { tokenData: recreated.tokenData }));
 }

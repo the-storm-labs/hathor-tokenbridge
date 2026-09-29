@@ -150,6 +150,15 @@ export const envSchema = z.object({
   HATHOR_INPUT_LOCK_TTL_MS: positiveIntFromEnv('HATHOR_INPUT_LOCK_TTL_MS'),
   HATHOR_FROM_TIMESTAMP: nonNegativeIntFromEnv('HATHOR_FROM_TIMESTAMP'),
 
+  /**
+   * How many mint (and, separately, melt) authorities the multisig should hold per token. A
+   * proposal locks the authority it spends for HATHOR_INPUT_LOCK_TTL_MS, and with a single one
+   * every other mint or melt of that token waits behind it. While the multisig holds fewer than
+   * this many, each mint or melt this federator proposes also creates one more authority of the
+   * kind it spends. 0 turns it off: the proposal recreates exactly the authority it spends.
+   */
+  HATHOR_AUTHORITY_POOL_TARGET: nonNegativeIntFromEnv('HATHOR_AUTHORITY_POOL_TARGET').default('0'),
+
   // Transitional - only the headless adapter uses these. Removed with the container.
   HATHOR_HEADLESS_URL: httpUrl('HATHOR_HEADLESS_URL').optional(),
   HATHOR_HEADLESS_API_KEY: optionalText,

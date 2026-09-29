@@ -50,13 +50,24 @@ export interface ProposalOptions {
   readonly fixedAddress: string;
 }
 
-export interface MintProposalRequest extends ProposalOptions {
+/** The two token authorities. A transaction can only create more of the kind it spends. */
+export type AuthorityKind = 'mint' | 'melt';
+
+export interface AuthorityOptions {
+  /**
+   * Also create one more authority of the kind the proposal spends, at `fixedAddress`, on top of
+   * the one it recreates - growing the multisig's pool of them. Default false.
+   */
+  readonly extraAuthority?: boolean;
+}
+
+export interface MintProposalRequest extends ProposalOptions, AuthorityOptions {
   readonly token: string;
   readonly amount: bigint;
   readonly receiverAddress: string;
 }
 
-export interface MeltProposalRequest extends ProposalOptions {
+export interface MeltProposalRequest extends ProposalOptions, AuthorityOptions {
   readonly token: string;
   readonly amount: bigint;
 }
@@ -91,6 +102,12 @@ export interface HathorWalletPort {
 
   /** Decode a serialised proposal into the domain's transaction shape. */
   decodeTxHex(txHex: string): Promise<DecodedTx>;
+
+  /**
+   * How many authorities of a kind this wallet holds for a token - locked by an in-flight proposal
+   * or not, since this sizes the pool rather than asking what is free right now.
+   */
+  countAuthorities(token: string, kind: AuthorityKind): Promise<number>;
 
   createMintProposal(request: MintProposalRequest): Promise<string>;
   createMeltProposal(request: MeltProposalRequest): Promise<string>;

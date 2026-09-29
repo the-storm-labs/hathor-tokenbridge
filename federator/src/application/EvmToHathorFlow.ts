@@ -6,6 +6,7 @@ import type { BridgePort, CrossEvent, TokenMapping } from '../ports/BridgePort';
 import type { ProposalIdentity } from '../ports/HathorFederationPort';
 import type { HathorWalletPort } from '../ports/HathorWalletPort';
 import type { LoggerPort } from '../ports/LoggerPort';
+import { shouldGrowAuthorityPool } from './authorityPool';
 import type { ProposalCoordinator, ProposalStrategy } from './ProposalCoordinator';
 
 /**
@@ -25,6 +26,8 @@ export interface EvmToHathorFlowDeps {
   readonly logger: LoggerPort;
   readonly evmChainId: number;
   readonly inputLockTtlMs: number;
+  /** HATHOR_AUTHORITY_POOL_TARGET: mint authorities to grow the multisig's pool to; 0 = off. */
+  readonly authorityPoolTarget?: number | undefined;
 }
 
 export class EvmToHathorFlow {
@@ -34,6 +37,7 @@ export class EvmToHathorFlow {
   private readonly logger: LoggerPort;
   private readonly evmChainId: number;
   private readonly inputLockTtlMs: number;
+  private readonly authorityPoolTarget: number;
 
   constructor(deps: EvmToHathorFlowDeps) {
     this.wallet = deps.wallet;
@@ -42,6 +46,7 @@ export class EvmToHathorFlow {
     this.logger = deps.logger;
     this.evmChainId = deps.evmChainId;
     this.inputLockTtlMs = deps.inputLockTtlMs;
+    this.authorityPoolTarget = deps.authorityPoolTarget ?? 0;
   }
 
   /**
@@ -95,6 +100,13 @@ export class EvmToHathorFlow {
         token: mapping.hathorToken,
         amount: hathorAmount,
         receiverAddress: identity.receiver,
+        extraAuthority: await shouldGrowAuthorityPool(
+          this.wallet,
+          this.logger,
+          mapping.hathorToken,
+          'mint',
+          this.authorityPoolTarget,
+        ),
       });
     }
 

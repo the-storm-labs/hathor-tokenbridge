@@ -1,5 +1,6 @@
 import type { DecodedTx } from '../../domain/types';
 import type {
+  AuthorityKind,
   HathorWalletPort,
   HistoryEntry,
   MeltProposalRequest,
@@ -316,7 +317,23 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
     return txHex;
   }
 
+  /**
+   * The headless wallet has no call for an extra authority output, so the authority pool is a
+   * wallet-lib-only feature; config refuses HATHOR_AUTHORITY_POOL_TARGET with this adapter, and
+   * these two only guard against a caller that got past it.
+   */
+  async countAuthorities(_token: string, _kind: AuthorityKind): Promise<number> {
+    throw new WalletOperationError('The headless adapter does not support the authority pool.');
+  }
+
+  private refuseExtraAuthority(request: { readonly extraAuthority?: boolean }, operation: string): void {
+    if (request.extraAuthority === true) {
+      throw new WalletOperationError(`${operation}: the headless adapter cannot add an extra authority output.`);
+    }
+  }
+
   async createMintProposal(request: MintProposalRequest): Promise<string> {
+    this.refuseExtraAuthority(request, 'createMintProposal');
     return this.proposal(
       'wallet/p2sh/tx-proposal/mint-tokens',
       {
@@ -335,6 +352,7 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
   }
 
   async createMeltProposal(request: MeltProposalRequest): Promise<string> {
+    this.refuseExtraAuthority(request, 'createMeltProposal');
     return this.proposal(
       'wallet/p2sh/tx-proposal/melt-tokens',
       {

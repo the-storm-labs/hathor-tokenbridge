@@ -111,7 +111,9 @@ async function deliver(flow: HathorToEvmFlow, wallet: FakeHathorWallet, tx: Hist
   return flow.handleIncoming(tx);
 }
 
-async function build(options: { multisigOrder?: number; minConfirmations?: number } = {}) {
+async function build(
+  options: { multisigOrder?: number; minConfirmations?: number; authorityPoolTarget?: number | undefined } = {},
+) {
   const wallet = new FakeHathorWallet();
   await wallet.start();
   const bridge = new FakeBridge().addMapping(EVM_NATIVE).addMapping(HATHOR_NATIVE);
@@ -150,6 +152,7 @@ async function build(options: { multisigOrder?: number; minConfirmations?: numbe
     inputLockTtlMs: 1_800_000,
     minConfirmations: options.minConfirmations ?? 1,
     multisigOrder: options.multisigOrder ?? 1,
+    authorityPoolTarget: options.authorityPoolTarget,
   });
 
   return { flow, wallet, bridge, allowTokens, federation, evmFederation, logger, metrics };
@@ -270,6 +273,26 @@ describe('HathorToEvmFlow: a token native to the EVM chain', () => {
     });
     // The vote waits for the melt to settle.
     expect(evmFederation.votes).toEqual([]);
+  });
+
+  it('adds a melt authority to the proposal while the pool is below its target', async () => {
+    const { flow, wallet, federation } = await build({ authorityPoolTarget: 2 });
+    wallet.confirmations.set(TX_ID, 10);
+
+    await deliver(flow, wallet, incomingTx());
+
+    expect(wallet.proposals[0]).toMatchObject({ kind: 'melt', extraAuthority: true });
+    expect(federation.submitted[0]).toMatchObject({ kind: 'proposal' });
+  });
+
+  it('adds no melt authority once the pool is at its target', async () => {
+    const { flow, wallet } = await build({ authorityPoolTarget: 2 });
+    wallet.authorityCounts.set(`${EVM_NATIVE.hathorToken}:melt`, 2);
+    wallet.confirmations.set(TX_ID, 10);
+
+    await deliver(flow, wallet, incomingTx());
+
+    expect(wallet.proposals[0]).toMatchObject({ kind: 'melt', extraAuthority: false });
   });
 
   it('votes in the bridge 18-decimal unit even for a 6-decimal token', async () => {

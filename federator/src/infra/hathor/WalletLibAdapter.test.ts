@@ -1,5 +1,7 @@
 import { Network, transactionUtils } from '@hathor/wallet-lib';
 
+import { validateMintProposal } from '../../domain/validation/proposals';
+
 import { RecordingLogger } from '../../ports/testSupport/fakes';
 import { WalletLibAdapter } from './WalletLibAdapter';
 import type { WalletLibAdapterConfig } from './WalletLibAdapter';
@@ -259,6 +261,91 @@ describe('WalletLibAdapter proposals', () => {
     });
 
     expect(stub.markedUtxos).toEqual([]);
+  });
+});
+
+/** A 64-hex custom token uid; the library indexes outputs into the tx's token list by it. */
+const TOKEN_UID = '00a83f5072386920b3ee4e843f71e2f1c1c9545b96346af0df32bf332605a2d0';
+
+/**
+ * A real, unsigned mint as the library prepares it: the minted amount to the receiver and the
+ * recreated mint authority to the multisig.
+ */
+function preparedMint() {
+  return transactionUtils.createTransactionFromData(
+    {
+      version: 1,
+      tokens: [TOKEN_UID],
+      inputs: [],
+      outputs: [
+        { address: RECEIVER_ADDRESS, value: 150n, token: TOKEN_UID, authorities: 0n, timelock: null },
+        { address: MULTISIG_ADDRESS, value: 1n, token: TOKEN_UID, authorities: 1n, timelock: null },
+      ],
+    } as never,
+    new Network('testnet'),
+  );
+}
+
+describe('WalletLibAdapter authority pool', () => {
+  const mintRequest = {
+    token: TOKEN_UID,
+    amount: 150n,
+    receiverAddress: RECEIVER_ADDRESS,
+    markInputsAsUsed: false,
+    inputLockTtlMs: 1_800_000,
+    fixedAddress: MULTISIG_ADDRESS,
+  };
+
+  it('leaves the prepared mint alone when no extra authority is asked for', async () => {
+    const { adapter, stub } = build();
+    await adapter.start();
+    const tx = preparedMint();
+    stub.proposalTx = tx;
+    const untouched = tx.toHex();
+
+    expect(await adapter.createMintProposal(mintRequest)).toBe(untouched);
+  });
+
+  it('appends a copy of the recreated authority, and the result still decodes and validates', async () => {
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.proposalTx = preparedMint();
+
+    const txHex = await adapter.createMintProposal({ ...mintRequest, extraAuthority: true });
+    const decoded = await adapter.decodeTxHex(txHex);
+
+    const authorities = decoded.outputs.filter((output) => (output.tokenData & 0x80) !== 0);
+    expect(authorities).toHaveLength(2);
+    for (const authority of authorities) {
+      expect(authority).toMatchObject({ token: TOKEN_UID, value: 1n, mine: true });
+      expect(authority.decoded.address).toBe(MULTISIG_ADDRESS);
+    }
+    // The genuine serialised bytes pass the same check every other federator runs before signing.
+    // The mint authority input comes from the wallet at build time, so it is added here.
+    const withAuthorityInput = {
+      ...decoded,
+      inputs: [{ value: 1n, tokenData: 0b1000_0001, script: '', token: TOKEN_UID, decoded: {} }],
+    };
+    expect(validateMintProposal(withAuthorityInput, { token: TOKEN_UID, amount: 150n })).toEqual({ valid: true });
+  });
+
+  it('refuses to add one when the prepared transaction recreates no authority to copy', async () => {
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.proposalTx = { toHex: () => 'deadbeef', outputs: [] };
+
+    await expect(adapter.createMeltProposal({ ...mintRequest, extraAuthority: true })).rejects.toThrow(
+      /recreates no melt authority/,
+    );
+  });
+
+  it('counts the whole pool, locked authorities included', async () => {
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.mintAuthorities = [{}, {}, {}];
+
+    expect(await adapter.countAuthorities(TOKEN_UID, 'mint')).toBe(3);
+    expect(stub.authorityQueries[0]).toEqual([TOKEN_UID, 'mint', { many: true }]);
   });
 });
 
