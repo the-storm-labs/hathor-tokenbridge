@@ -303,7 +303,7 @@ describe('HathorToEvmFlow: a token native to the EVM chain', () => {
       }),
     ).toBe(true);
 
-    const expected = deriveEvmOriginIdentity(SENDER, TX_ID);
+    const expected = deriveEvmOriginIdentity(SENDER, TX_ID, 'bytes');
     expect(evmFederation.votes).toEqual([
       {
         originalTokenAddress: EVM_NATIVE.evmToken,
@@ -335,9 +335,12 @@ describe('HathorToEvmFlow: a token native to Hathor', () => {
     expect(wallet.proposals).toEqual([]);
     expect(federation.submitted).toEqual([]);
     expect(evmFederation.votes).toHaveLength(1);
+    const expected = deriveEvmOriginIdentity(SENDER, TX_ID, 'text');
     expect(evmFederation.votes[0]).toMatchObject({
       originalTokenAddress: HATHOR_NATIVE.evmToken,
       receiver: DESTINATION,
+      blockHash: expected.idHash,
+      transactionHash: expected.idHash,
     });
   });
 });

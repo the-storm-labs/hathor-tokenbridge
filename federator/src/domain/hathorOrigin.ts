@@ -18,6 +18,21 @@ import { keccak256, toChecksumAddress } from 'web3-utils';
  */
 export const HATHOR_SYNTHETIC_LOG_INDEX = 129;
 
+/**
+ * How the Hathor transaction id is fed to the hash. The two directions have always disagreed, and
+ * the ids already on chain pin both, so neither can change:
+ *
+ * - `bytes`: a melt is voted from the ProposalSent event, whose `transactionHash` is a bytes32 the
+ *   pre-rearchitecture federator read with its `0x`, so web3's keccak256 hashed the decoded bytes.
+ *   hathor-functions derives the same id that way to join a melt's Hathor events to its votes.
+ * - `text`: a Hathor-native transfer is voted straight from the wallet's tx, whose id carries no
+ *   `0x`, so keccak256 hashed the UTF-8 of the hex string.
+ *
+ * Hashing a melt as text votes on an id no pre-rearchitecture federator would, so a mixed-version
+ * federation never reaches quorum on it.
+ */
+export type HathorTxIdEncoding = 'bytes' | 'text';
+
 export interface EvmOriginIdentity {
   /** The Hathor sender, folded into something address-shaped. */
   readonly sender: string;
@@ -33,11 +48,17 @@ export interface EvmOriginIdentity {
  * 20 bytes, so they cannot be used directly, and hashing keeps the mapping deterministic and
  * collision-resistant enough for an identifier.
  */
-export function deriveEvmOriginIdentity(hathorSenderAddress: string, hathorTxId: string): EvmOriginIdentity {
+export function deriveEvmOriginIdentity(
+  hathorSenderAddress: string,
+  hathorTxId: string,
+  txIdEncoding: HathorTxIdEncoding,
+): EvmOriginIdentity {
   const hashedSender = keccak256(hathorSenderAddress);
+  const bareTxId = hathorTxId.startsWith('0x') ? hathorTxId.substring(2) : hathorTxId;
   return {
     sender: toChecksumAddress(hashedSender.substring(0, 42)),
-    idHash: keccak256(hathorTxId),
+    // web3's keccak256 hashes a 0x-prefixed hex string as bytes and anything else as UTF-8.
+    idHash: keccak256(txIdEncoding === 'bytes' ? `0x${bareTxId}` : bareTxId),
     logIndex: HATHOR_SYNTHETIC_LOG_INDEX,
   };
 }

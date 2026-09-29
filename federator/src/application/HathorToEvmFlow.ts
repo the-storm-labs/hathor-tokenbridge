@@ -1,6 +1,6 @@
 import { BRIDGE_NORMALISED_DECIMALS, toEvmAmount } from '../domain/amounts';
 import { InvalidTransactionError } from '../domain/errors';
-import { deriveEvmOriginIdentity } from '../domain/hathorOrigin';
+import { HathorTxIdEncoding, deriveEvmOriginIdentity } from '../domain/hathorOrigin';
 import { readDestination } from '../domain/bridgePayload';
 import { readBridgedToken } from '../domain/tokenData';
 import { TransactionType } from '../domain/transactionTypes';
@@ -139,7 +139,7 @@ export class HathorToEvmFlow {
     if (!isEvmNative) {
       // Native to Hathor: the funds sit in the multisig, and releasing them on the EVM side is
       // the whole transfer.
-      return this.vote(params, mapping, evmAmount);
+      return this.vote(params, mapping, evmAmount, 'text');
     }
 
     // Native to the EVM chain: burn the Hathor-side supply first. The vote follows once the melt
@@ -169,15 +169,16 @@ export class HathorToEvmFlow {
   }): Promise<boolean> {
     const mapping = await this.deps.bridge.mappingByHathorToken(params.hathorTokenAddress);
     const evmAmount = await this.toEvmAmount(params.hathorAmount, mapping);
-    return this.vote(params, mapping, evmAmount);
+    return this.vote(params, mapping, evmAmount, 'bytes');
   }
 
   private async vote(
     params: { hathorSenderAddress: string; evmReceiverAddress: string; hathorTxId: string },
     mapping: TokenMapping,
     evmAmount: bigint,
+    txIdEncoding: HathorTxIdEncoding,
   ): Promise<boolean> {
-    const origin = deriveEvmOriginIdentity(params.hathorSenderAddress, params.hathorTxId);
+    const origin = deriveEvmOriginIdentity(params.hathorSenderAddress, params.hathorTxId, txIdEncoding);
 
     return this.deps.voter.vote({
       originalTokenAddress: mapping.evmToken,
