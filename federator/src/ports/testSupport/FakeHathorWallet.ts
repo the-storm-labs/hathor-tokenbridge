@@ -94,7 +94,7 @@ export class FakeHathorWallet implements HathorWalletPort {
     | ({ kind: 'transfer' } & TransferProposalRequest)
   > = [];
 
-  private handlers: Array<(tx: HistoryEntry) => void | Promise<void>> = [];
+  private readonly handlers: Array<(tx: HistoryEntry) => void | Promise<void>> = [];
   private nextProposalId = 0;
 
   async start(): Promise<void> {
