@@ -6,6 +6,7 @@ import tokenAbi from '../../../../../bridge/abi/MainToken.json';
 import type { BridgePort, CrossEvent, TokenMapping } from '../../../ports/BridgePort';
 import type { LoggerPort } from '../../../ports/LoggerPort';
 import { type ContractLike, contractAt, method, pastEventsOf } from './contractAccess';
+import { fieldString } from './eventValues';
 
 /**
  * The Bridge contract: its token registry, and the `Cross` events it emits when funds are locked.
@@ -92,7 +93,7 @@ export class BridgeAdapter implements BridgePort {
     const token = this.tokenContract(evmToken);
     const decimals = Number(await method(token, 'decimals').call());
     if (!Number.isInteger(decimals)) {
-      throw new Error(`Token ${evmToken} reported non-integer decimals (${decimals}).`);
+      throw new TypeError(`Token ${evmToken} reported non-integer decimals (${decimals}).`);
     }
 
     this.decimals.set(key, decimals);
@@ -121,7 +122,7 @@ export class BridgeAdapter implements BridgePort {
     // The event is looked up by the block its transaction landed in; scanning a range for one
     // hash would be a different, far more expensive query.
     const tx = await this.web3.eth.getTransaction(transactionHash).catch(() => undefined);
-    if (!tx || tx.blockNumber === undefined || tx.blockNumber === null) {
+    if (tx?.blockNumber === undefined || tx.blockNumber === null) {
       return undefined;
     }
 
@@ -155,10 +156,10 @@ export class BridgeAdapter implements BridgePort {
       blockHash: String(log.blockHash ?? ''),
       blockNumber: Number(log.blockNumber ?? 0),
       logIndex: Number(log.logIndex ?? 0),
-      receiver: String(values._to ?? ''),
-      sender: String(values._from ?? ''),
-      amount: BigInt(String(values._amount ?? '0')),
-      tokenAddress: String(values._tokenAddress ?? ''),
+      receiver: fieldString(values._to),
+      sender: fieldString(values._from),
+      amount: BigInt(fieldString(values._amount, '0')),
+      tokenAddress: fieldString(values._tokenAddress),
       originChainId: Number(values._originChainId ?? 0),
       destinationChainId: Number(values._destinationChainId ?? 0),
     };

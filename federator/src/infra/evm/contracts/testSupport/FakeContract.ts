@@ -20,7 +20,7 @@ export class FakeContract implements ContractLike {
   }
 
   /** Scripts a method: `result` may be a value or a function of the call arguments. */
-  on(name: string, result: unknown | ((...args: unknown[]) => unknown)): this {
+  on(name: string, result: unknown): this {
     this.methods[name] = (...args: unknown[]) => {
       const call: ContractCall<unknown> = {
         call: async (options?: { from?: string }) => {

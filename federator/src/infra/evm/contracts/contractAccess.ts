@@ -43,7 +43,7 @@ export function contractAt(web3: Web3, abi: unknown, address: string): ContractL
 export function method(contract: ContractLike, name: string, ...args: unknown[]): ContractCall<unknown> {
   const fn = contract.methods[name];
   if (typeof fn !== 'function') {
-    throw new Error(
+    throw new TypeError(
       `The ABI for the contract at ${contract.options.address} has no method "${name}". ` +
         `The deployed contract and the bundled ABI have diverged.`,
     );
@@ -51,9 +51,7 @@ export function method(contract: ContractLike, name: string, ...args: unknown[])
   return fn(...args);
 }
 
-export interface PastEventsReader {
-  (eventName: string, options: Record<string, unknown>): Promise<(string | EventLog)[]>;
-}
+export type PastEventsReader = (eventName: string, options: Record<string, unknown>) => Promise<(string | EventLog)[]>;
 
 export function pastEventsOf(contract: ContractLike): PastEventsReader {
   return contract.getPastEvents.bind(contract);

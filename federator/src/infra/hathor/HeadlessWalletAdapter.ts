@@ -55,9 +55,7 @@ export interface HeadlessAdapterOptions {
   readonly readinessDelayMs?: number;
 }
 
-export interface Sleeper {
-  (ms: number): Promise<void>;
-}
+export type Sleeper = (ms: number) => Promise<void>;
 
 const defaultSleep: Sleeper = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -98,7 +96,7 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
 
   async start(): Promise<void> {
     for (let attempt = 1; attempt <= this.options.readinessAttempts; attempt++) {
-      const { state, raw } = await this.status();
+      const { state } = await this.status();
 
       if (state === 'ready') {
         return;
@@ -126,7 +124,6 @@ export class HeadlessWalletAdapter implements HathorWalletPort {
       // would restart a wallet that is merely in a state this code has not been taught about.
       // Retrying is the safe reading: it is either transient, or the attempt budget ends it with
       // a real error rather than a silent hang.
-      void raw;
       await this.sleep(this.options.readinessDelayMs * attempt);
     }
 

@@ -59,6 +59,6 @@ if (seed && pubkeys && foreignAddress) {
 } else {
   // A silent skip is how a suite quietly stops covering anything. State the reason.
   describe('WalletLibAdapter contract (live)', () => {
-    it.skip('needs WALLETLIB_CONTRACT_SEED, _PUBKEYS and _FOREIGN_ADDRESS to run', () => undefined);
+    it.todo('needs WALLETLIB_CONTRACT_SEED, _PUBKEYS and _FOREIGN_ADDRESS to run');
   });
 }

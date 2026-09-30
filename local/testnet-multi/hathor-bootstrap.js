@@ -12,8 +12,8 @@
 // with the EVM destination in a data output, the shape bridgePayload.ts reads.
 //
 // `run` is safe to repeat: set HUSDC_UID to skip creating the token again.
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const dotenv = require('dotenv');
 const { Connection, HathorWallet, SendTransaction, config: libConfig } = require('@hathor/wallet-lib');
 const { stopGLLBackgroundTask } = require('@hathor/wallet-lib/lib/sync/gll');
@@ -41,11 +41,17 @@ async function startWallet() {
     pinCode: 'bootstrap',
   });
   await wallet.start();
-  for (let i = 0; !wallet.isReady(); i++) {
-    if (i > 240) throw new Error('wallet did not become ready in 2 minutes');
+  await waitFor(() => wallet.isReady(), 240, 'wallet did not become ready in 2 minutes');
+  return wallet;
+}
+
+/** Polls `check` every 500 ms, giving up after `attempts` tries. */
+async function waitFor(check, attempts, message) {
+  for (let attempt = 0; attempt <= attempts; attempt++) {
+    if (await check()) return;
     await new Promise((r) => setTimeout(r, 500));
   }
-  return wallet;
+  throw new Error(message);
 }
 
 async function htrBalance(wallet) {
@@ -88,10 +94,11 @@ async function main(mode) {
       // The creation spent the whole HTR UTXO; its change only becomes spendable once the wallet
       // has seen its own transaction come back over the websocket. Sending before that fails with
       // "Insufficient amount of tokens".
-      for (let i = 0; (await htrBalance(wallet)) < HTR_TO_MULTISIG; i++) {
-        if (i > 120) throw new Error('the token creation change never became spendable');
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      await waitFor(
+        async () => (await htrBalance(wallet)) >= HTR_TO_MULTISIG,
+        120,
+        'the token creation change never became spendable',
+      );
     }
 
     const funding = await wallet.sendTransaction(multisig, HTR_TO_MULTISIG, { pinCode: 'bootstrap' });

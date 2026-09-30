@@ -43,9 +43,7 @@ export class EvmTransactionSender {
   }
 
   private async getChainId(): Promise<number> {
-    if (this.chainId === undefined) {
-      this.chainId = Number(await this.web3.eth.getChainId());
-    }
+    this.chainId ??= Number(await this.web3.eth.getChainId());
     return this.chainId;
   }
 
@@ -62,7 +60,7 @@ export class EvmTransactionSender {
   private async getGasLimit(tx: { from: string; to: string; data: string; value: string }): Promise<number> {
     try {
       const estimate = Number(await this.web3.eth.estimateGas(tx));
-      return estimate < GAS_FLOOR ? GAS_FLOOR : estimate;
+      return Math.max(estimate, GAS_FLOOR);
     } catch (error) {
       // An estimate that reverts usually means the call itself would revert - but the caller has
       // its own idea of whether to send anyway, so this reports rather than decides.

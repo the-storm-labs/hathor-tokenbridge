@@ -167,6 +167,6 @@ if (url && apiKey && seed && pubkeys) {
   });
 } else {
   describe('adapter parity (live)', () => {
-    it.skip('needs PARITY_HEADLESS_URL, _API_KEY, _SEED and _PUBKEYS to run', () => undefined);
+    it.todo('needs PARITY_HEADLESS_URL, _API_KEY, _SEED and _PUBKEYS to run');
   });
 }

@@ -41,7 +41,7 @@ export class FileRevertedTransferStore implements RevertedTransferStorePort {
   }
 
   async has(transactionId: string): Promise<boolean> {
-    return Object.prototype.hasOwnProperty.call(await this.readAll(), transactionId);
+    return Object.hasOwn(await this.readAll(), transactionId);
   }
 
   async record(transactionId: string, details: RevertedTransfer): Promise<void> {

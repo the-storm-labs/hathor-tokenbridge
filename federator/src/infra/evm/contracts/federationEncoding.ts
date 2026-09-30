@@ -2,6 +2,7 @@ import { isAddress, padLeft, toChecksumAddress } from 'web3-utils';
 
 import type { FederationEvent, FederationTransfer } from '../../../domain/federationEvents';
 import { TransactionType } from '../../../domain/transactionTypes';
+import { fieldString } from './eventValues';
 
 /**
  * How the HathorFederation contract's bytes32 fields are encoded and read back.
@@ -34,11 +35,9 @@ export function fromBytes32Address(value: string): string {
   return toChecksumAddress(candidate);
 }
 
-const stripPrefix = (value: unknown): string => String(value ?? '').replace(/^0x/, '');
+const stripPrefix = (value: unknown): string => fieldString(value).replace(/^0x/, '');
 
-export interface EncodingProblem {
-  (message: string, error: unknown): void;
-}
+export type EncodingProblem = (message: string, error: unknown) => void;
 
 /**
  * Reads the transfer fields shared by every federation event.
@@ -48,9 +47,9 @@ export interface EncodingProblem {
  */
 export function toTransfer(values: Record<string, unknown>, onProblem: EncodingProblem): FederationTransfer {
   const transactionType = Number(values.transactionType ?? 0) as TransactionType;
-  const rawToken = String(values.originalTokenAddress ?? '');
+  const rawToken = fieldString(values.originalTokenAddress);
 
-  const rawHash = String(values.transactionHash ?? '');
+  const rawHash = fieldString(values.transactionHash);
   const evmHash = rawHash === '' || rawHash.startsWith('0x') ? rawHash : `0x${rawHash}`;
 
   let originalTokenAddress: string;
@@ -66,16 +65,16 @@ export function toTransfer(values: Record<string, unknown>, onProblem: EncodingP
   }
 
   return {
-    transactionId: String(values.transactionId ?? ''),
+    transactionId: fieldString(values.transactionId),
     originalTokenAddress,
     // Same asymmetry as the token above, and for the same reason. A MELT's transactionHash is a
     // Hathor transaction id, which carries no 0x; for a MINT or TRANSFER it is an EVM transaction
     // hash, and stripping the prefix makes it unusable for an eth_getTransaction lookup - which is
     // how the proposal validator finds the Cross event that justifies the transfer.
     transactionHash: transactionType === TransactionType.MELT ? stripPrefix(values.transactionHash) : evmHash,
-    value: BigInt(String(values.value ?? '0')),
-    sender: String(values.sender ?? ''),
-    receiver: String(values.receiver ?? ''),
+    value: BigInt(fieldString(values.value, '0')),
+    sender: fieldString(values.sender),
+    receiver: fieldString(values.receiver),
     transactionType,
   };
 }
@@ -102,9 +101,9 @@ export function toFederationEvent(
       return {
         kind: 'signed',
         ...toTransfer(values, onProblem),
-        member: String(values.member ?? ''),
+        member: fieldString(values.member),
         signed: Boolean(values.signed),
-        signature: String(values.signature ?? ''),
+        signature: fieldString(values.signature),
       };
 
     case 'ProposalSent':

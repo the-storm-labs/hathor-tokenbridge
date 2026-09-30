@@ -84,11 +84,11 @@ export class FakeHathorWallet implements HathorWalletPort {
   public signatures = new Map<string, string>();
   /** Set to make signAndPush fail with a specific wallet message. */
   public pushFailure?: string;
-  public lockedInputs: Array<{ txHex: string; ttlMs: number }> = [];
+  public readonly lockedInputs: Array<{ txHex: string; ttlMs: number }> = [];
   public pushed: Array<{ txHex: string; signatures: readonly string[] }> = [];
   /** Authorities held, keyed by `token:kind`. Unset means one - what a freshly bridged token has. */
-  public authorityCounts = new Map<string, number>();
-  public proposals: Array<
+  public readonly authorityCounts = new Map<string, number>();
+  public readonly proposals: Array<
     | ({ kind: 'mint' } & MintProposalRequest)
     | ({ kind: 'melt' } & MeltProposalRequest)
     | ({ kind: 'transfer' } & TransferProposalRequest)

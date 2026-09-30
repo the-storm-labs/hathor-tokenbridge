@@ -6,8 +6,8 @@
 // How to run the script:
 //   npx hardhat run ./hardhat/script/setupTestnetMulti.js --network sepolia_arbitrum_multi
 //   HATHOR_TOKEN_UID=<uid> npx hardhat run ./hardhat/script/setupTestnetMulti.js --network sepolia_arbitrum_multi
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const hre = require('hardhat');
 
 const PUBLIC_JSON = path.join(__dirname, '../../../local/testnet-multi/public.json');

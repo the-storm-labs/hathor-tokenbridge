@@ -46,6 +46,6 @@ if (url && apiKey && foreignAddress) {
   // A file with no tests fails the run, and a silent skip is how a suite quietly stops covering
   // anything. State the reason instead.
   describe('HeadlessWalletAdapter contract (live)', () => {
-    it.skip('needs HEADLESS_CONTRACT_URL, _API_KEY and _FOREIGN_ADDRESS to run', () => undefined);
+    it.todo('needs HEADLESS_CONTRACT_URL, _API_KEY and _FOREIGN_ADDRESS to run');
   });
 }

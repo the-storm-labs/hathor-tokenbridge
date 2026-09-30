@@ -31,11 +31,11 @@ module.exports = {
   coveragePathIgnorePatterns: [
     '/node_modules/',
     '/testSupport/',
-    '\\.contract\\.ts$',
-    'walletLib/defaultDriver\\.ts$',
-    'src/main\\.ts$',
+    String.raw`\.contract\.ts$`,
+    String.raw`walletLib/defaultDriver\.ts$`,
+    String.raw`src/main\.ts$`,
     'src/scripts/',
-    'EvmTransactionSender\\.ts$',
+    String.raw`EvmTransactionSender\.ts$`,
   ],
   coverageThreshold: {
     global: { statements: 98, functions: 96, lines: 98, branches: 95 },
