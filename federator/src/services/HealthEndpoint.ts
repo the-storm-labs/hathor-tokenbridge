@@ -29,6 +29,8 @@ export class HealthEndpoint {
 
   async start(): Promise<void> {
     const app = express();
+    // Don't advertise the framework and its version on a probe endpoint.
+    app.disable('x-powered-by');
 
     app.get('/isAlive', (_request, response) => {
       response.status(200).json({ status: 'ok' });

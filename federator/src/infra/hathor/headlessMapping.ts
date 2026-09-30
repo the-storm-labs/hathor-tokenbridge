@@ -72,7 +72,7 @@ export function mapTx(tx: HeadlessTx): DecodedTx {
     version: tx.version,
     timestamp: tx.timestamp,
     isVoided: tx.is_voided,
-    inputs: (tx.inputs ?? []).map(mapInput),
-    outputs: (tx.outputs ?? []).map(mapOutput),
+    inputs: (tx.inputs ?? []).map((io, index) => mapInput(io, index)),
+    outputs: (tx.outputs ?? []).map((io, index) => mapOutput(io, index)),
   };
 }
