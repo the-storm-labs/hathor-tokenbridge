@@ -15,7 +15,7 @@ HELPER_IMAGE=${HELPER_IMAGE:-alpine:3.12}
 STATE="$STATE_ROOT/latest"
 
 die() { printf '\nABORT: %s\n' "$*" >&2; exit 1; }
-[ -f "$STATE/state.env" ] || die "no upgrade state in $STATE"
+[[ -f "$STATE/state.env" ]] || die "no upgrade state in $STATE"
 # shellcheck disable=SC1091
 . "$STATE/state.env"
 STAMP=$(basename "$(readlink -f "$STATE")")
@@ -30,7 +30,7 @@ if docker inspect "$NAME" >/dev/null 2>&1; then
 fi
 
 echo "== restoring lastHathorTimestamp.txt to its pre-upgrade value"
-if [ -f "$STATE/cursors/lastHathorTimestamp.txt" ]; then
+if [[ -f "$STATE/cursors/lastHathorTimestamp.txt" ]]; then
   docker run --rm -v "$DB_VOLUME:/db" -v "$PWD/$STATE/cursors:/backup:ro" "$HELPER_IMAGE" \
     sh -c 'echo "  was $(cat /db/lastHathorTimestamp.txt), now $(cat /backup/lastHathorTimestamp.txt)"; cp /backup/lastHathorTimestamp.txt /db/lastHathorTimestamp.txt'
 fi

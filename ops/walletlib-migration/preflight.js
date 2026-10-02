@@ -13,7 +13,10 @@ const bitcore = require('bitcore-lib');
 
 let failures = 0;
 function check(name, ok, detail = '') {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` - ${detail}` : ''}`);
+  // Details include answers from remote nodes; keep each check on one line whatever they say.
+  const clean = String(detail).replace(/[\r\n]+/g, ' ');
+  const suffix = clean ? ' - ' + clean : '';
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${suffix}`);
   if (!ok) failures += 1;
 }
 
@@ -27,7 +30,7 @@ async function rpcChainId(url) {
   return Number.parseInt((await response.json()).result, 16);
 }
 
-(async () => {
+async function main() {
   let config;
   try {
     config = loadConfig(process.env);
@@ -48,7 +51,8 @@ async function rpcChainId(url) {
     'multisig pubkeys are the expected set',
     expectedXpubs.length > 0 &&
       configured.length === expectedXpubs.length &&
-      [...configured].sort().join() === [...expectedXpubs].sort().join(),
+      [...configured].sort((a, b) => a.localeCompare(b)).join() ===
+        [...expectedXpubs].sort((a, b) => a.localeCompare(b)).join(),
     `${configured.length} configured, ${expectedXpubs.length} expected`,
   );
 
@@ -69,18 +73,25 @@ async function rpcChainId(url) {
   } catch (error) {
     check('Hathor full node answers', false, error.message);
   }
-  for (const [name, url, expected] of [
+  const rpcs = [
     ['EVM RPC', evm.host, evm.chainId],
     ['state chain RPC', state.host, state.chainId],
-  ]) {
-    try {
-      const chainId = await rpcChainId(url);
-      check(`${name} is chain ${expected}`, chainId === expected, `answered ${chainId}`);
-    } catch (error) {
-      check(`${name} is chain ${expected}`, false, error.message);
+  ];
+  const answers = await Promise.allSettled(rpcs.map(([, url]) => rpcChainId(url)));
+  rpcs.forEach(([name, , expected], index) => {
+    const answer = answers[index];
+    if (answer.status === 'fulfilled') {
+      check(`${name} is chain ${expected}`, answer.value === expected, `answered ${answer.value}`);
+    } else {
+      check(`${name} is chain ${expected}`, false, answer.reason?.message);
     }
-  }
+  });
 
   console.log(failures === 0 ? '\nPREFLIGHT OK' : `\nPREFLIGHT FAILED (${failures})`);
   process.exit(failures === 0 ? 0 : 1);
-})();
+}
+
+main().catch((error) => {
+  check('preflight ran to the end', false, error?.message);
+  process.exit(1);
+});
