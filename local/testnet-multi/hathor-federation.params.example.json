@@ -1,0 +1,10 @@
+{
+  "HathorfederationModule": {
+    "members": [
+      "0xc4bC6582b42d19796f6f0B7182762fC9057c2467",
+      "0x4BC5b1274840334E45Ae9eB269E5B3F93087df91",
+      "0xc4BA26E4404E3834Fa826aA19a90d6C717CDFe8c"
+    ],
+    "owner": "<DEPLOYER_ADDRESS>"
+  }
+}

@@ -12,11 +12,62 @@
     "prettier"
   ],
   "rules": {
-    "no-console": 1,       // Means warning
+    "no-console": "error",
     "prettier/prettier": ["error", {
       "endOfLine": "auto"
     }],
-    "@typescript-eslint/explicit-module-boundary-types": "off", // avoid things for any type, it should be removed after migrating to tsnode
-    "@typescript-eslint/no-explicit-any": "off" // avoid things for any type
-  }
+    "@typescript-eslint/explicit-module-boundary-types": "off"
+  },
+  "overrides": [
+    {
+      // Layering is enforced by the linter rather than by discipline. The dependency rule: domain
+      // knows nothing; ports know only domain; application knows domain + ports; infra implements
+      // ports; only composition is allowed to wire infra into the rest.
+      "files": ["src/**/*.ts"],
+      "plugins": ["@typescript-eslint", "prettier", "import"],
+      // Without a resolver that knows about .ts, eslint-plugin-import cannot resolve intra-tree
+      // imports to absolute paths and no-restricted-paths silently skips them - the rule loads,
+      // reports nothing, and the boundaries go unenforced.
+      "settings": {
+        "import/resolver": {
+          "node": { "extensions": [".ts", ".d.ts", ".js", ".json"] }
+        }
+      },
+      "rules": {
+        "no-console": "error",
+        "@typescript-eslint/no-explicit-any": "error",
+        // Moved out of `recommended` in typescript-eslint v8, so it has to be asked for by name.
+        // Worth keeping here: it caught real assertions hiding fixture mistakes in tests.
+        "@typescript-eslint/no-non-null-assertion": "error",
+        // A parameter kept only to satisfy an interface is named with a leading underscore.
+        "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+        "import/no-restricted-paths": ["error", {
+          "basePath": "./src",
+          "zones": [
+            { "target": "./domain", "from": "./config",      "message": "domain must stay pure: no configuration." },
+            { "target": "./domain", "from": "./ports",       "message": "domain must not know about ports." },
+            { "target": "./domain", "from": "./infra",       "message": "domain must stay free of I/O." },
+            { "target": "./domain", "from": "./application", "message": "domain must not depend on use cases." },
+            { "target": "./domain", "from": "./services",    "message": "domain must not depend on services." },
+            { "target": "./domain", "from": "./composition", "message": "domain must not depend on wiring." },
+
+            { "target": "./ports", "from": "./infra",        "message": "a port must not know its adapters." },
+            { "target": "./ports", "from": "./application",  "message": "a port must not depend on use cases." },
+            { "target": "./ports", "from": "./services",     "message": "a port must not depend on services." },
+            { "target": "./ports", "from": "./composition",  "message": "a port must not depend on wiring." },
+
+            { "target": "./application", "from": "./infra",       "message": "use cases talk to ports, never to adapters." },
+            { "target": "./application", "from": "./services",    "message": "use cases must not depend on services." },
+            { "target": "./application", "from": "./composition", "message": "use cases must not depend on wiring." },
+
+            { "target": "./infra", "from": "./application",  "message": "an adapter must not depend on use cases." },
+            { "target": "./infra", "from": "./services",     "message": "an adapter must not depend on services." },
+            { "target": "./infra", "from": "./composition",  "message": "an adapter must not depend on wiring." },
+
+            { "target": "./services", "from": "./composition", "message": "services must not depend on wiring." }
+          ]
+        }]
+      }
+    }
+  ]
 }

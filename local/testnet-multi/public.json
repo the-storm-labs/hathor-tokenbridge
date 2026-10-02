@@ -1,0 +1,24 @@
+{
+  "network": "testnet",
+  "numSignatures": 2,
+  "multisigAddressIndex0": "wbihDnF11dfeMRVAWtE6b3MCCy9eSPoi5p",
+  "pubkeys": [
+    "xpub6CqonxbmvMch8xZ4cnbprzyBiiFJtGc3E1JDme31HHMyXqqeH99yqrTpd15yv9nBM6ogJjSbSeTnydaJqTftjyM39AgaRPEbPfQG7kCA35f",
+    "xpub6C426L9s6QfCwU7n65BQTLnUUoNG46XFmkQhFffYKnmo7niLQMTmhQ1vN228dNgZ6pbDRSAE2ePARZ9Qy1YenkFi2MCELjDg6ZxboSo6Eo1",
+    "xpub6BuDjem7Tfe5idXhKBFYkq2gZuAMz4B9Gop3xpQrAk8FzchcHZ52FuGgTfaAPWdAmMjUmdWYhamy2nMmp5eWw8FbC2XvZxv18WZQ9hGKTvR"
+  ],
+  "federators": [
+    {
+      "order": 1,
+      "evmAddress": "0xc4bC6582b42d19796f6f0B7182762fC9057c2467"
+    },
+    {
+      "order": 2,
+      "evmAddress": "0x4BC5b1274840334E45Ae9eB269E5B3F93087df91"
+    },
+    {
+      "order": 3,
+      "evmAddress": "0xc4BA26E4404E3834Fa826aA19a90d6C717CDFe8c"
+    }
+  ]
+}

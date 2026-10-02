@@ -16,8 +16,7 @@ COPY --chown=node:node ./bridge/abi ./bridge/abi/
 COPY --chown=node:node ./federator/ ./federator/
 
 WORKDIR ./federator
-RUN (cd ./config/ && cp config.sample.js config.js) && \
-    npx tsc --build
+RUN npm run build
 
 WORKDIR ./built/federator
 
