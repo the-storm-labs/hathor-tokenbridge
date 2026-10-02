@@ -22,7 +22,7 @@ const EVM_NATIVE = {
   evmToken: '0xEVMTOKEN',
   hathorToken: 'htrEVMTOKEN',
   originChainId: EVM_CHAIN_ID,
-  limitsToken: '0xEVMTOKEN',
+  evmTokenContract: '0xEVMTOKEN',
 };
 // Like HTR on mainnet: evmToken is uidToAddress(uid), which AllowTokens never lists; the limits
 // live on the side token.
@@ -30,7 +30,7 @@ const HATHOR_NATIVE = {
   evmToken: '0xHTRPSEUDO',
   hathorToken: 'htrNATIVE',
   originChainId: HATHOR_CHAIN_ID,
-  limitsToken: '0xSIDETOKEN',
+  evmTokenContract: '0xSIDETOKEN',
 };
 
 class FakeEvmFederation implements EvmFederationPort {
@@ -385,7 +385,7 @@ describe('HathorToEvmFlow: a token native to Hathor', () => {
     const { flow, wallet, allowTokens, evmFederation, logger } = await build();
     wallet.confirmations.set(TX_ID, 10);
     allowTokens.limits = { allowed: false, min: 0n, mediumAmount: 0n, largeAmount: 0n };
-    allowTokens.limitsByToken.set(HATHOR_NATIVE.limitsToken, {
+    allowTokens.limitsByToken.set(HATHOR_NATIVE.evmTokenContract, {
       allowed: true,
       min: 10n ** 20n,
       mediumAmount: 0n,

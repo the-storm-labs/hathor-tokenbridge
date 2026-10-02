@@ -24,11 +24,13 @@ export interface TokenMapping {
   /** The chain the token is native to. */
   readonly originChainId: number;
   /**
-   * The EVM token AllowTokens keeps limits for. For an EVM-native token it is `evmToken`; for a
-   * Hathor-native one `evmToken` is a pseudo-address (`uidToAddress(uid)`, never listed) and the
-   * limits live on its side token - checking the pseudo-address reads "not allowed", zero limits.
+   * The ERC-20 that actually exists on the EVM side: the one AllowTokens keeps limits for and the
+   * one that answers `decimals()`. For an EVM-native token it is `evmToken`; for a Hathor-native one
+   * `evmToken` is a pseudo-address (`uidToAddress(uid)`) with no contract behind it, so asking it
+   * reads "not allowed" from AllowTokens and fails outright on `decimals()`. Use `evmToken` only
+   * where the Bridge itself expects the original address, such as a vote.
    */
-  readonly limitsToken: string;
+  readonly evmTokenContract: string;
 }
 
 export interface BridgePort {

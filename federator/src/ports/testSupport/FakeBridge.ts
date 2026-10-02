@@ -15,7 +15,8 @@ export class FakeBridge implements BridgePort {
 
   addMapping(mapping: TokenMapping, evmDecimals = 18): this {
     this.mappings.push(mapping);
-    this.decimals.set(mapping.evmToken, evmDecimals);
+    // Keyed by the contract, as on chain: a Hathor-native token's pseudo-address has no decimals().
+    this.decimals.set(mapping.evmTokenContract, evmDecimals);
     return this;
   }
 
@@ -36,7 +37,12 @@ export class FakeBridge implements BridgePort {
   }
 
   async getEvmTokenDecimals(evmToken: string): Promise<number> {
-    return this.decimals.get(evmToken) ?? 18;
+    const decimals = this.decimals.get(evmToken);
+    if (decimals === undefined) {
+      // What web3 does when the address has no contract: the call returns nothing to decode.
+      throw new Error(`FakeBridge: ${evmToken} is not a token contract (no decimals)`);
+    }
+    return decimals;
   }
 
   async getCrossEvents(fromBlock: number, toBlock: number, destinationChainId: number): Promise<CrossEvent[]> {

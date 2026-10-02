@@ -8,7 +8,12 @@ import { EVM_BRIDGE_READER, EvmBridgeReader } from './EvmBridgeReader';
 
 const EVM_CHAIN_ID = 42161;
 const HATHOR_CHAIN_ID = 31;
-const TOKEN = { evmToken: '0xTOKEN', hathorToken: 'htrTOKEN', originChainId: EVM_CHAIN_ID, limitsToken: '0xTOKEN' };
+const TOKEN = {
+  evmToken: '0xTOKEN',
+  hathorToken: 'htrTOKEN',
+  originChainId: EVM_CHAIN_ID,
+  evmTokenContract: '0xTOKEN',
+};
 
 class FakeChain implements EvmChainPort {
   public head = 1_000;
@@ -153,7 +158,12 @@ describe('EvmBridgeReader reading', () => {
     // HTR on mainnet: the Cross event carries uidToAddress("00"), which AllowTokens never lists.
     // Checking that address skipped every aHTR -> HTR transfer.
     const { reader, bridge, allowTokens, transfers } = build();
-    const htr = { evmToken: '0xHTRPSEUDO', hathorToken: '00', originChainId: HATHOR_CHAIN_ID, limitsToken: '0xSIDE' };
+    const htr = {
+      evmToken: '0xHTRPSEUDO',
+      hathorToken: '00',
+      originChainId: HATHOR_CHAIN_ID,
+      evmTokenContract: '0xSIDE',
+    };
     bridge.addMapping(htr);
     allowTokens.limits = { allowed: false, min: 0n, mediumAmount: 0n, largeAmount: 0n };
     allowTokens.limitsByToken.set('0xSIDE', { allowed: true, min: 0n, mediumAmount: 0n, largeAmount: 0n });
@@ -218,6 +228,26 @@ describe('EvmBridgeReader confirmation depth', () => {
     await reader.run();
     expect(transfers).toEqual([]);
     expect(logger.at('debug')).toMatch(/large amount/);
+  });
+
+  it("sizes a Hathor-native amount with its side token's decimals, not the pseudo-address", async () => {
+    // HTR's Cross event carries uidToAddress("00"), which has no contract: decimals() on it fails
+    // the whole read. The side token is the ERC-20 that answers.
+    const context = shallowEvent(0n);
+    const htr = {
+      evmToken: '0xHTRPSEUDO',
+      hathorToken: '00',
+      originChainId: HATHOR_CHAIN_ID,
+      evmTokenContract: '0xSIDE',
+    };
+    context.bridge.addMapping(htr, 18);
+    context.bridge.crossEvents.length = 0;
+    context.bridge.crossEvents.push(
+      crossEvent({ blockNumber: 995, amount: 50n, tokenAddress: htr.evmToken, originChainId: HATHOR_CHAIN_ID }),
+    );
+
+    await context.reader.run();
+    expect(context.transfers).toEqual(['0xTX']);
   });
 
   it('does not let the shallow pass move the cursor past unsettled blocks', async () => {
