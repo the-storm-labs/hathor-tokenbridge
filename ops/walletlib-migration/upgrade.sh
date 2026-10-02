@@ -29,9 +29,9 @@ STATE_ROOT=${STATE_ROOT:-walletlib-upgrade}
 say() { printf '\n== %s\n' "$*"; }
 die() { printf '\nABORT: %s\n' "$*" >&2; exit 1; }
 
-[ -f "$ENV_FILE" ] || die "$ENV_FILE not found - run migrate-env.py first"
+[[ -f "$ENV_FILE" ]] || die "$ENV_FILE not found - run migrate-env.py first"
 OLD_ID=$(docker compose ps -q "$SERVICE")
-[ "$(printf '%s\n' "$OLD_ID" | grep -c .)" = 1 ] || die "expected exactly one running $SERVICE container"
+[[ "$(printf '%s\n' "$OLD_ID" | grep -c .)" = 1 ]] || die "expected exactly one running $SERVICE container"
 NAME=$(docker inspect -f '{{.Name}}' "$OLD_ID" | sed 's#^/##')
 docker inspect "$NAME-legacy" >/dev/null 2>&1 && die "$NAME-legacy already exists - an upgrade is already in place (rollback.sh first)"
 OLD_IMAGE=$(docker inspect -f '{{.Config.Image}}' "$OLD_ID")
@@ -39,8 +39,8 @@ NET=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\
 PORT=$(docker inspect -f '{{with index .HostConfig.PortBindings "5000/tcp"}}{{(index . 0).HostPort}}{{end}}' "$OLD_ID")
 DB_VOLUME=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/db"}}{{.Name}}{{end}}{{end}}' "$OLD_ID")
 MOUNTS=$(docker inspect -f '{{range .Mounts}}{{.Name}}:{{.Destination}}{{"\n"}}{{end}}' "$OLD_ID")
-[ -n "$DB_VOLUME" ] || die "no volume mounted at /app/db on $NAME"
-[ -n "$PORT" ] || die "no host port mapped to 5000 on $NAME"
+[[ -n "$DB_VOLUME" ]] || die "no volume mounted at /app/db on $NAME"
+[[ -n "$PORT" ]] || die "no host port mapped to 5000 on $NAME"
 
 say "1/6 preflight ($IMAGE)"
 docker pull -q "$IMAGE" >/dev/null
@@ -48,7 +48,7 @@ docker run --rm --env-file "$ENV_FILE" --network "$NET" \
   -e EXPECTED_MULTISIG -e EXPECTED_XPUBS ${PREFLIGHT_EXTRA_ENV:-} \
   -v "$HERE/preflight.js:/app/federator/built/federator/preflight.js:ro" \
   --entrypoint node "$IMAGE" preflight.js || die "preflight failed - nothing was changed"
-if [ "${PREFLIGHT_ONLY:-0}" = 1 ]; then
+if [[ "${PREFLIGHT_ONLY:-0}" = 1 ]]; then
   printf '\nPREFLIGHT_ONLY=1: stopping here, nothing was changed.\n'
   exit 0
 fi
@@ -79,15 +79,15 @@ docker update --restart no "$NAME-legacy" >/dev/null
 say "4/6 carrying the cursors over"
 docker run --rm -v "$DB_VOLUME:/db" "$HELPER_IMAGE" sh -c '
   set -e
-  for f in /db/lastBlock_fhtr_*_31.txt; do [ -f "$f" ] && cp "$f" /db/cursor_evm-bridge.txt; done
-  for f in /db/lastBlock_hmm_*_31.txt;  do [ -f "$f" ] && cp "$f" /db/cursor_hathor-federation.txt; done
+  for f in /db/lastBlock_fhtr_*_31.txt; do test -f "$f" && cp "$f" /db/cursor_evm-bridge.txt; done
+  for f in /db/lastBlock_hmm_*_31.txt;  do test -f "$f" && cp "$f" /db/cursor_hathor-federation.txt; done
   for f in cursor_evm-bridge.txt cursor_hathor-federation.txt lastHathorTimestamp.txt; do
     echo "  $f = $(cat /db/$f 2>/dev/null || echo MISSING)"
   done'
 
 say "5/6 starting $IMAGE as $NAME"
 MOUNT_ARGS=()
-while IFS= read -r mount; do [ -n "$mount" ] && MOUNT_ARGS+=(-v "$mount"); done < "$STATE/mounts"
+while IFS= read -r mount; do [[ -n "$mount" ]] && MOUNT_ARGS+=(-v "$mount"); done < "$STATE/mounts"
 docker run -d --name "$NAME" --restart unless-stopped \
   --env-file "$ENV_FILE" \
   --network "$NET" --network-alias "$SERVICE" \
@@ -98,7 +98,7 @@ docker run -d --name "$NAME" --restart unless-stopped \
 
 say "6/6 waiting for the federator to come up (a cold start rebuilds the multisig history)"
 for _ in $(seq 1 90); do
-  if [ "$(docker inspect -f '{{.RestartCount}}' "$NAME")" -gt 3 ]; then
+  if [[ "$(docker inspect -f '{{.RestartCount}}' "$NAME")" -gt 3 ]]; then
     docker logs --tail 30 "$NAME" 2>&1 | grep -E "ERROR|failed|Invalid" | tail -5
     die "$NAME keeps restarting - run ./rollback.sh"
   fi

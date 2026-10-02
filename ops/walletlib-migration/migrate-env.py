@@ -157,8 +157,11 @@ def shown(key, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default=".env.walletlib")
+    parser.add_argument("--out", default=".env.walletlib", help="file name in the current directory")
     args = parser.parse_args()
+    # A plain file name in the current directory, next to .env: nowhere else gets a file of secrets.
+    if os.path.basename(args.out) != args.out or args.out in (".", "..") or not args.out:
+        fail("--out must be a file name in the current directory")
 
     if os.path.exists(args.out):
         fail(f"{args.out} already exists; move it away first (this script never overwrites)")
