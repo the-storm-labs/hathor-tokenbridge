@@ -78,7 +78,7 @@ export class BridgeAdapter implements BridgePort {
       evmToken: original.tokenAddress,
       originChainId: Number(original.originChainId),
       // A side token exists only for a token native to another chain; an EVM-native token has none.
-      limitsToken: sideToken && !/^0x0{40}$/i.test(sideToken) ? sideToken : original.tokenAddress,
+      evmTokenContract: sideToken && !/^0x0{40}$/i.test(sideToken) ? sideToken : original.tokenAddress,
     };
 
     this.mappingsByHathor.set(hathorToken, mapping);

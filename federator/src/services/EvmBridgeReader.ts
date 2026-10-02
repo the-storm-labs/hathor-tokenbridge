@@ -123,7 +123,7 @@ export class EvmBridgeReader implements SchedulerJob {
     const { bridge, allowTokens, flow, logger } = this.deps;
 
     const mapping = await bridge.mappingByEvmToken(event.tokenAddress);
-    const limits = await allowTokens.getLimits(mapping.limitsToken);
+    const limits = await allowTokens.getLimits(mapping.evmTokenContract);
 
     if (!limits.allowed) {
       logger.error(`Token ${event.tokenAddress} is not allowed; skipping transfer ${event.transactionHash}.`);
@@ -136,7 +136,7 @@ export class EvmBridgeReader implements SchedulerJob {
       // compared. Skipping that reads every USDC amount as a million times smaller than it is, and
       // a large transfer would then clear on the shallow confirmation depth instead of the deep
       // one. The previous federator compared them raw.
-      const decimals = await bridge.getEvmTokenDecimals(mapping.evmToken);
+      const decimals = await bridge.getEvmTokenDecimals(mapping.evmTokenContract);
       const normalisedAmount = toBridgeUnit(event.amount, decimals);
       if (!this.isDeepEnough(event, normalisedAmount, currentBlock, confirmations, limits)) {
         return;

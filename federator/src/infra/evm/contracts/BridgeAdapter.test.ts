@@ -59,7 +59,7 @@ describe('BridgeAdapter token mapping', () => {
       hathorToken: HATHOR_TOKEN,
       evmToken: EVM_TOKEN,
       originChainId: SEPOLIA,
-      limitsToken: EVM_TOKEN,
+      evmTokenContract: EVM_TOKEN,
     });
   });
 
@@ -79,7 +79,7 @@ describe('BridgeAdapter token mapping', () => {
       hathorToken: '00',
       evmToken: pseudo,
       originChainId: 31,
-      limitsToken: sideToken,
+      evmTokenContract: sideToken,
     });
   });
 

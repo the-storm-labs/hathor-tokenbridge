@@ -151,7 +151,7 @@ export class EvmToHathorFlow {
    * itself, which is identical for 18-decimal tokens and correct for the rest.
    */
   private async toHathorAmount(evmAmount: bigint, mapping: TokenMapping): Promise<bigint> {
-    const decimals = await this.bridge.getEvmTokenDecimals(mapping.evmToken);
+    const decimals = await this.bridge.getEvmTokenDecimals(mapping.evmTokenContract);
     return toHathorAmount(evmAmount, decimals);
   }
 }
