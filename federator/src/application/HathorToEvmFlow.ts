@@ -130,7 +130,7 @@ export class HathorToEvmFlow {
     const isEvmNative = mapping.originChainId === evmChainId;
     const evmAmount = await this.toEvmAmount(params.hathorAmount, mapping);
 
-    const limits = await allowTokens.getLimits(mapping.evmToken);
+    const limits = await allowTokens.getLimits(mapping.limitsToken);
     if (evmAmount < limits.min) {
       logger.info(
         `Transaction ${params.hathorTxId} moves ${evmAmount} of ${mapping.evmToken}, below the ` +

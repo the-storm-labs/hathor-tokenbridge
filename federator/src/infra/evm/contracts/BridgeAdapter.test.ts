@@ -28,7 +28,9 @@ function build() {
   const adapter = new TestableBridge(new Web3(), '0xBRIDGE', logger, contract);
   contract
     .on('EvmToHathorTokenMap', () => HATHOR_TOKEN)
-    .on('HathorToEvmTokenMap', () => ({ tokenAddress: EVM_TOKEN, originChainId: String(SEPOLIA) }));
+    .on('HathorToEvmTokenMap', () => ({ tokenAddress: EVM_TOKEN, originChainId: String(SEPOLIA) }))
+    // EVM-native: the bridge never created a side token for it.
+    .on('sideTokenByOriginalTokenByChain', () => '0x0000000000000000000000000000000000000000');
   return { adapter, contract, logger };
 }
 
@@ -57,6 +59,27 @@ describe('BridgeAdapter token mapping', () => {
       hathorToken: HATHOR_TOKEN,
       evmToken: EVM_TOKEN,
       originChainId: SEPOLIA,
+      limitsToken: EVM_TOKEN,
+    });
+  });
+
+  it('takes the limits of a Hathor-native token from its side token', async () => {
+    // HTR on mainnet: HathorToEvmTokenMap("00") is uidToAddress("00"), which AllowTokens never
+    // lists - only the side token aHTR is. Asking about the pseudo-address reads "not allowed".
+    const { adapter, contract } = build();
+    const pseudo = '0xE3f0Ae350EE09657933CD8202A4dd563c5af941F';
+    const sideToken = '0x87ca1aC7697c1240518b464B02E92A856D81Aee1';
+    contract
+      .on('HathorToEvmTokenMap', () => ({ tokenAddress: pseudo, originChainId: '31' }))
+      .on('sideTokenByOriginalTokenByChain', (chainId: unknown, token: unknown) =>
+        String(chainId) === '31' && token === pseudo ? sideToken : '0x0000000000000000000000000000000000000000',
+      );
+
+    expect(await adapter.mappingByHathorToken('00')).toEqual({
+      hathorToken: '00',
+      evmToken: pseudo,
+      originChainId: 31,
+      limitsToken: sideToken,
     });
   });
 

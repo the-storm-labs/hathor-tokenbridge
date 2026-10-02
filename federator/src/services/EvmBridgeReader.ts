@@ -123,7 +123,7 @@ export class EvmBridgeReader implements SchedulerJob {
     const { bridge, allowTokens, flow, logger } = this.deps;
 
     const mapping = await bridge.mappingByEvmToken(event.tokenAddress);
-    const limits = await allowTokens.getLimits(mapping.evmToken);
+    const limits = await allowTokens.getLimits(mapping.limitsToken);
 
     if (!limits.allowed) {
       logger.error(`Token ${event.tokenAddress} is not allowed; skipping transfer ${event.transactionHash}.`);

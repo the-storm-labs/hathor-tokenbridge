@@ -54,15 +54,18 @@ export class FakeBridge implements BridgePort {
 }
 
 export class FakeAllowTokens implements AllowTokensPort {
+  /** What any token not in `limitsByToken` gets. */
   public limits: TransferLimits = { allowed: true, min: 0n, mediumAmount: 0n, largeAmount: 0n };
+  /** Per-token answers, so a test can tell which token was asked about. */
+  public readonly limitsByToken = new Map<string, TransferLimits>();
   public confirmations: Confirmations = {
     smallAmountConfirmations: 1,
     mediumAmountConfirmations: 5,
     largeAmountConfirmations: 10,
   };
 
-  async getLimits(): Promise<TransferLimits> {
-    return this.limits;
+  async getLimits(evmToken: string): Promise<TransferLimits> {
+    return this.limitsByToken.get(evmToken) ?? this.limits;
   }
 
   async getConfirmations(): Promise<Confirmations> {

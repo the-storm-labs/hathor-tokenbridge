@@ -15,6 +15,12 @@ const PUBLIC_JSON = path.join(__dirname, '../../../local/testnet-multi/public.js
 const STABLECOIN_TYPE_ID = 4;
 const TEST_TOKEN_DECIMALS = 6; // like USDC, so all three unit scales are exercised
 const TEST_TOKEN_SUPPLY = (10n ** 6n * 10n ** 6n).toString(); // one million tUSDC
+// HTR as mainnet registers it (hardhat/script/createHathorToken.js): uid "00" on Hathor's synthetic
+// chain id 31, type 1 ('ETH' limits on testnet: min 0.0005, max 750).
+const HTR_UID = '00';
+const HATHOR_CHAIN_ID = 31;
+const HTR_TYPE_ID = 1;
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 async function main() {
   const { getNamedAccounts, deployments, network } = hre;
@@ -99,7 +105,35 @@ async function main() {
     );
   }
 
+  // 5. HTR, the Hathor-native case, registered the way mainnet is: a side token for the pseudo
+  //    address uidToAddress("00") on origin chain 31, and that address mapped back to "00". HTR is
+  //    held by the multisig rather than minted, so this exercises the transfer proposals that the
+  //    tUSDC mint/melt round trip never reaches.
+  const htrAddress = await bridge.methods.uidToAddress(HTR_UID).call();
+  let htrSideToken = await bridge.methods.sideTokenByOriginalTokenByChain(HATHOR_CHAIN_ID, htrAddress).call();
+  if (htrSideToken === ZERO_ADDRESS) {
+    await viaMultiSig(
+      'createSideToken(tHTR)',
+      bridge.options.address,
+      bridge.methods.createSideToken(HTR_TYPE_ID, htrAddress, 18, 'tHTR', 'Testnet Hathor Token', HATHOR_CHAIN_ID),
+    );
+    htrSideToken = await bridge.methods.sideTokenByOriginalTokenByChain(HATHOR_CHAIN_ID, htrAddress).call();
+  } else {
+    console.log(`tHTR side token already exists at ${htrSideToken}`);
+  }
+  const htrOriginal = await bridge.methods.HathorToEvmTokenMap(HTR_UID).call();
+  if (htrOriginal.tokenAddress.toLowerCase() === htrAddress.toLowerCase()) {
+    console.log(`"${HTR_UID}" already maps to ${htrAddress}`);
+  } else {
+    await viaMultiSig(
+      `addHathorToken(${HTR_UID})`,
+      bridge.options.address,
+      bridge.methods.addHathorToken(HATHOR_CHAIN_ID, htrAddress, HTR_UID),
+    );
+  }
+
   console.log('\nState:');
+  console.log('  tHTR         ', htrSideToken, `(side token of ${htrAddress})`);
   console.log('  members      ', await federation.methods.getMembers().call());
   console.log('  required     ', await federation.methods.required().call());
   console.log('  tUSDC        ', testToken.address);

@@ -23,6 +23,12 @@ export interface TokenMapping {
   readonly evmToken: string;
   /** The chain the token is native to. */
   readonly originChainId: number;
+  /**
+   * The EVM token AllowTokens keeps limits for. For an EVM-native token it is `evmToken`; for a
+   * Hathor-native one `evmToken` is a pseudo-address (`uidToAddress(uid)`, never listed) and the
+   * limits live on its side token - checking the pseudo-address reads "not allowed", zero limits.
+   */
+  readonly limitsToken: string;
 }
 
 export interface BridgePort {

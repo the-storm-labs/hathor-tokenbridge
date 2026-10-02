@@ -66,10 +66,19 @@ export class BridgeAdapter implements BridgePort {
       throw new Error(`The bridge has no EVM token registered for Hathor token ${hathorToken}.`);
     }
 
+    const sideToken = (await method(
+      this.contract,
+      'sideTokenByOriginalTokenByChain',
+      original.originChainId,
+      original.tokenAddress,
+    ).call()) as string;
+
     const mapping: TokenMapping = {
       hathorToken,
       evmToken: original.tokenAddress,
       originChainId: Number(original.originChainId),
+      // A side token exists only for a token native to another chain; an EVM-native token has none.
+      limitsToken: sideToken && !/^0x0{40}$/i.test(sideToken) ? sideToken : original.tokenAddress,
     };
 
     this.mappingsByHathor.set(hathorToken, mapping);
