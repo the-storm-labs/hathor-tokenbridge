@@ -8,7 +8,7 @@ import { EVM_BRIDGE_READER, EvmBridgeReader } from './EvmBridgeReader';
 
 const EVM_CHAIN_ID = 42161;
 const HATHOR_CHAIN_ID = 31;
-const TOKEN = { evmToken: '0xTOKEN', hathorToken: 'htrTOKEN', originChainId: EVM_CHAIN_ID };
+const TOKEN = { evmToken: '0xTOKEN', hathorToken: 'htrTOKEN', originChainId: EVM_CHAIN_ID, limitsToken: '0xTOKEN' };
 
 class FakeChain implements EvmChainPort {
   public head = 1_000;
@@ -147,6 +147,20 @@ describe('EvmBridgeReader reading', () => {
     await reader.run();
     expect(transfers).toEqual([]);
     expect(logger.at('error')).toMatch(/not allowed/);
+  });
+
+  it('checks a Hathor-native token against its side token, not its pseudo-address', async () => {
+    // HTR on mainnet: the Cross event carries uidToAddress("00"), which AllowTokens never lists.
+    // Checking that address skipped every aHTR -> HTR transfer.
+    const { reader, bridge, allowTokens, transfers } = build();
+    const htr = { evmToken: '0xHTRPSEUDO', hathorToken: '00', originChainId: HATHOR_CHAIN_ID, limitsToken: '0xSIDE' };
+    bridge.addMapping(htr);
+    allowTokens.limits = { allowed: false, min: 0n, mediumAmount: 0n, largeAmount: 0n };
+    allowTokens.limitsByToken.set('0xSIDE', { allowed: true, min: 0n, mediumAmount: 0n, largeAmount: 0n });
+    bridge.crossEvents.push(crossEvent({ tokenAddress: htr.evmToken, originChainId: HATHOR_CHAIN_ID }));
+
+    await reader.run();
+    expect(transfers).toEqual(['0xTX']);
   });
 
   it('counts a completed run', async () => {

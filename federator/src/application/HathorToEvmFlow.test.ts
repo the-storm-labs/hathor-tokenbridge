@@ -18,8 +18,20 @@ const SENDER = 'HSENDER';
 const DESTINATION = '0xE23d59ef0c1F63B53234b00a1e1EaBEf822397D2';
 const TX_ID = 'a'.repeat(64);
 
-const EVM_NATIVE = { evmToken: '0xEVMTOKEN', hathorToken: 'htrEVMTOKEN', originChainId: EVM_CHAIN_ID };
-const HATHOR_NATIVE = { evmToken: '0xSIDETOKEN', hathorToken: 'htrNATIVE', originChainId: HATHOR_CHAIN_ID };
+const EVM_NATIVE = {
+  evmToken: '0xEVMTOKEN',
+  hathorToken: 'htrEVMTOKEN',
+  originChainId: EVM_CHAIN_ID,
+  limitsToken: '0xEVMTOKEN',
+};
+// Like HTR on mainnet: evmToken is uidToAddress(uid), which AllowTokens never lists; the limits
+// live on the side token.
+const HATHOR_NATIVE = {
+  evmToken: '0xHTRPSEUDO',
+  hathorToken: 'htrNATIVE',
+  originChainId: HATHOR_CHAIN_ID,
+  limitsToken: '0xSIDETOKEN',
+};
 
 class FakeEvmFederation implements EvmFederationPort {
   public receipt: VoteReceipt = { status: true };
@@ -365,6 +377,29 @@ describe('HathorToEvmFlow: a token native to Hathor', () => {
       blockHash: expected.idHash,
       transactionHash: expected.idHash,
     });
+  });
+
+  it("applies the side token's minimum, not the unlisted pseudo-address's zero limits", async () => {
+    // AllowTokens lists the side token only. Reading the pseudo-address gave min 0, so a deposit
+    // under the real minimum was voted anyway.
+    const { flow, wallet, allowTokens, evmFederation, logger } = await build();
+    wallet.confirmations.set(TX_ID, 10);
+    allowTokens.limits = { allowed: false, min: 0n, mediumAmount: 0n, largeAmount: 0n };
+    allowTokens.limitsByToken.set(HATHOR_NATIVE.limitsToken, {
+      allowed: true,
+      min: 10n ** 20n,
+      mediumAmount: 0n,
+      largeAmount: 0n,
+    });
+
+    const nativeTx = incomingTx();
+    const inputs = [{ ...at(nativeTx.inputs, 0), token: HATHOR_NATIVE.hathorToken }];
+    const outputs = [...nativeTx.outputs];
+    outputs[0] = { ...at(outputs, 0), token: HATHOR_NATIVE.hathorToken };
+
+    expect(await deliver(flow, wallet, { ...nativeTx, inputs, outputs })).toBe(true);
+    expect(evmFederation.votes).toEqual([]);
+    expect(logger.at('info')).toMatch(/below the minimum/);
   });
 });
 

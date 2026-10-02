@@ -13,9 +13,21 @@ const TX_HASH = '0xCROSSTX';
 const RECEIVER = 'HRECEIVER';
 
 /** A token native to the EVM chain: it has to be minted on Hathor. */
-const EVM_NATIVE = { evmToken: '0xEVMTOKEN', hathorToken: 'htrEVMTOKEN', originChainId: EVM_CHAIN_ID };
+const EVM_NATIVE = {
+  evmToken: '0xEVMTOKEN',
+  hathorToken: 'htrEVMTOKEN',
+  originChainId: EVM_CHAIN_ID,
+  limitsToken: '0xEVMTOKEN',
+};
 /** A token native to Hathor: it was locked in the multisig and is transferred back. */
-const HATHOR_NATIVE = { evmToken: '0xSIDETOKEN', hathorToken: 'htrNATIVE', originChainId: HATHOR_CHAIN_ID };
+// Like HTR on mainnet: evmToken is uidToAddress(uid), which AllowTokens never lists; the limits
+// live on the side token.
+const HATHOR_NATIVE = {
+  evmToken: '0xHTRPSEUDO',
+  hathorToken: 'htrNATIVE',
+  originChainId: HATHOR_CHAIN_ID,
+  limitsToken: '0xSIDETOKEN',
+};
 
 function crossEvent(overrides: Partial<CrossEvent> = {}): CrossEvent {
   return {
