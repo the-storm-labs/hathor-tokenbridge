@@ -119,6 +119,13 @@ const LIB_STATE: Record<number, WalletStatus['state']> = {
   5: 'processing',
 };
 
+/** The parts of a full node `meta` that confirmation depends on. */
+interface FullTxMeta {
+  readonly first_block?: string | null;
+  readonly first_block_height?: number | null;
+  readonly voided_by?: readonly string[];
+}
+
 export class WalletLibAdapter implements HathorWalletPort {
   private readonly config: WalletLibAdapterConfig;
   private readonly logger: LoggerPort;
@@ -266,21 +273,33 @@ export class WalletLibAdapter implements HathorWalletPort {
    * How many blocks have confirmed a transaction.
    *
    * The headless exposed this as one endpoint; the library does not, so it is the two calls the
-   * endpoint itself made: the transaction's own height, and the height of the best block.
+   * endpoint itself made: the height of the block that first confirmed the transaction, and the
+   * height of the best block.
+   *
+   * `meta.height` is NOT that: on a transaction (as opposed to a block) the full node reports
+   * `height: 0`, so subtracting it made every transaction - mempool ones included - look millions of
+   * blocks deep, and HATHOR_MIN_CONFIRMATIONS never held anything back. `meta.first_block_height`
+   * is the confirming block's height, and is absent or null until a block confirms the transaction.
    */
   async getConfirmationCount(txId: string): Promise<number> {
     const wallet = this.require();
-    const full = (await wallet.getFullTxById(txId)) as { meta?: { height?: number | null } };
+    const full = (await wallet.getFullTxById(txId)) as { meta?: FullTxMeta };
+    const meta = full.meta;
 
-    const height = full.meta?.height;
-    if (height === undefined || height === null) {
+    // A voided transaction will never confirm the deposit it claims to make.
+    if (meta?.voided_by && meta.voided_by.length > 0) {
+      return 0;
+    }
+
+    const firstBlockHeight = meta?.first_block ? meta.first_block_height : undefined;
+    if (firstBlockHeight === undefined || firstBlockHeight === null) {
       // Not in a block yet. Zero rather than an error: "not confirmed yet" is the normal answer
       // for a transaction that has only just been pushed, and callers compare against a threshold.
       return 0;
     }
 
     const bestHeight = await this.driver.bestBlockHeight();
-    return Math.max(0, bestHeight - Number(height));
+    return Math.max(0, bestHeight - Number(firstBlockHeight));
   }
 
   /**
