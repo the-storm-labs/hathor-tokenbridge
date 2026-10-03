@@ -72,6 +72,8 @@ export interface HathorConfig {
   readonly fromTimestamp: number;
   /** Mint/melt authorities per token to grow the multisig's pool to; 0 = off. See schema.ts. */
   readonly authorityPoolTarget: number;
+  /** Blocks back the Hathor side re-checks every round. See schema.ts. */
+  readonly lookbackBlocks: number;
   /**
    * Transitional: only the headless HTTP adapter reads this. It exists so both adapters can be
    * configured side by side while their behaviour is compared, and goes away with the container.

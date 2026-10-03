@@ -5,6 +5,9 @@ import { FakeHathorWallet } from '../ports/testSupport/FakeHathorWallet';
 import { RecordingLogger } from '../ports/testSupport/fakes';
 import { HathorService } from './HathorService';
 
+/** Close to the test transactions, so they all sit inside the time pre-filter. */
+const NOW = 1_000;
+
 const tx = (txId: string, timestamp: number): HistoryEntry => ({
   txId,
   timestamp,
@@ -27,7 +30,15 @@ function build(handle: (tx: HistoryEntry) => Promise<boolean> = async () => true
     },
   } as unknown as HathorToEvmFlow;
 
-  const service = new HathorService({ wallet, flow, cursors, logger, fromTimestamp: 100 });
+  const service = new HathorService({
+    wallet,
+    flow,
+    cursors,
+    logger,
+    fromTimestamp: 100,
+    lookbackBlocks: 120,
+    now: () => NOW,
+  });
   return { service, wallet, cursors, logger, handled };
 }
 
@@ -262,5 +273,61 @@ describe('HathorService retry of transactions that were not ready', () => {
     const { service, handled } = build();
     await service.run();
     expect(handled).toEqual([]);
+  });
+});
+
+describe('HathorService lookback window', () => {
+  it('handles a deposit whose wallet event never arrived', async () => {
+    // The deposit lands in the wallet's history, but neither the live event nor a restart replay
+    // delivers it (the cursor is already past it). Only the window can find it.
+    const { service, wallet, cursors, handled } = build();
+    cursors.timestamp = 900;
+    await service.start();
+    expect(handled).toEqual([]);
+
+    wallet.history = [tx('lost', 950)];
+    wallet.confirmations.set('lost', 25);
+    await service.run();
+    expect(handled).toEqual(['lost']);
+  });
+
+  it('leaves alone a transaction confirmed further back than the window', async () => {
+    const { service, wallet, cursors, handled } = build();
+    cursors.timestamp = 900;
+    await service.start();
+
+    wallet.history = [tx('ancient', 950)];
+    wallet.confirmations.set('ancient', 121);
+    await service.run();
+    expect(handled).toEqual([]);
+  });
+
+  it('does not handle again what this process already finished', async () => {
+    const { service, wallet, handled } = build();
+    wallet.history = [tx('deposit', 200)];
+
+    await service.start();
+    await service.run();
+    await service.run();
+    expect(handled).toEqual(['deposit']);
+  });
+
+  it('keeps retrying a pending transaction after it has left the window', async () => {
+    // A federator that could not reach a node for longer than the window must still finish it.
+    let reachable = false;
+    const { service, wallet, handled } = build(async () => {
+      if (!reachable) {
+        throw new Error('node unreachable');
+      }
+      return true;
+    });
+    wallet.history = [tx('deposit', 200)];
+    await service.start();
+
+    wallet.confirmations.set('deposit', 500);
+    reachable = true;
+    await service.run();
+    expect(handled).toEqual(['deposit', 'deposit']);
+    expect(service.pendingCount).toBe(0);
   });
 });
