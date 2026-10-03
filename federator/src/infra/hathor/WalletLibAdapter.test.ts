@@ -149,20 +149,45 @@ describe('WalletLibAdapter readiness', () => {
   });
 });
 
+/** A transaction's meta as the full node returns it: a transaction's own `height` is always 0. */
+const txMeta = (overrides: Record<string, unknown> = {}) => ({
+  meta: { height: 0, first_block: null, first_block_height: null, voided_by: [], ...overrides },
+});
+
 describe('WalletLibAdapter confirmations', () => {
-  it('counts confirmations as the distance from the best block', async () => {
+  it('counts confirmations from the block that first confirmed the transaction', async () => {
     const { adapter, stub } = build();
     await adapter.start();
-    stub.fullTxs.set('abc', { meta: { height: 990 } });
+    stub.fullTxs.set('abc', txMeta({ first_block: '00000000beef', first_block_height: 990 }));
     stub.bestBlockHeight = 1_000;
 
     expect(await adapter.getConfirmationCount('abc')).toBe(10);
   });
 
+  it("does not take a transaction's own height of 0 as a confirmation depth", async () => {
+    // Mainnet, 2026-10-03: an HTR deposit was voted 3 s after it reached the mempool because
+    // bestHeight - meta.height read as ~7 million confirmations.
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.fullTxs.set('abc', txMeta());
+    stub.bestBlockHeight = 7_171_895;
+
+    expect(await adapter.getConfirmationCount('abc')).toBe(0);
+  });
+
+  it('reports zero for a voided transaction, even one a block once confirmed', async () => {
+    const { adapter, stub } = build();
+    await adapter.start();
+    stub.fullTxs.set('abc', txMeta({ first_block: '00000000beef', first_block_height: 900, voided_by: ['abc'] }));
+    stub.bestBlockHeight = 1_000;
+
+    expect(await adapter.getConfirmationCount('abc')).toBe(0);
+  });
+
   it('never reports a negative count when the best height lags the transaction', async () => {
     const { adapter, stub } = build();
     await adapter.start();
-    stub.fullTxs.set('abc', { meta: { height: 1_010 } });
+    stub.fullTxs.set('abc', txMeta({ first_block: '00000000beef', first_block_height: 1_010 }));
     stub.bestBlockHeight = 1_000;
 
     expect(await adapter.getConfirmationCount('abc')).toBe(0);
@@ -603,7 +628,7 @@ describe('WalletLibAdapter reading', () => {
     // threshold - an error here would turn a normal state into a failed round.
     const { adapter, stub } = build();
     await adapter.start();
-    stub.fullTxs.set('abc', { meta: { height: null } });
+    stub.fullTxs.set('abc', txMeta());
 
     expect(await adapter.getConfirmationCount('abc')).toBe(0);
   });

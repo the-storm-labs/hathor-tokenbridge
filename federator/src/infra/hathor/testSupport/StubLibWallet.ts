@@ -27,7 +27,7 @@ export class StubLibWallet {
   public history: unknown[] = [];
   public ownAddresses = new Set<string>(['wXonH2U9Bys5EcYsFspZyBVqeTVQ3Htf4Q']);
   public txs = new Map<string, unknown>();
-  public fullTxs = new Map<string, { meta?: { height?: number | null } }>();
+  public readonly fullTxs = new Map<string, { meta?: Record<string, unknown> }>();
 
   public signature = 'pub|0:aaaa';
   public assembled?: { txHex: string; signatures: string[] };
@@ -98,7 +98,7 @@ export class StubLibWallet {
     return this.txs.get(id) ?? null;
   }
 
-  async getFullTxById(id: string): Promise<{ meta?: { height?: number | null } }> {
+  async getFullTxById(id: string): Promise<{ meta?: Record<string, unknown> }> {
     return this.fullTxs.get(id) ?? {};
   }
 
