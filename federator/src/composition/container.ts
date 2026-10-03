@@ -170,6 +170,7 @@ export function buildFederator(config: AppConfig): Federator {
     cursors,
     logger: new Log4jsLogger('HATHOR_SERVICE'),
     fromTimestamp: config.hathor.fromTimestamp,
+    lookbackBlocks: config.hathor.lookbackBlocks,
   });
 
   const bridgeReader = new EvmBridgeReader({

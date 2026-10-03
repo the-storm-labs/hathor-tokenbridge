@@ -159,6 +159,14 @@ export const envSchema = z.object({
    */
   HATHOR_AUTHORITY_POOL_TARGET: nonNegativeIntFromEnv('HATHOR_AUTHORITY_POOL_TARGET').default('0'),
 
+  /**
+   * How many blocks back the Hathor side looks, every polling round, for multisig transactions it
+   * has not finished with - including ones whose wallet event never arrived. Must exceed the
+   * confirmations this federator waits for (HATHOR_MIN_CONFIRMATIONS x HATHOR_MULTISIG_ORDER), or a
+   * deposit would leave the window before it became eligible. Unset: that requirement plus 100.
+   */
+  HATHOR_LOOKBACK_BLOCKS: positiveIntFromEnv('HATHOR_LOOKBACK_BLOCKS').optional(),
+
   // Transitional - only the headless adapter uses these. Removed with the container.
   HATHOR_HEADLESS_URL: httpUrl('HATHOR_HEADLESS_URL').optional(),
   HATHOR_HEADLESS_API_KEY: optionalText,

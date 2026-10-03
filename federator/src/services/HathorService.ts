@@ -22,15 +22,27 @@ export interface HathorServiceDeps {
   readonly logger: LoggerPort;
   /** Unix seconds to replay from when no cursor has been recorded yet. */
   readonly fromTimestamp: number;
+  /** Blocks back each run() looks for transactions not finished with (HATHOR_LOOKBACK_BLOCKS). */
+  readonly lookbackBlocks: number;
+  /** Unix seconds now; injectable for tests. */
+  readonly now?: () => number;
 }
+
+/**
+ * Hathor's target block time. Only used to bound which transactions are worth a confirmation lookup
+ * at all - the window itself is measured in blocks - so it is applied with a 2x margin.
+ */
+const BLOCK_SECONDS = 30;
 
 export class HathorService {
   /** As the scheduler names it in its logs. */
-  readonly name = 'Hathor pending-deposit retry';
+  readonly name = 'Hathor lookback window';
   private readonly deps: HathorServiceDeps;
   private started = false;
-  /** Transactions not done with yet, by id - retried by run(). */
+  /** Transactions not done with yet, by id - retried by run() until done, however old. */
   private readonly pending = new Map<string, HistoryEntry>();
+  /** Transactions done with in this process, by id -> timestamp; trimmed to the window. */
+  private readonly done = new Map<string, number>();
   /** The newest timestamp of a transaction that is done with. */
   private latestDone = 0;
   /**
@@ -42,6 +54,10 @@ export class HathorService {
 
   constructor(deps: HathorServiceDeps) {
     this.deps = deps;
+  }
+
+  private now(): number {
+    return this.deps.now ? this.deps.now() : Math.floor(Date.now() / 1000);
   }
 
   /**
@@ -100,28 +116,54 @@ export class HathorService {
   }
 
   /**
-   * Re-checks every transaction that was not ready, on the scheduler's cadence.
+   * One round of the Hathor side, on the scheduler's cadence: every multisig transaction confirmed
+   * within the last `lookbackBlocks` blocks (or not confirmed yet) that this process has not
+   * finished with, plus anything still pending however old.
    *
-   * A deposit is seen once - live, or on replay - normally before it has the confirmations it
-   * needs, so "come back to it" has to mean something: without this, a deposit waiting on
-   * HATHOR_MIN_CONFIRMATIONS was only looked at again on the next process start. A transaction the
-   * wallet now reports voided or no longer knows is dropped: it will never become a valid deposit.
+   * The window is what makes a lost wallet event harmless: a deposit is found here whether or not
+   * `new-tx` ever reached us, and it stays eligible while it climbs to the confirmations the flow
+   * waits for. Pending transactions are kept past the window - a federator that cannot reach a node
+   * for an hour must still finish the deposit afterwards - and dropped only once the wallet reports
+   * them voided or no longer knows them.
    */
   async run(): Promise<void> {
-    const { wallet, logger } = this.deps;
     if (!this.started) {
       return;
     }
-    const waiting = [...this.pending.values()].sort((a, b) => a.timestamp - b.timestamp);
-    for (const tx of waiting) {
-      if (!(await wallet.getTransaction(tx.txId))) {
-        logger.warn(`Transaction ${tx.txId} is voided or gone; no longer waiting on it.`);
-        this.pending.delete(tx.txId);
-        await this.advanceCursor();
+    const { wallet, logger, lookbackBlocks } = this.deps;
+    const horizon = this.now() - lookbackBlocks * BLOCK_SECONDS * 2;
+
+    for (const [txId, timestamp] of this.done) {
+      if (timestamp < horizon) {
+        this.done.delete(txId);
+      }
+    }
+
+    const work = new Map<string, HistoryEntry>();
+    for (const tx of await wallet.getHistory()) {
+      if (tx.isVoided === true || tx.timestamp < horizon || this.done.has(tx.txId) || this.pending.has(tx.txId)) {
         continue;
       }
-      await this.handle(tx, 'retry');
+      if ((await wallet.getConfirmationCount(tx.txId)) > lookbackBlocks) {
+        continue;
+      }
+      logger.info(`Transaction ${tx.txId} was found by the lookback window, not by its event.`);
+      work.set(tx.txId, tx);
     }
+
+    for (const tx of this.pending.values()) {
+      if (await wallet.getTransaction(tx.txId)) {
+        work.set(tx.txId, tx);
+      } else {
+        logger.warn(`Transaction ${tx.txId} is voided or gone; no longer waiting on it.`);
+        this.pending.delete(tx.txId);
+      }
+    }
+
+    for (const tx of [...work.values()].sort((a, b) => a.timestamp - b.timestamp)) {
+      await this.handle(tx, 'lookback');
+    }
+    await this.advanceCursor();
   }
 
   /** How many transactions are waiting to be handled again. */
@@ -138,7 +180,7 @@ export class HathorService {
    * synced wallet - and the replay path must not let one bad transaction block the rest of the
    * history behind it.
    */
-  private async handle(tx: HistoryEntry, source: 'live' | 'replay' | 'retry'): Promise<void> {
+  private async handle(tx: HistoryEntry, source: 'live' | 'replay' | 'lookback'): Promise<void> {
     const { flow, logger } = this.deps;
 
     let done = false;
@@ -153,6 +195,7 @@ export class HathorService {
 
     if (done) {
       this.pending.delete(tx.txId);
+      this.done.set(tx.txId, tx.timestamp);
       this.latestDone = Math.max(this.latestDone, tx.timestamp);
     } else {
       this.pending.set(tx.txId, tx);

@@ -18,6 +18,14 @@ export class ConfigError extends Error {
   }
 }
 
+/** Blocks of margin the lookback window keeps past the confirmations a deposit waits for. */
+const DEFAULT_LOOKBACK_MARGIN = 100;
+
+/** Confirmations this federator waits for before acting on a deposit (see HathorToEvmFlow). */
+function requiredConfirmations(e: ParsedEnv): number {
+  return e.HATHOR_MIN_CONFIRMATIONS * e.HATHOR_MULTISIG_ORDER;
+}
+
 function formatIssues(issues: readonly string[]): string {
   return issues.map((issue) => '  - ' + issue).join('\n');
 }
@@ -99,6 +107,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       inputLockTtlMs: e.HATHOR_INPUT_LOCK_TTL_MS,
       fromTimestamp: e.HATHOR_FROM_TIMESTAMP,
       authorityPoolTarget: e.HATHOR_AUTHORITY_POOL_TARGET,
+      lookbackBlocks: e.HATHOR_LOOKBACK_BLOCKS ?? requiredConfirmations(e) + DEFAULT_LOOKBACK_MARGIN,
       headless,
     },
     federator: {
@@ -168,6 +177,13 @@ function crossFieldIssues(e: ParsedEnv, derivedAddress: string): string[] {
 
   // Only the wallet-lib adapter can add the extra authority output; the transitional headless one
   // cannot, so refuse the combination at boot rather than at the first mint.
+  if (e.HATHOR_LOOKBACK_BLOCKS !== undefined && e.HATHOR_LOOKBACK_BLOCKS <= requiredConfirmations(e)) {
+    issues.push(
+      `HATHOR_LOOKBACK_BLOCKS (${e.HATHOR_LOOKBACK_BLOCKS}) must exceed the ${requiredConfirmations(e)} ` +
+        `confirmations this federator waits for, or a deposit leaves the window before it is eligible.`,
+    );
+  }
+
   if (hasHeadlessUrl && e.HATHOR_AUTHORITY_POOL_TARGET > 0) {
     issues.push('HATHOR_AUTHORITY_POOL_TARGET needs the wallet-lib adapter; unset HATHOR_HEADLESS_URL or set it to 0.');
   }

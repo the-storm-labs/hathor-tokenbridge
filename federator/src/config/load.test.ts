@@ -249,6 +249,24 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('HATHOR_LOOKBACK_BLOCKS', () => {
+    it('defaults to the confirmations this federator waits for, plus 100', () => {
+      // validEnv: HATHOR_MIN_CONFIRMATIONS 1; order 6 would make it 106.
+      const env = validEnv({ HATHOR_MIN_CONFIRMATIONS: '20' });
+      const order = loadConfig(env).hathor.multisig.order;
+      expect(loadConfig(env).hathor.lookbackBlocks).toBe(20 * order + 100);
+    });
+
+    it('reads an explicit window', () => {
+      expect(loadConfig(validEnv({ HATHOR_LOOKBACK_BLOCKS: '300' })).hathor.lookbackBlocks).toBe(300);
+    });
+
+    it('refuses a window a deposit would leave before it is eligible', () => {
+      const issues = issuesFrom(validEnv({ HATHOR_MIN_CONFIRMATIONS: '20', HATHOR_LOOKBACK_BLOCKS: '20' }));
+      expect(issues.join('\n')).toMatch(/HATHOR_LOOKBACK_BLOCKS \(20\) must exceed/);
+    });
+  });
+
   describe('HATHOR_AUTHORITY_POOL_TARGET', () => {
     it('is off unless set', () => {
       expect(loadConfig(validEnv()).hathor.authorityPoolTarget).toBe(0);
