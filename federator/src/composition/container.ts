@@ -202,6 +202,8 @@ export function buildFederator(config: AppConfig): Federator {
   const schedulers = [
     new Scheduler(bridgeReader, schedulerOptions, new Log4jsLogger('SCHEDULER')),
     new Scheduler(federationReader, schedulerOptions, new Log4jsLogger('SCHEDULER')),
+    // Deposits that were not ready when they arrived (confirmations), checked again every round.
+    new Scheduler(hathorService, schedulerOptions, new Log4jsLogger('SCHEDULER')),
   ];
 
   const status = async (): Promise<Record<string, unknown>> => ({

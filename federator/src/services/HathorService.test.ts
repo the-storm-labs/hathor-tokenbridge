@@ -178,3 +178,89 @@ describe('HathorService failure isolation', () => {
     expect(logger.at('error')).toMatch(/Failed to handle live transaction live/);
   });
 });
+
+describe('HathorService retry of transactions that were not ready', () => {
+  it('checks a waiting deposit again on every run until it is done', async () => {
+    // Mainnet, 2026-10-03: once confirmations were counted correctly, a deposit seen before its
+    // confirmations was never looked at again until the next restart.
+    let confirmed = false;
+    const { service, wallet, handled } = build(async (incoming) => incoming.txId !== 'deposit' || confirmed);
+    wallet.history = [tx('deposit', 200)];
+
+    await service.start();
+    expect(service.pendingCount).toBe(1);
+
+    await service.run();
+    expect(service.pendingCount).toBe(1);
+
+    confirmed = true;
+    await service.run();
+    expect(service.pendingCount).toBe(0);
+    expect(handled).toEqual(['deposit', 'deposit', 'deposit']);
+  });
+
+  it('does not let a later transaction carry the cursor past an earlier one still waiting', async () => {
+    let confirmed = false;
+    const { service, wallet, cursors } = build(async (incoming) => incoming.txId !== 'deposit' || confirmed);
+    wallet.history = [tx('deposit', 200), tx('own-melt', 300)];
+
+    await service.start();
+    // The melt at 300 is done, but replay from 300 would skip the deposit at 200.
+    expect(cursors.timestamp).toBe(200);
+
+    confirmed = true;
+    await service.run();
+    expect(cursors.timestamp).toBe(300);
+  });
+
+  it('keeps a live transaction that is not ready, too', async () => {
+    let confirmed = false;
+    const { service, wallet } = build(async () => confirmed);
+
+    await service.start();
+    wallet.history = [tx('live', 400)];
+    await wallet.emitNewTransaction(tx('live', 400));
+    expect(service.pendingCount).toBe(1);
+
+    confirmed = true;
+    await service.run();
+    expect(service.pendingCount).toBe(0);
+  });
+
+  it('stops waiting on a transaction the wallet reports voided or gone', async () => {
+    const { service, wallet, logger, cursors } = build(async (incoming) => incoming.txId !== 'deposit');
+    wallet.history = [tx('deposit', 200), tx('later', 300)];
+
+    await service.start();
+    expect(cursors.timestamp).toBe(200);
+
+    wallet.history = [tx('later', 300)];
+    await service.run();
+    expect(service.pendingCount).toBe(0);
+    expect(logger.at('warn')).toMatch(/deposit is voided or gone/);
+    expect(cursors.timestamp).toBe(300);
+  });
+
+  it('retries a transaction whose handling failed', async () => {
+    let failing = true;
+    const { service, wallet, handled } = build(async () => {
+      if (failing) {
+        throw new Error('node timeout');
+      }
+      return true;
+    });
+    wallet.history = [tx('flaky', 200)];
+
+    await service.start();
+    failing = false;
+    await service.run();
+    expect(handled).toEqual(['flaky', 'flaky']);
+    expect(service.pendingCount).toBe(0);
+  });
+
+  it('does nothing before it has started', async () => {
+    const { service, handled } = build();
+    await service.run();
+    expect(handled).toEqual([]);
+  });
+});

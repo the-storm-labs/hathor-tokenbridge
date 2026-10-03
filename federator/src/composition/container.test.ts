@@ -54,7 +54,7 @@ describe('buildFederator', () => {
     expect(federator.hathorService).toBeDefined();
     expect(federator.health).toBeDefined();
     expect(federator.metrics).toBeDefined();
-    expect(federator.schedulers).toHaveLength(2);
+    expect(federator.schedulers).toHaveLength(3);
   });
 
   it('starts nothing', async () => {
@@ -86,7 +86,7 @@ describe('buildFederator', () => {
       multisigOrder: 1,
       walletAdapter: 'wallet-lib',
       wallet: { state: 'closed' },
-      schedulers: [{ failureStreak: 0 }, { failureStreak: 0 }],
+      schedulers: [{ failureStreak: 0 }, { failureStreak: 0 }, { failureStreak: 0 }],
     });
   });
 

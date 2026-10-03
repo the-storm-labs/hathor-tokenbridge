@@ -25,8 +25,14 @@ export interface HathorServiceDeps {
 }
 
 export class HathorService {
+  /** As the scheduler names it in its logs. */
+  readonly name = 'Hathor pending-deposit retry';
   private readonly deps: HathorServiceDeps;
   private started = false;
+  /** Transactions not done with yet, by id - retried by run(). */
+  private readonly pending = new Map<string, HistoryEntry>();
+  /** The newest timestamp of a transaction that is done with. */
+  private latestDone = 0;
   /**
    * The furthest point the cursor has been moved to in this process. A live transaction can arrive
    * while older ones are still being replayed, and persisting each timestamp blindly would drag
@@ -94,28 +100,80 @@ export class HathorService {
   }
 
   /**
-   * Handles one transaction, advancing the cursor only when it is genuinely done with.
+   * Re-checks every transaction that was not ready, on the scheduler's cadence.
+   *
+   * A deposit is seen once - live, or on replay - normally before it has the confirmations it
+   * needs, so "come back to it" has to mean something: without this, a deposit waiting on
+   * HATHOR_MIN_CONFIRMATIONS was only looked at again on the next process start. A transaction the
+   * wallet now reports voided or no longer knows is dropped: it will never become a valid deposit.
+   */
+  async run(): Promise<void> {
+    const { wallet, logger } = this.deps;
+    if (!this.started) {
+      return;
+    }
+    const waiting = [...this.pending.values()].sort((a, b) => a.timestamp - b.timestamp);
+    for (const tx of waiting) {
+      if (!(await wallet.getTransaction(tx.txId))) {
+        logger.warn(`Transaction ${tx.txId} is voided or gone; no longer waiting on it.`);
+        this.pending.delete(tx.txId);
+        await this.advanceCursor();
+        continue;
+      }
+      await this.handle(tx, 'retry');
+    }
+  }
+
+  /** How many transactions are waiting to be handled again. */
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+
+  /**
+   * Handles one transaction. One that is not done with - waiting on confirmations, or failed - is
+   * kept for run() to retry, and the cursor never moves past it.
    *
    * A failure here is logged rather than thrown. The live path is an event handler - throwing
    * would reach an EventEmitter with no error listener and take the process down along with the
    * synced wallet - and the replay path must not let one bad transaction block the rest of the
    * history behind it.
    */
-  private async handle(tx: HistoryEntry, source: 'live' | 'replay'): Promise<void> {
-    const { flow, cursors, logger } = this.deps;
+  private async handle(tx: HistoryEntry, source: 'live' | 'replay' | 'retry'): Promise<void> {
+    const { flow, logger } = this.deps;
 
+    let done = false;
     try {
-      const done = await flow.handleIncoming(tx);
-      if (done) {
-        if (tx.timestamp > this.highWaterMark) {
-          this.highWaterMark = tx.timestamp;
-          await cursors.setTimestampCursor(tx.timestamp);
-        }
-      } else {
-        logger.debug(`Transaction ${tx.txId} is not ready yet; leaving the cursor where it is.`);
+      done = await flow.handleIncoming(tx);
+      if (!done) {
+        logger.debug(`Transaction ${tx.txId} is not ready yet; it will be checked again.`);
       }
     } catch (error) {
       logger.error(`Failed to handle ${source} transaction ${tx.txId}. It will be retried.`, error);
+    }
+
+    if (done) {
+      this.pending.delete(tx.txId);
+      this.latestDone = Math.max(this.latestDone, tx.timestamp);
+    } else {
+      this.pending.set(tx.txId, tx);
+    }
+    await this.advanceCursor();
+  }
+
+  /**
+   * Moves the persisted cursor to the newest transaction done with, but never past the oldest one
+   * still waiting: replay starts "at or after" the cursor, so a restart picks the waiting one up.
+   * A later transaction finishing first (the federator's own melts and mints arrive all the time)
+   * must not carry the cursor over an earlier deposit that is still waiting.
+   */
+  private async advanceCursor(): Promise<void> {
+    let target = this.latestDone;
+    for (const waiting of this.pending.values()) {
+      target = Math.min(target, waiting.timestamp);
+    }
+    if (target > this.highWaterMark) {
+      this.highWaterMark = target;
+      await this.deps.cursors.setTimestampCursor(target);
     }
   }
 }
