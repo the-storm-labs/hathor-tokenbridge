@@ -1,4 +1,7 @@
-FROM node:22-alpine3.23
+# Node 22.23.4: the 2026-10-21 security release (Brotli decoder RCE, TLS hostname bypass). The
+# federator decompresses RPC and Hathor node responses, and holds the keys. Pinned so a rebuild
+# from a stale layer cache cannot quietly ship an older Node.
+FROM node:22.23.4-alpine3.23
 
 RUN apk add --no-cache build-base python3
 
