@@ -22,6 +22,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
 # Public values of each federation: the multisig every federator of it must derive. Checked by
 # preflight so a federator cannot be moved onto the wrong federation by a copy-paste mistake.
@@ -278,10 +279,16 @@ def build_env(fed_name, wallet_name):
     from_ts = (fed.get("HATHOR_LAST_TIMESTAMP") or "").strip()
     if not from_ts.isdigit():
         from_ts = cursor_timestamp(fed_name)
-        if not from_ts:
-            raise Stop("HATHOR_LAST_TIMESTAMP is not set and the federator has no saved Hathor position.",
-                       "Ask the bridge maintainers for the starting timestamp before migrating.")
-        notes.append("HATHOR_LAST_TIMESTAMP was not set; using the position the federator saved.")
+        if from_ts:
+            notes.append("HATHOR_LAST_TIMESTAMP was not set; using the position the federator saved.")
+        else:
+            # The legacy federator fell back to Date.now() here - milliseconds against Hathor's
+            # seconds, so its history replay never matched anything: it only acted on live events.
+            # Now (in seconds) is the same behaviour, and the new federator's lookback window
+            # (HATHOR_LOOKBACK_BLOCKS) still re-checks recent blocks, so the switch loses nothing.
+            from_ts = str(int(time.time()))
+            notes.append(f"HATHOR_LAST_TIMESTAMP was not set and no Hathor position was saved; "
+                         f"starting from now ({from_ts}), as the legacy federator did.")
 
     seed_words = value(wal, "HEADLESS_SEED_DEFAULT", W, "The wallet seed (HEADLESS_SEED_DEFAULT) must be in your .env.").split()
 
