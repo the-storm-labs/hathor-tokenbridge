@@ -1,10 +1,13 @@
-# REFERENCE ONLY - do not start this with your existing .env.
+# The wallet-lib federator. Do not start this by hand: ops/walletlib-migration/migrate.sh switches
+# to it, and `migrate.sh --rollback` switches back.
 #
-# This is what the wallet-lib federator runs with. Operators move to it with
-# ops/walletlib-migration/migrate.sh, which reads the legacy container, writes the new
-# configuration and creates the new container itself. Started straight from a legacy .env, this
-# file leaves HATHOR_TX_MINING_URL / HATHOR_FROM_TIMESTAMP empty and the xpubs space-separated,
-# the federator refuses to boot, and the legacy container it replaced is gone.
+# migrate.sh reads the legacy federator's container and writes its whole configuration, under the
+# new variable names, to walletlib-fed<order>.env next to this file (mode 600; ignored by git as
+# **.env). It then adds COMPOSE_FILE=<this file> to the .env compose uses, so the usual
+# `docker compose up -d` runs this file from then on. From .env this file only reads
+# HATHOR_MULTISIG_ORDER (container name, port, volume) and, for alloy, the GRAFANA_CLOUD_* values.
+# The legacy .env cannot feed the federator directly: its names, the xpub separator and two
+# required values differ.
 #
 # The federator, with Grafana Alloy instead of prometheus + promtail.
 #
@@ -36,52 +39,9 @@ services:
     volumes:
       - federator_db:/app/db
       - federator_db:/var/log
-    environment:
-      # ---- EVM chain: Bridge / Federation / AllowTokens ----
-      EVM_NAME: "${EVM_NETWORK}"
-      EVM_CHAIN_ID: "${EVM_CHAIN_ID}"
-      EVM_HOST: "${EVM_HOST}"
-      EVM_BRIDGE_ADDRESS: "${BRIDGE_ADDRESS}"
-      EVM_FEDERATION_ADDRESS: "${FEDERATION_ADDRESS}"
-      EVM_ALLOW_TOKENS_ADDRESS: "${ALLOW_TOKENS_ADDRESS}"
-      EVM_FROM_BLOCK: "${FROM_BLOCK}"
-
-      # ---- State chain: the HathorFederation coordination contract ----
-      STATE_CHAIN_ID: "${FEDERATION_CHAIN_ID}"
-      STATE_CHAIN_HOST: "${HATHOR_STATE_CONTRACT_HOST_URL}"
-      STATE_CONTRACT_ADDRESS: "${HATHOR_STATE_CONTRACT_ADDR}"
-      STATE_FROM_BLOCK: "${FEDERATION_FROM_BLOCK}"
-      STATE_CONFIRMATION_BLOCKS: "${FEDERATION_CONFIRMATION_BLOCKS}"
-
-      # ---- Hathor ----
-      HATHOR_NAME: "${HATHOR_NAME}"
-      HATHOR_CHAIN_ID: "${HATHOR_CHAIN_ID}"
-      HATHOR_NETWORK: "${HEADLESS_NETWORK}"
-      HATHOR_FULLNODE_URL: "${HEADLESS_SERVER}"
-      HATHOR_TX_MINING_URL: "${HEADLESS_TX_MINING_URL}"
-      # The seed that used to live on the wallet container. See the note at the top of this file.
-      HATHOR_SEED: "${HEADLESS_SEED_DEFAULT}"
-      HATHOR_MULTISIG_PUBKEYS: "${HEADLESS_MULTISIG_SEED_DEFAULT_PUBKEYS}"
-      HATHOR_NUM_SIGNATURES: "${HEADLESS_MULTISIG_SEED_DEFAULT_NUM_SIGNATURES}"
-      HATHOR_MULTISIG_ORDER: "${HATHOR_MULTISIG_ORDER}"
-      HATHOR_MIN_CONFIRMATIONS: "${HATHOR_MINIMUM_CONFIRMATIONS}"
-      # Milliseconds, and it goes straight into a timer. The old HATHOR_INPUT_BLOCK_TTL example of
-      # `1` meant one millisecond, which is no input lock at all.
-      HATHOR_INPUT_LOCK_TTL_MS: "${HATHOR_INPUT_LOCK_TTL_MS:-1800000}"
-      HATHOR_FROM_TIMESTAMP: "${HATHOR_LAST_TIMESTAMP}"
-
-      # ---- Rollout switch ----
-      # Set these two to run this whole tree against the wallet container you already have, before
-      # moving onto the embedded library. Leave them unset for wallet-lib. /status reports which.
-      HATHOR_HEADLESS_URL: "${HATHOR_HEADLESS_URL:-}"
-      HATHOR_HEADLESS_API_KEY: "${HATHOR_HEADLESS_API_KEY:-}"
-
-      # ---- Federator identity and runtime ----
-      FEDERATOR_KEY: "${FEDERATOR_KEY}"
-      # Optional: checked against the address derived from the key, never trusted on its own.
-      FEDERATOR_ADDRESS: "${FEDERATOR_ADDRESS:-}"
-      STORAGE_PATH: /app/db
-      LOG_FILE: /var/log/federator.log
+    # Written by migrate.sh from the legacy federator; every setting the federator reads is here.
+    env_file:
+      - "walletlib-fed${HATHOR_MULTISIG_ORDER}.env"
 
   alloy:
     image: grafana/alloy:v1.19.0

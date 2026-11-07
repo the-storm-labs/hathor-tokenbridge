@@ -22,3 +22,5 @@ server/package-lock.json
 .rabbitmq/prometheus/prometheus.yml
 .rabbitmq/promtail/**.yaml
 .rabbitmq/**.tf
+# walletlib-migration: per-run state (legacy.env, the generated config) holds secrets
+**/walletlib-migration/state/
