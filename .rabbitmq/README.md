@@ -40,7 +40,30 @@ from a previous promtail-based setup):
 - Default (prometheus + promtail): `docker compose up -d`
 - Alloy instead (see above): `docker compose -f docker-compose.alloy.yml up -d`
 
-### What the federator runs
+These start the **legacy** federator (headless wallet + RabbitMQ), which is what every operator's
+`.env` is written for. They stay the default here until every federator has been migrated.
+
+### Moving to the wallet-lib federator
+
+Use the migration kit, not a compose file:
+
+    cd ops/walletlib-migration
+    sudo ./migrate.sh --check     # changes nothing
+    sudo ./migrate.sh             # asks for "yes", switches
+    sudo ./migrate.sh --rollback  # back to the legacy federator
+
+It reads the legacy container (running or stopped), writes the new configuration, carries the
+block cursors over and creates the new container in its place. See `ops/walletlib-migration/README.md`.
+After migrating, do not run `docker compose up` for the federator again.
+
+`docker-compose.walletlib.yml` / `docker-compose.walletlib.alloy.yml` describe what the new
+federator runs, **for reference only**. Do not start them with your existing `.env`: it leaves
+`HATHOR_TX_MINING_URL` and `HATHOR_FROM_TIMESTAMP` empty and the xpubs space-separated, the new
+federator refuses to boot, and compose has already replaced the legacy container. If that already
+happened, bring the legacy federator back with `docker compose up -d` (this file) and run
+`migrate.sh`; the `hathor_federator_db_<n>` volume and its cursors are untouched by `compose down`.
+
+### What the wallet-lib federator runs
 
 The federator embeds `@hathor/wallet-lib` rather than talking to a separate wallet container over
 HTTP, so the stack is two or three containers instead of five or six:
@@ -60,9 +83,9 @@ wallet runs inside the federator.
 wallet container. This changes the blast radius of a federator compromise, and it is the one part
 of this migration that alters the bridge's risk profile.
 
-**Rename the block cursor files when upgrading an existing federator.** A name the federator does
-not recognise reads as "never ran", which means re-scanning the chain from `FROM_BLOCK`. On
-`hathor_federator_db_<n>`:
+**The block cursor files are renamed when upgrading an existing federator** (`migrate.sh` does
+it). A name the federator does not recognise reads as "never ran", which means re-scanning the
+chain from `FROM_BLOCK`. On `hathor_federator_db_<n>`:
 
     lastBlock_fhtr_<mainChainId>_31.txt  ->  cursor_evm-bridge.txt
     lastBlock_hmm_<mainChainId>_31.txt   ->  cursor_hathor-federation.txt
@@ -87,14 +110,15 @@ one. Two switches, in this order:
 `GET /status` on port `500<order>` reports which adapter is in use, the wallet's state, and each
 scheduler's consecutive-failure count.
 
-Rolling back is deploying the previous image with the previous compose; both are on `master`.
+Rolling back is `migrate.sh --rollback`, which recreates the legacy container as it was.
 
 #### Configuration
 
 Variables are flat and validated instead of two JSON blobs, and a missing or malformed one fails at
-boot by name rather than surfacing as `undefined` further in. The compose files map the existing
-`.env` names onto the new ones, so a deployed `.env` works unchanged. The full old -> new mapping is
-in `federator/src/config/CONFIG_MIGRATION.md`.
+boot by name rather than surfacing as `undefined` further in. `docker-compose.walletlib.yml` maps
+most of the legacy `.env` names onto the new ones, but a deployed `.env` does **not** work unchanged
+(see above) - `migrate.sh` builds the new configuration. The full old -> new mapping is in
+`federator/src/config/CONFIG_MIGRATION.md`.
 
 #### When a transfer is stuck
 
