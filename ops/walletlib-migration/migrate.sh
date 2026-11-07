@@ -6,9 +6,10 @@
 #   sudo ./migrate.sh --check      only check; changes nothing
 #   sudo ./migrate.sh --rollback   go back to the legacy federator
 #
-# It reads the federator that is RUNNING, not your files: whatever .env name, folder or compose
+# It reads the federator's CONTAINER, not your files: whatever .env name, folder or compose
 # project you use, and whatever order your variables are in, it carries over exactly what the
-# federator runs with today. Your .env and docker-compose.yml are never modified.
+# federator runs with today. The container may be running or stopped (docker compose stop); a
+# running one is preferred. Your .env and docker-compose.yml are never modified.
 #
 # Options: --image <image>  --federator <container name, if more than one runs here>  --yes
 #          --set KEY=VALUE  (repeatable; only when the bridge maintainers tell you to)
@@ -80,6 +81,19 @@ rollback() {
       cp /backup/lastHathorTimestamp.txt /app/db/lastHathorTimestamp.txt
   fi
   step 3/3 "Recreating the legacy federator exactly as it was"
+  # If it was migrated while stopped, its wallet and RabbitMQ were stopped too: the legacy federator
+  # cannot run without them, so start them first (the rest of its compose project with them).
+  if [ "$(docker inspect -f '{{.State.Running}}' "${WALLET:-}" 2>/dev/null)" = false ]; then
+    local -a stopped
+    if [ -n "${COMPOSE_PROJECT:-}" ]; then
+      mapfile -t stopped < <(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+        --filter status=exited --filter status=created)
+    else
+      stopped=("$WALLET")
+    fi
+    echo "  starting the wallet and the other stopped containers of the legacy federator"
+    [ ${#stopped[@]} -eq 0 ] || docker start "${stopped[@]}" >/dev/null
+  fi
   recreate "$FED" "$OLD_IMAGE" legacy-args
   sleep 5
   docker ps --filter "name=^/$FED\$" --format '  {{.Names}}  {{.Image}}  {{.Status}}'
@@ -90,11 +104,12 @@ if [ "$MODE" = rollback ]; then rollback; exit 0; fi
 
 # ---------------------------------------------------------------------------------------- check
 
-step 1/6 "Finding the federator running on this machine"
+step 1/6 "Finding the federator on this machine"
 DISCOVERY=$(kit discover ${FEDERATOR:+--federator "$FEDERATOR"}) || exit 2
 eval "$DISCOVERY"
-echo "  federator: $FED ($OLD_IMAGE)"
-echo "  wallet:    $WALLET"
+running_label() { [ "$1" = 1 ] && echo running || echo "STOPPED - read from the stopped container"; }
+echo "  federator: $FED ($OLD_IMAGE) - $(running_label "$FED_WAS_RUNNING")"
+echo "  wallet:    $WALLET - $(running_label "$WALLET_RUNNING")"
 [ -n "$COMPOSE_DIR" ] && echo "  started from: $COMPOSE_DIR (compose project $COMPOSE_PROJECT)"
 
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -113,6 +128,11 @@ fi
 EXPECTED=$(kit expected --env "$ENV_FILE") || { rm -rf "$STATE"; exit 2; }
 eval "$EXPECTED"
 NET=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$FED" | head -1)
+if [ -z "$NET" ] || ! docker network inspect "$NET" >/dev/null 2>&1; then
+  rm -rf "$STATE"
+  stop "the docker network of $FED (${NET:-none}) no longer exists." \
+    "Recreate it by starting the federator once the way you always do (docker compose up -d), then try again."
+fi
 if ! docker run --rm --env-file "$ENV_FILE" --network "$NET" \
     -e EXPECTED_MULTISIG="$EXPECTED_MULTISIG" -e EXPECTED_XPUBS="$EXPECTED_XPUBS" \
     -v "$HERE/preflight.js:/app/federator/built/federator/preflight.js:ro" \
@@ -129,7 +149,11 @@ if [ "$MODE" = check ]; then
 fi
 
 if [ "$YES" != 1 ]; then
-  printf '\nReady to switch %s to the new version. It stops for about a minute; the old one is kept\n' "$FED"
+  if [ "$FED_WAS_RUNNING" = 1 ]; then
+    printf '\nReady to switch %s to the new version. It stops for about a minute; the old one is kept\n' "$FED"
+  else
+    printf '\nReady to switch %s (stopped now) to the new version, which will be STARTED. The old one is kept\n' "$FED"
+  fi
   printf 'and "sudo ./migrate.sh --rollback" brings it back in seconds.\n\nType yes to continue: '
   read -r answer
   [ "$answer" = yes ] || { rm -rf "$STATE"; echo "Not changed."; exit 0; }
@@ -140,13 +164,18 @@ fi
 # Everything needed - including how to put the legacy federator back - is saved before it stops.
 STATE_DIR=$STATE
 kit save-legacy --federator "$FED" --state "$STATE"
-printf 'FED=%s\nOLD_IMAGE=%s\nNEW_IMAGE=%s\nSTAMP=%s\n' "$FED" "$OLD_IMAGE" "$IMAGE" "$STAMP" > "$STATE/state.env"
+printf 'FED=%s\nOLD_IMAGE=%s\nNEW_IMAGE=%s\nSTAMP=%s\nWALLET=%s\nCOMPOSE_PROJECT=%s\nFED_WAS_RUNNING=%s\n' \
+  "$FED" "$OLD_IMAGE" "$IMAGE" "$STAMP" "$WALLET" "$COMPOSE_PROJECT" "$FED_WAS_RUNNING" > "$STATE/state.env"
 docker run --rm --volumes-from "$FED" -v "$STATE:/backup" "$HELPER_IMAGE" \
   sh -c 'cp /app/db/lastHathorTimestamp.txt /backup/ 2>/dev/null; true'
 ln -sfn "$STAMP" "$STATE_ROOT/latest"
 
-step 4/6 "Stopping the legacy federator (its configuration is saved; --rollback recreates it)"
-docker stop -t 60 "$FED" >/dev/null
+if [ "$FED_WAS_RUNNING" = 1 ]; then
+  step 4/6 "Stopping the legacy federator (its configuration is saved; --rollback recreates it)"
+  docker stop -t 60 "$FED" >/dev/null
+else
+  step 4/6 "The legacy federator is already stopped (its configuration is saved; --rollback recreates it)"
+fi
 
 step 5/6 "Carrying its progress over and starting the new federator"
 docker run --rm --volumes-from "$FED" "$HELPER_IMAGE" sh -c '

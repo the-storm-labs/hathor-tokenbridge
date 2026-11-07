@@ -97,9 +97,15 @@ def env_of(container):
     return env
 
 
-def running():
-    ids = docker("ps", "-q").split()
+def all_containers():
+    """Running and stopped: an operator may have stopped the legacy federator before migrating.
+    `docker inspect` still has everything of a stopped container (env, volumes, networks, labels)."""
+    ids = docker("ps", "-aq").split()
     return inspect(*ids) if ids else []
+
+
+def is_running(c):
+    return bool((c.get("State") or {}).get("Running"))
 
 
 def name_of(container):
@@ -138,37 +144,46 @@ def find_wallet(federator, containers):
             if net in fed_nets:
                 names.update(settings.get("Aliases") or [])
         return names
-    matches = [c for c in wallets if host and host in reachable_as(c)]
-    if len(matches) == 1:
-        return matches[0]
-    same_net = [c for c in wallets if fed_nets & set(networks_of(c))]
-    if len(same_net) == 1:
-        return same_net[0]
+    # Running wallets first; a stopped one only counts when no running one matches.
+    for pool in ([c for c in wallets if is_running(c)], wallets):
+        matches = [c for c in pool if host and host in reachable_as(c)]
+        if len(matches) == 1:
+            return matches[0]
+        same_net = [c for c in pool if fed_nets & set(networks_of(c))]
+        if len(same_net) == 1:
+            return same_net[0]
     raise Stop(
         f"could not tell which headless wallet belongs to {name_of(federator)} "
-        f"({len(wallets)} wallet container(s) running, WALLET_URL host '{host or '?'}').",
-        "Make sure the hathor-wallet container of this federator is running (docker ps), then try again.")
+        f"({len(wallets)} wallet container(s) here, running or stopped, WALLET_URL host '{host or '?'}').",
+        "Make sure the hathor-wallet container of this federator exists (docker ps -a), then try again.")
 
 
 def discover(args):
-    containers = running()
-    legacy = [c for c in containers if is_legacy_federator(c)]
+    containers = all_containers()
+    every_legacy = [c for c in containers if is_legacy_federator(c)]
     if args.federator:
-        legacy = [c for c in legacy if name_of(c) == args.federator]
+        legacy = [c for c in every_legacy if name_of(c) == args.federator]
         if not legacy:
-            names = ", ".join(name_of(c) for c in containers if is_legacy_federator(c)) or "none"
-            raise Stop(f"no running legacy federator called {args.federator}.",
-                       f"Legacy federators running here: {names}.")
+            names = ", ".join(name_of(c) for c in every_legacy) or "none"
+            raise Stop(f"no legacy federator called {args.federator}.",
+                       f"Legacy federators here (running or stopped): {names}.")
+    else:
+        # A running legacy federator is the one to migrate. Only when none runs, a stopped one -
+        # the operator stopped it before migrating (docker compose stop / docker stop).
+        legacy = [c for c in every_legacy if is_running(c)]
+        if not legacy:
+            done = [name_of(c) for c in containers if is_walletlib_federator(c) and is_running(c)]
+            if done:
+                raise Stop(f"this machine already runs the new federator ({', '.join(done)}); nothing to migrate.",
+                           "If you meant to go back, run: sudo ./migrate.sh --rollback")
+            legacy = every_legacy
     if not legacy:
-        done = [name_of(c) for c in containers if is_walletlib_federator(c)]
-        if done:
-            raise Stop(f"this machine already runs the new federator ({', '.join(done)}); nothing to migrate.",
-                       "If you meant to go back, run: sudo ./migrate.sh --rollback")
-        raise Stop("no legacy federator is running on this machine.",
-                   "Start it the way you always do (docker compose up -d), check it with docker ps, then try again.")
+        raise Stop("no legacy federator was found on this machine, running or stopped.",
+                   "If it was removed (docker compose down), start it the way you always did, then try again.")
     if len(legacy) > 1:
         names = " ".join(name_of(c) for c in legacy)
-        raise Stop(f"more than one legacy federator is running here: {names}.",
+        state = "running" if is_running(legacy[0]) else "stopped"
+        raise Stop(f"more than one legacy federator is {state} here: {names}.",
                    f"Choose one: sudo ./migrate.sh --federator <name>   (one of: {names})")
     fed = legacy[0]
     wallet = find_wallet(fed, containers)
@@ -183,6 +198,8 @@ def discover(args):
     print(f"OLD_IMAGE={shlex.quote(fed['Config']['Image'])}")
     print(f"COMPOSE_PROJECT={shlex.quote(labels.get('com.docker.compose.project', ''))}")
     print(f"COMPOSE_DIR={shlex.quote(labels.get('com.docker.compose.project.working_dir', ''))}")
+    print(f"FED_WAS_RUNNING={1 if is_running(fed) else 0}")
+    print(f"WALLET_RUNNING={1 if is_running(wallet) else 0}")
 
 
 # --------------------------------------------------------------------------------------------- env

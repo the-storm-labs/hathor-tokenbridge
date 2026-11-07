@@ -11,9 +11,13 @@ sudo ./migrate.sh             # checks again, asks you to type "yes", then switc
 sudo ./migrate.sh --rollback  # back to the legacy federator, in seconds
 ```
 
-You do not need to point it at your `.env`. It reads the federator that is **running**, so it works
+You do not need to point it at your `.env`. It reads the federator's **container**, so it works
 whatever your env file is called, wherever it is, whatever compose project name you use, and in
 whatever order your variables are. Your `.env` and `docker-compose.yml` are never changed.
+
+The container can be running or **stopped** (`docker compose stop`, `docker stop`): a stopped one
+is read the same way, and the new federator is started at the end. It must still exist, though: if
+it was removed (`docker compose down`), start it once the way you always did, then run this.
 
 If something is missing or wrong it stops before touching anything, with a sentence saying what to
 fix. If the new federator does not start, it goes back to the legacy one by itself.
@@ -30,8 +34,9 @@ Options, only when the bridge maintainers tell you to:
 
 ## What migrate.sh does
 
-1. **Finds** the legacy federator among the running containers (by its `HTR_CONFIG`/`EVM_CONFIG`
+1. **Finds** the legacy federator among the containers (by its `HTR_CONFIG`/`EVM_CONFIG`
    environment, not by name), and its headless wallet (the `WALLET_URL` host on its networks).
+   A running one wins; a stopped one is used only when none runs.
 2. **Reads** both with `docker inspect` and writes `state/<timestamp>/.env.walletlib` (mode 600).
    No secret is printed. Missing `HATHOR_INPUT_BLOCK_TTL` falls back to 30 minutes and missing
    `HATHOR_LAST_TIMESTAMP` to the position the federator saved, each with a NOTE. Keys, seeds and
@@ -48,7 +53,9 @@ Options, only when the bridge maintainers tell you to:
 
 `--rollback` stops the new container (kept, renamed `<name>-new-<timestamp>`, for its logs),
 restores the Hathor timestamp cursor, and recreates the legacy container from the saved
-configuration, compose labels included, so compose owns it again.
+configuration, compose labels included, so compose owns it again. If the headless wallet is
+stopped (a federator migrated while stopped), it first starts the stopped containers of the legacy
+compose project, since the legacy federator cannot run without its wallet and RabbitMQ.
 
 ## Rehearsed (2026-10-23, `local/testnet-multi/legacy`)
 
