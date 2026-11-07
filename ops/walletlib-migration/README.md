@@ -39,8 +39,8 @@ Options, only when the bridge maintainers tell you to:
    A running one wins; a stopped one is used only when none runs.
 2. **Reads** both with `docker inspect` and writes `state/<timestamp>/.env.walletlib` (mode 600).
    No secret is printed. Missing `HATHOR_INPUT_BLOCK_TTL` falls back to 30 minutes and missing
-   `HATHOR_LAST_TIMESTAMP` to the position the federator saved, each with a NOTE. Keys, seeds and
-   addresses are never guessed.
+   `HATHOR_LAST_TIMESTAMP` to the position the federator saved, or to now when it saved none (what
+   the legacy federator did), each with a NOTE. Keys, seeds and addresses are never guessed.
 3. **Checks** it from inside the new image (`preflight.js`). The multisig and xpubs each federator
    must derive are built in for mainnet and the Arbitrum Sepolia testnet (`kit.py`, `FEDERATIONS`).
 4. **Saves** the legacy container's whole configuration (`legacy.json`, `legacy.env`, mode 600) and
