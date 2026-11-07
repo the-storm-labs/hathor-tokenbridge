@@ -9,8 +9,9 @@ compose file. What the containers run with today is what gets carried over.
     kit.py env --federator NAME --wallet NAME --out FILE
     kit.py expected --env FILE                  -> prints EXPECTED_MULTISIG / EXPECTED_XPUBS
     kit.py save-legacy --federator NAME --state DIR  -> legacy.json + legacy.env (mode 600)
-    kit.py new-args --state DIR --env FILE --stamp S  -> `docker create` args for the new federator
+    kit.py env-mark add|remove --file ENV [--compose-file F] -> the COMPOSE_FILE switch in the compose .env
     kit.py legacy-args --state DIR                     -> `docker create` args recreating the legacy one
+                                                         (rollback of a migration made by an earlier kit)
     kit.py networks --state DIR                        -> its networks after the first, with aliases
 
 No secret is ever printed. Every problem ends with a plain sentence saying what is missing and
@@ -18,6 +19,7 @@ where it usually lives, and exit status 2.
 """
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -194,6 +196,7 @@ def discover(args):
     if "5000/tcp" not in (fed["HostConfig"].get("PortBindings") or {}):
         print("NOTE: the federator publishes no host port for 5000; the new one will not either.", file=sys.stderr)
     labels = fed["Config"].get("Labels") or {}
+    compose = compose_plan(fed, labels)
     print(f"FED={shlex.quote(name_of(fed))}")
     print(f"WALLET={shlex.quote(name_of(wallet))}")
     print(f"OLD_IMAGE={shlex.quote(fed['Config']['Image'])}")
@@ -201,6 +204,74 @@ def discover(args):
     print(f"COMPOSE_DIR={shlex.quote(labels.get('com.docker.compose.project.working_dir', ''))}")
     print(f"FED_WAS_RUNNING={1 if is_running(fed) else 0}")
     print(f"WALLET_RUNNING={1 if is_running(wallet) else 0}")
+    for key, v in compose.items():
+        print(f"{key}={shlex.quote(v)}")
+
+
+DEFAULT_COMPOSE_NAMES = ("compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml")
+WALLETLIB_COMPOSE = "docker-compose.walletlib.yml"
+MARK_BEGIN = "# >>> walletlib-migration: the federator runs the new version. sudo ./migrate.sh --rollback removes this."
+MARK_END = "# <<< walletlib-migration"
+
+
+def compose_plan(fed, labels):
+    """Where the switch happens: the compose project the legacy federator came from. After the
+    switch the operator's usual `docker compose up -d` must run the new federator, so this only
+    goes ahead when that command picks its file by default (no -f) and the repository's
+    docker-compose.walletlib.yml sits next to it."""
+    project = labels.get("com.docker.compose.project", "")
+    directory = labels.get("com.docker.compose.project.working_dir", "")
+    service = labels.get("com.docker.compose.service", "")
+    if not (project and directory and service):
+        raise Stop(f"{name_of(fed)} was not started with docker compose.",
+                   "This kit switches the compose setup; ask the bridge maintainers.")
+    files = [f for f in labels.get("com.docker.compose.project.config_files", "").split(",") if f]
+    if len(files) != 1 or os.path.dirname(files[0]) != directory or os.path.basename(files[0]) not in DEFAULT_COMPOSE_NAMES:
+        raise Stop(f"{name_of(fed)} was started with a compose file chosen by hand ({', '.join(files) or '?'}).",
+                   "The switch only works with the default docker-compose.yml of the folder (no -f); "
+                   "ask the bridge maintainers.")
+    walletlib = os.path.join(directory, WALLETLIB_COMPOSE)
+    if not os.path.isfile(walletlib):
+        raise Stop(f"{walletlib} does not exist.",
+                   f"Update the repository in {directory} (git pull), then try again.")
+    env_file = labels.get("com.docker.compose.project.environment_file") or os.path.join(directory, ".env")
+    if not os.path.isfile(env_file):
+        raise Stop(f"the .env compose used ({env_file}) is not there any more.", "Put it back, then try again.")
+    with open(env_file) as handle:
+        text = handle.read()
+    if MARK_BEGIN in text:
+        raise Stop(f"{env_file} already switches to the new federator, but the legacy one is what runs.",
+                   "Ask the bridge maintainers; do not edit the file by hand.")
+    if re.search(r"^\s*(export\s+)?COMPOSE_FILE\s*=", text, re.M):
+        raise Stop(f"{env_file} already sets COMPOSE_FILE.", "Ask the bridge maintainers before migrating.")
+    order = str(blob(env_of(fed), "HTR_CONFIG", HTR_FIELDS, f"federator ({name_of(fed)})")["multisigOrder"])
+    image = re.search(r"^\s*image:\s*(\S*hathor-tokenbridge\S*)", open(walletlib).read(), re.M)
+    if not image:
+        raise Stop(f"no federator image in {walletlib}.", "Update the repository (git pull), then try again.")
+    return {"COMPOSE_DIR": directory, "COMPOSE_SERVICE": service, "COMPOSE_ENV": env_file,
+            "WALLETLIB_COMPOSE": walletlib, "WALLETLIB_ENV": os.path.join(directory, f"walletlib-fed{order}.env"),
+            "IMAGE": image.group(1).strip("'\"")}
+
+
+def env_mark(args):
+    """Adds or removes the COMPOSE_FILE line that makes `docker compose` run the new federator.
+    Edits in place, so the file keeps its owner and mode; only the marked block is touched."""
+    with open(args.file) as handle:
+        lines = handle.read().splitlines(keepends=True)
+    kept, inside = [], False
+    for line in lines:
+        if line.rstrip("\n") == MARK_BEGIN:
+            inside = True
+        elif inside and line.rstrip("\n") == MARK_END:
+            inside = False
+        elif not inside:
+            kept.append(line)
+    if args.action == "add":
+        if kept and not kept[-1].endswith("\n"):
+            kept[-1] += "\n"
+        kept += [MARK_BEGIN + "\n", f"COMPOSE_FILE={args.compose_file}\n", MARK_END + "\n"]
+    with open(args.file, "w") as handle:
+        handle.writelines(kept)
 
 
 # --------------------------------------------------------------------------------------------- env
@@ -333,6 +404,11 @@ def build_env(fed_name, wallet_name):
     for key, v in values.items():
         if any(c in v for c in "\n\r"):
             raise Stop(f"{key} contains a line break.", f"Remove the line break from {key} in your .env.")
+        # docker compose reads env_file with quotes, $ and # meaning something; docker --env-file
+        # (the preflight) takes the line verbatim. Without these characters both read the same.
+        if any(c in v for c in "$'\"#`\\"):
+            raise Stop(f"{key} contains one of  $ ' \" # ` \\  which compose would read differently.",
+                       "Ask the bridge maintainers before migrating.")
     return values, notes
 
 
@@ -451,14 +527,6 @@ def common_args(c):
     return out + mount_args(c)
 
 
-def new_args(args):
-    """`docker create` arguments that put the new federator exactly where the legacy one was."""
-    c = saved(args.state)
-    out = ["--name", name_of(c), "--restart", "unless-stopped", "--env-file", args.env,
-           "--stop-timeout", "60", "--label", f"walletlib-migration={args.stamp}"]
-    print("\n".join(out + common_args(c)))
-
-
 def legacy_args(args):
     """`docker create` arguments recreating the legacy federator as it was, compose labels included."""
     import os
@@ -495,13 +563,14 @@ def main():
     p.add_argument("--set", action="append")
     p = sub.add_parser("expected"); p.add_argument("--env", required=True)
     p = sub.add_parser("save-legacy"); p.add_argument("--federator", required=True); p.add_argument("--state", required=True)
-    p = sub.add_parser("new-args"); p.add_argument("--state", required=True); p.add_argument("--env", required=True); p.add_argument("--stamp", required=True)
+    p = sub.add_parser("env-mark"); p.add_argument("action", choices=["add", "remove"]); p.add_argument("--file", required=True)
+    p.add_argument("--compose-file")
     p = sub.add_parser("legacy-args"); p.add_argument("--state", required=True)
     p = sub.add_parser("networks"); p.add_argument("--state", required=True)
     args = parser.parse_args()
     try:
         {"discover": discover, "env": write_env, "expected": expected, "save-legacy": save_legacy,
-         "new-args": new_args, "legacy-args": legacy_args, "networks": networks}[args.cmd](args)
+         "env-mark": env_mark, "legacy-args": legacy_args, "networks": networks}[args.cmd](args)
     except Stop as stop:
         print(f"\nSTOPPED: {stop.problem}\n  What to do: {stop.todo}\n  Nothing was changed.", file=sys.stderr)
         sys.exit(2)

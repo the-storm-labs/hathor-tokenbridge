@@ -52,16 +52,16 @@ Use the migration kit, not a compose file:
     sudo ./migrate.sh             # asks for "yes", switches
     sudo ./migrate.sh --rollback  # back to the legacy federator
 
-It reads the legacy container (running or stopped), writes the new configuration, carries the
-block cursors over and creates the new container in its place. See `ops/walletlib-migration/README.md`.
-After migrating, do not run `docker compose up` for the federator again.
+It reads the legacy container (running or stopped), writes the new configuration to
+`walletlib-fed<order>.env` here, carries the block cursors over, and adds a marked
+`COMPOSE_FILE=.../docker-compose.walletlib.yml` block to your `.env`. From then on the usual
+`docker compose up -d` / `down` here run the new federator; `--rollback` removes the block and
+`docker compose up -d` runs the legacy one again. See `ops/walletlib-migration/README.md`.
 
-`docker-compose.walletlib.yml` / `docker-compose.walletlib.alloy.yml` describe what the new
-federator runs, **for reference only**. Do not start them with your existing `.env`: it leaves
-`HATHOR_TX_MINING_URL` and `HATHOR_FROM_TIMESTAMP` empty and the xpubs space-separated, the new
-federator refuses to boot, and compose has already replaced the legacy container. If that already
-happened, bring the legacy federator back with `docker compose up -d` (this file) and run
-`migrate.sh`; the `hathor_federator_db_<n>` volume and its cursors are untouched by `compose down`.
+Do not start `docker-compose.walletlib.yml` / `docker-compose.walletlib.alloy.yml` by hand: they
+read the federator's settings only from the `walletlib-fed<order>.env` that `migrate.sh` writes.
+The switch needs this folder's default `docker-compose.yml`; a federator started with
+`-f docker-compose.alloy.yml` is not switched automatically - ask the bridge maintainers.
 
 ### What the wallet-lib federator runs
 
@@ -110,15 +110,15 @@ one. Two switches, in this order:
 `GET /status` on port `500<order>` reports which adapter is in use, the wallet's state, and each
 scheduler's consecutive-failure count.
 
-Rolling back is `migrate.sh --rollback`, which recreates the legacy container as it was.
+Rolling back is `migrate.sh --rollback`, which switches the compose setup back and starts the legacy stack.
 
 #### Configuration
 
 Variables are flat and validated instead of two JSON blobs, and a missing or malformed one fails at
-boot by name rather than surfacing as `undefined` further in. `docker-compose.walletlib.yml` maps
-most of the legacy `.env` names onto the new ones, but a deployed `.env` does **not** work unchanged
-(see above) - `migrate.sh` builds the new configuration. The full old -> new mapping is in
-`federator/src/config/CONFIG_MIGRATION.md`.
+boot by name rather than surfacing as `undefined` further in. A deployed `.env` does **not** work
+unchanged; `migrate.sh` builds the new configuration from the legacy container. The full old -> new
+mapping is in `federator/src/config/CONFIG_MIGRATION.md`, and `federator/src/config/.env.example`
+lists every setting.
 
 #### When a transfer is stuck
 
