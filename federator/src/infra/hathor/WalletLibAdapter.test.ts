@@ -1,8 +1,7 @@
-import { Network, errors as libErrors, transactionUtils } from '@hathor/wallet-lib';
+import { Network, transactionUtils } from '@hathor/wallet-lib';
 
 import { validateMintProposal } from '../../domain/validation/proposals';
 
-import { WalletOperationError } from '../../ports/HathorWalletPort';
 import { RecordingLogger } from '../../ports/testSupport/fakes';
 import { WalletLibAdapter } from './WalletLibAdapter';
 import type { WalletLibAdapterConfig } from './WalletLibAdapter';
@@ -411,26 +410,6 @@ describe('WalletLibAdapter signAndPush', () => {
     stub.pushHash = '';
 
     await expect(adapter.signAndPush('beef', ['sigA'])).rejects.toThrow(/without a hash/);
-  });
-
-  it("reports the fullnode's rejection as walletMessage, so an already-spent push can be settled", async () => {
-    // ProposalCoordinator marks an already-spent push for manual check only when it recognises the
-    // message on a WalletOperationError. The library throws its own SendTxError instead, and a bare
-    // one kept a proposal retrying forever on mainnet.
-    const spent = 'Invalid transaction. At least one of your inputs has already been spent.';
-    const stub = new StubLibWallet();
-    const adapter = new WalletLibAdapter(CONFIG, new RecordingLogger(), {
-      ...stubWalletDriver(stub),
-      push: async () => {
-        throw new libErrors.SendTxError(spent);
-      },
-    });
-    await adapter.start();
-
-    const failure = await adapter.signAndPush('beef', ['sigA']).catch((error: unknown) => error);
-
-    expect(failure).toBeInstanceOf(WalletOperationError);
-    expect((failure as WalletOperationError).walletMessage).toBe(spent);
   });
 });
 

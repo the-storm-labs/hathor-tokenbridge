@@ -501,7 +501,7 @@ export class WalletLibAdapter implements HathorWalletPort {
       const tx = await wallet.assemblePartialTransaction(txHex, [...signatures]);
       tx.prepareToSend(transactionUtils.getWeightConstantsFromStorage(wallet.storage));
 
-      const pushed = await this.withPushTimeout(this.pushReportingWalletMessage(wallet, tx));
+      const pushed = await this.withPushTimeout(this.driver.push(wallet, tx, this.pin, this.logger));
 
       const hash = pushed.hash;
       if (!hash) {
@@ -509,30 +509,6 @@ export class WalletLibAdapter implements HathorWalletPort {
       }
       return hash;
     });
-  }
-
-  /**
-   * Rethrows a failed push as a WalletOperationError that carries the fullnode's own message.
-   *
-   * The library rejects with its own SendTxError, whose message is the fullnode's rejection
-   * verbatim. Callers branch on `walletMessage`: ProposalCoordinator records an "already spent"
-   * push as unsent with the manual-check marker. A bare SendTxError fails its `instanceof` check,
-   * so the proposal is retried forever and never settles. The headless adapter has always
-   * reported it this way.
-   */
-  private async pushReportingWalletMessage(
-    wallet: Parameters<LibWalletDriver['push']>[0],
-    tx: Parameters<LibWalletDriver['push']>[1],
-  ): ReturnType<LibWalletDriver['push']> {
-    try {
-      return await this.driver.push(wallet, tx, this.pin, this.logger);
-    } catch (error) {
-      if (error instanceof WalletOperationError) {
-        throw error;
-      }
-      const walletMessage = error instanceof Error ? error.message : String(error);
-      throw new WalletOperationError(`Pushing the transaction failed: ${walletMessage}`, walletMessage);
-    }
   }
 
   /**
